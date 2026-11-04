@@ -1,7 +1,5 @@
 package com.github.tvbox.osc.ui.activity
 
-import android.content.DialogInterface
-import android.os.Build
 import android.os.Bundle
 import android.view.View
 import androidx.recyclerview.widget.DiffUtil
@@ -9,6 +7,7 @@ import com.blankj.utilcode.util.ToastUtils
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.api.ApiConfig
 import com.github.tvbox.osc.base.BaseVbActivity
+import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.bean.IJKCode
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.databinding.ActivitySettingBinding
@@ -23,7 +22,6 @@ import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.HistoryHelper
 import com.github.tvbox.osc.util.OkGoHelper
 import com.github.tvbox.osc.util.PlayerHelper
-import com.github.tvbox.osc.util.Utils
 import com.hjq.permissions.OnPermissionCallback
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
@@ -385,48 +383,11 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
                 .setPositiveButton("确定") { _, _ -> onClickClearCache(view) }
                 .show()
         }
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            mBinding.llTheme.visibility = View.GONE
+        mBinding.tvAppearance.text = themeColorLabel()
+        mBinding.llAppearance.setOnClickListener { v: View? ->
+            FastClickCheckUtil.check(v)
+            jumpActivity(AppearanceActivity::class.java)
         }
-        val oldTheme = Hawk.get(HawkConfig.THEME_TAG, 0)
-        val themes = arrayOf("跟随系统", "浅色", "深色")
-        mBinding.tvTheme.text = themes[oldTheme]
-        mBinding.llTheme.setOnClickListener(View.OnClickListener { view: View? ->
-            FastClickCheckUtil.check(view)
-            val types = ArrayList<Int>()
-            types.add(0)
-            types.add(1)
-            types.add(2)
-            val dialog = SelectDialog<Int>(this@SettingActivity)
-            dialog.setTip("请选择")
-            dialog.setAdapter(object : SelectDialogInterface<Int?> {
-                override fun click(value: Int?, pos: Int) {
-                    mBinding.tvTheme.text = themes[value?:0]
-                    Hawk.put(HawkConfig.THEME_TAG, value)
-                }
-
-                override fun getDisplay(value: Int?): String {
-                    return themes[value?:0]
-                }
-            }, object : DiffUtil.ItemCallback<Int>() {
-                override fun areItemsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-
-                override fun areContentsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-            }, types, oldTheme)
-            dialog.setOnDismissListener { dialog1: DialogInterface? ->
-                if (oldTheme != Hawk.get(HawkConfig.THEME_TAG, 0)) {
-                    Utils.initTheme()
-                    val bundle = Bundle()
-                    bundle.putBoolean(IntentKey.CACHE_CONFIG_CHANGED, true)
-                    jumpActivity(MainActivity::class.java, bundle)
-                }
-            }
-            dialog.show()
-        })
 
         mBinding.switchVideoPurify.setChecked(Hawk.get(HawkConfig.VIDEO_PURIFY, true))
         // toggle purify video -------------------------------------
@@ -494,5 +455,11 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
             1 -> "站点推荐"
             else -> "关闭"
         }
+    }
+
+    /** 外观入口行显示当前主题颜色 */
+    private fun themeColorLabel(): String {
+        return if (ThemeManager.useDynamicColor()) "动态取色"
+        else ThemeManager.presetOf(ThemeManager.colorScheme())?.label ?: "动态取色"
     }
 }

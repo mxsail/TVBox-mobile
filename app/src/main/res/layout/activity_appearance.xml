@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/title_bar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorSurface"
+        app:title="外观设置"
+        app:titleTextAppearance="?attr/textAppearanceTitleLarge"
+        app:titleTextColor="?attr/colorOnSurface"
+        app:navigationIcon="@drawable/ic_arrow_back"
+        app:navigationIconTint="?attr/colorOnSurface" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none"
+        android:clipToPadding="false"
+        android:paddingBottom="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp">
+
+            <TextView
+                style="@style/M3SectionTitle"
+                android:text="主题" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_m3_surface_card"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/llThemeMode"
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_theme_mode_48" />
+
+                    <TextView
+                        style="@style/M3MenuText"
+                        android:text="主题模式" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/tvThemeMode"
+                        style="@style/M3MenuValue" />
+
+                    <ImageView
+                        style="@style/M3MenuChevron" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/llThemeColor"
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_palette_48" />
+
+                    <TextView
+                        style="@style/M3MenuText"
+                        android:text="主题颜色" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/tvThemeColor"
+                        style="@style/M3MenuValue" />
+
+                    <ImageView
+                        style="@style/M3MenuChevron" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvSwatches"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_m3_surface_card"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:overScrollMode="never" />
+
+            <TextView
+                style="@style/M3SectionTitle"
+                android:text="界面材质" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_m3_surface_card"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/llMaterial"
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_material_48" />
+
+                    <TextView
+                        style="@style/M3MenuText"
+                        android:text="材质效果" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/tvMaterial"
+                        style="@style/M3MenuValue" />
+
+                    <ImageView
+                        style="@style/M3MenuChevron" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:layout_marginTop="6dp"
+                android:text="高斯模糊/液态玻璃需 Android 12+, 低版本自动降级为半透明"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp" />
+
+            <TextView
+                style="@style/M3SectionTitle"
+                android:text="字体" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_m3_surface_card"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/llFont"
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_font_48" />
+
+                    <TextView
+                        style="@style/M3MenuText"
+                        android:text="自定义字体" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/tvFont"
+                        style="@style/M3MenuValue" />
+
+                    <ImageView
+                        style="@style/M3MenuChevron" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                style="@style/M3SectionTitle"
+                android:text="手势与底栏" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_m3_surface_card"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/llPredictiveBack"
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_gesture_48" />
+
+                    <TextView
+                        style="@style/M3MenuText"
+                        android:text="预见性返回手势" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swPredictiveBack"
+                        style="@style/M3MenuSwitch" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/llBarFloating"
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_dock_48" />
+
+                    <TextView
+                        style="@style/M3MenuText"
+                        android:text="悬浮底栏" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swBarFloating"
+                        style="@style/M3MenuSwitch" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/llBarAutoHide"
+                    style="@style/M3MenuRowLast">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_auto_hide_48" />
+
+                    <TextView
+                        style="@style/M3MenuText"
+                        android:text="底栏随滚动隐藏" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swBarAutoHide"
+                        style="@style/M3MenuSwitch" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:layout_marginTop="6dp"
+                android:text="底栏随滚动隐藏: 浏览内容上滑时收起底栏, 反向下滑时呼出"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

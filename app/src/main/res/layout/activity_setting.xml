@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
@@ -19,42 +18,64 @@
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:scrollbars="none"
-        >
+        android:clipToPadding="false"
+        android:paddingBottom="20dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginHorizontal="20dp"
-            android:paddingVertical="10dp">
+            android:paddingHorizontal="16dp">
+
+            <TextView
+                style="@style/M3SectionTitle"
+                android:text="常规" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingVertical="20dp"
-                android:background="@drawable/bg_m3_surface_card">
+                android:background="@drawable/bg_m3_surface_card"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/llAppearance"
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_palette_48" />
+
+                    <TextView
+                        style="@style/M3MenuText"
+                        android:text="外观设置" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/tvAppearance"
+                        style="@style/M3MenuValue" />
+
+                    <ImageView
+                        style="@style/M3MenuChevron" />
+                </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llHomeRec"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:layout_weight="1"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground"
-                    >
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_home" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="主页内容"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"/>
+                        style="@style/M3MenuText"
+                        android:text="主页内容" />
 
                     <Space
                         android:layout_width="0dp"
@@ -63,119 +84,23 @@
 
                     <TextView
                         android:id="@+id/tvHomeRec"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-
-                        />
+                        style="@style/M3MenuValue" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
-                </LinearLayout>
-
-
-                <LinearLayout
-                    android:id="@+id/showFastSearch"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:layout_marginBottom="@dimen/dp_10"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="20dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="聚合模式"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
-
-                    <Space
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1" />
-
-                    <TextView
-                        android:id="@+id/showFastSearchText"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-
-                        />
-
-                    <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/llTheme"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:layout_weight="1"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground"
-                    >
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="主题颜色"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
-
-                    <Space
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1" />
-
-                    <TextView
-                        android:id="@+id/tvTheme"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        />
-
-                    <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llLiveApi"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:layout_weight="1"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_live_tv_48" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="直播源"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
+                        style="@style/M3MenuText"
+                        android:text="直播源" />
 
                     <Space
                         android:layout_width="0dp"
@@ -183,32 +108,20 @@
                         android:layout_weight="1" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llPrivateBrowsing"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:layout_weight="1"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRowLast">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_incognito_48" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="无痕浏览"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
+                        style="@style/M3MenuText"
+                        android:text="无痕浏览" />
 
                     <Space
                         android:layout_width="0dp"
@@ -217,37 +130,31 @@
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switchPrivateBrowsing"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:clickable="false"/>
+                        style="@style/M3MenuSwitch" />
                 </LinearLayout>
             </LinearLayout>
+
+            <TextView
+                style="@style/M3SectionTitle"
+                android:text="播放与缓存" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingVertical="20dp"
-                android:layout_marginTop="14dp"
-                android:background="@drawable/bg_m3_surface_card">
+                android:background="@drawable/bg_m3_surface_card"
+                android:orientation="vertical">
+
                 <LinearLayout
                     android:id="@+id/llPlay"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:layout_weight="1"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_m3_play_arrow" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="播放器"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
+                        style="@style/M3MenuText"
+                        android:text="播放器" />
 
                     <Space
                         android:layout_width="0dp"
@@ -256,35 +163,23 @@
 
                     <TextView
                         android:id="@+id/tvPlay"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        />
+                        style="@style/M3MenuValue" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llVideoPurify"
-                    android:layout_width="match_parent"
-                    android:layout_height="60dp"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_filter_list" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="广告过滤"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"/>
+                        style="@style/M3MenuText"
+                        android:text="广告过滤" />
 
                     <Space
                         android:layout_width="0dp"
@@ -293,27 +188,20 @@
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switchVideoPurify"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:clickable="false"/>
+                        style="@style/M3MenuSwitch" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llDownloadWifiOnly"
-                    android:layout_width="match_parent"
-                    android:layout_height="60dp"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_download_18" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="缓存仅Wi-Fi下载"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"/>
+                        style="@style/M3MenuText"
+                        android:text="缓存仅Wi-Fi下载" />
 
                     <Space
                         android:layout_width="0dp"
@@ -322,29 +210,20 @@
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switchDownloadWifiOnly"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:clickable="false"/>
+                        style="@style/M3MenuSwitch" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llPressSpeed"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:layout_weight="1"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_speed_48" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="长按倍速"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
+                        style="@style/M3MenuText"
+                        android:text="长按倍速" />
 
                     <Space
                         android:layout_width="0dp"
@@ -353,38 +232,23 @@
 
                     <TextView
                         android:id="@+id/tvSpeed"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-
-                        />
+                        style="@style/M3MenuValue" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llBackgroundPlay"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:layout_weight="1"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_m3_pip" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="后台播放"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
+                        style="@style/M3MenuText"
+                        android:text="后台播放" />
 
                     <Space
                         android:layout_width="0dp"
@@ -393,36 +257,23 @@
 
                     <TextView
                         android:id="@+id/tvBackgroundPlayType"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        />
+                        style="@style/M3MenuValue" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llMediaCodec"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_memory_48" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="IJK解码方式"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
+                        style="@style/M3MenuText"
+                        android:text="IJK解码方式" />
 
                     <Space
                         android:layout_width="0dp"
@@ -431,36 +282,23 @@
 
                     <TextView
                         android:id="@+id/tvMediaCodec"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        />
+                        style="@style/M3MenuValue" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
-
 
                 <LinearLayout
                     android:id="@+id/llRender"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_material_48" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="渲染方式"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
+                        style="@style/M3MenuText"
+                        android:text="渲染方式" />
 
                     <Space
                         android:layout_width="0dp"
@@ -469,36 +307,23 @@
 
                     <TextView
                         android:id="@+id/tvRenderType"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-
-                        />
+                        style="@style/M3MenuValue" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llScale"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_scale_48" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="画面缩放"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
+                        style="@style/M3MenuText"
+                        android:text="画面缩放" />
 
                     <Space
                         android:layout_width="0dp"
@@ -507,36 +332,23 @@
 
                     <TextView
                         android:id="@+id/tvScaleType"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-
-                        />
+                        style="@style/M3MenuValue" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llIjkCachePlay"
-                    android:layout_width="match_parent"
-                    android:layout_height="60dp"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRowLast">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_cache_48" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="IJK缓存"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"/>
+                        style="@style/M3MenuText"
+                        android:text="IJK缓存" />
 
                     <Space
                         android:layout_width="0dp"
@@ -545,37 +357,31 @@
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switchIjkCachePlay"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:clickable="false"/>
+                        style="@style/M3MenuSwitch" />
                 </LinearLayout>
-
             </LinearLayout>
+
+            <TextView
+                style="@style/M3SectionTitle"
+                android:text="数据" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingVertical="20dp"
-                android:layout_marginTop="14dp"
-                android:background="@drawable/bg_m3_surface_card">
+                android:background="@drawable/bg_m3_surface_card"
+                android:orientation="vertical">
 
                 <LinearLayout
                     android:id="@+id/llBackup"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_backup_48" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="数据备份还原"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"/>
+                        style="@style/M3MenuText"
+                        android:text="数据备份还原" />
 
                     <Space
                         android:layout_width="0dp"
@@ -583,30 +389,20 @@
                         android:layout_weight="1" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llCloudSync"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_sync_48" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="多设备数据同步"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"/>
+                        style="@style/M3MenuText"
+                        android:text="多设备数据同步" />
 
                     <Space
                         android:layout_width="0dp"
@@ -615,39 +411,24 @@
 
                     <TextView
                         android:id="@+id/tvCloudSyncStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="未启用"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="14sp"
-                        android:layout_marginEnd="8dp" />
+                        style="@style/M3MenuValue"
+                        android:text="未启用" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
-
 
                 <LinearLayout
                     android:id="@+id/llDns"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_dns_48" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="安全DNS"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"/>
+                        style="@style/M3MenuText"
+                        android:text="安全DNS" />
 
                     <Space
                         android:layout_width="0dp"
@@ -656,36 +437,23 @@
 
                     <TextView
                         android:id="@+id/tvDns"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        />
+                        style="@style/M3MenuValue" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llHistoryNum"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_history_48" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="历史记录"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
+                        style="@style/M3MenuText"
+                        android:text="历史记录" />
 
                     <Space
                         android:layout_width="0dp"
@@ -694,38 +462,23 @@
 
                     <TextView
                         android:id="@+id/tvHistoryNum"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-
-                        />
+                        style="@style/M3MenuValue" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
-
 
                 <LinearLayout
                     android:id="@+id/llClearCache"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/dp_60"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="40dp"
-                    android:foreground="?android:selectableItemBackground">
+                    style="@style/M3MenuRowLast">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_clear" />
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="清空缓存"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        />
+                        style="@style/M3MenuText"
+                        android:text="清空缓存" />
 
                     <Space
                         android:layout_width="0dp"
@@ -733,14 +486,8 @@
                         android:layout_weight="1" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.75"
-                        android:src="@drawable/icon_pre"
-                        app:tint="?attr/colorOnSurfaceVariant"/>
+                        style="@style/M3MenuChevron" />
                 </LinearLayout>
-
             </LinearLayout>
 
         </LinearLayout>

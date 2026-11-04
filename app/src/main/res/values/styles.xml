@@ -157,6 +157,40 @@
         <item name="android:importantForAccessibility">no</item>
     </style>
 
+    <!-- 行右侧当前值文本（选择类行用） -->
+    <style name="M3MenuValue">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_gravity">center_vertical</item>
+        <item name="android:layout_marginLeft">12dp</item>
+        <item name="android:layout_marginRight">6dp</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxWidth">170dp</item>
+    </style>
+
+    <!-- 行右侧开关（开关类行用，行点击与开关联动） -->
+    <style name="M3MenuSwitch">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_gravity">center_vertical</item>
+        <item name="android:clickable">false</item>
+    </style>
+
+    <!-- 卡片分组小节标题（我的页/设置页/外观页通用） -->
+    <style name="M3SectionTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginLeft">4dp</item>
+        <item name="android:layout_marginTop">18dp</item>
+        <item name="android:layout_marginBottom">8dp</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
     <!-- 实心通用主题色,MaterialButton样式（M3 pill 形）-->
     <style name="mbSolid" parent="@style/Widget.Material3.Button.UnelevatedButton">
 

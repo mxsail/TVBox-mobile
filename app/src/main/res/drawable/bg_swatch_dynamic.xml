@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 动态取色示意: 多色渐变圆 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <gradient android:type="sweepGradient"
+        android:startColor="#FF4C5C92"
+        android:centerColor="#FFD81B60"
+        android:endColor="#FF388E3C" />
+</shape>

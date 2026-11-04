@@ -81,6 +81,9 @@
             android:name=".ui.activity.SettingActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
         <activity
+            android:name=".ui.activity.AppearanceActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"/>
+        <activity
             android:name=".ui.activity.HistoryActivity"
             android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity
