@@ -1,0 +1,77 @@
+package com.github.tvbox.osc.base
+
+import android.app.Activity
+import android.content.res.Resources
+import com.github.tvbox.osc.R
+import com.github.tvbox.osc.util.HawkConfig
+import com.google.android.material.color.DynamicColors
+import com.orhanobut.hawk.Hawk
+
+/**
+ * 外观中枢: 主题颜色(动态取色/预设色板)的唯一裁决处。
+ * 深浅模式仍走 Utils.initTheme()+THEME_TAG, 这里只管「颜色从哪来」。
+ *
+ * 预设覆盖层(values/styles_presets.xml)只叠彩色 token(primary/secondary/tertiary 全组),
+ * 不动中性表面色和 android:windowBackground——页面底色在切色时保持稳定,
+ * 叠加到 Dialog 显式主题上也安全(CustomDialogStyle 的透明窗口背景不会被覆盖)。
+ */
+object ThemeManager {
+
+    /** 主题颜色: 动态取色(Android 12+ 跟随壁纸; 低版本无此能力, 保持品牌蓝) */
+    const val COLOR_DYNAMIC = "dynamic"
+
+    // 界面材质取值(HawkConfig.UI_MATERIAL)
+    const val MATERIAL_SOLID = "solid"             // 实底(默认, 即现状)
+    const val MATERIAL_TRANSLUCENT = "translucent" // 半透明
+    const val MATERIAL_BLUR = "blur"               // 高斯模糊(Android 12+, 低版本降级半透明)
+    const val MATERIAL_LIQUID = "liquid"           // 液态玻璃(Android 12+, 低版本降级半透明)
+
+    class Preset(val id: String, val label: String, val overlayRes: Int, val swatchRes: Int)
+
+    val PRESETS = listOf(
+        Preset("blue", "经典蓝", R.style.ThemeOverlay_Preset_Blue, R.color.md_primary),
+        Preset("teal", "青绿", R.style.ThemeOverlay_Preset_Teal, R.color.preset_teal_primary),
+        Preset("green", "翠绿", R.style.ThemeOverlay_Preset_Green, R.color.preset_green_primary),
+        Preset("amber", "琥珀", R.style.ThemeOverlay_Preset_Amber, R.color.preset_amber_primary),
+        Preset("orange", "暖橙", R.style.ThemeOverlay_Preset_Orange, R.color.preset_orange_primary),
+        Preset("red", "绯红", R.style.ThemeOverlay_Preset_Red, R.color.preset_red_primary),
+        Preset("pink", "粉紫", R.style.ThemeOverlay_Preset_Pink, R.color.preset_pink_primary),
+        Preset("purple", "雅紫", R.style.ThemeOverlay_Preset_Purple, R.color.preset_purple_primary),
+    )
+
+    @JvmStatic
+    fun colorScheme(): String = Hawk.get(HawkConfig.THEME_COLOR, COLOR_DYNAMIC)
+
+    @JvmStatic
+    fun presetOf(id: String): Preset? = PRESETS.firstOrNull { it.id == id }
+
+    /** 当前是否应使用动态取色(App 注册的 DynamicColors precondition 逐 Activity 裁决) */
+    @JvmStatic
+    fun useDynamicColor(): Boolean = colorScheme() == COLOR_DYNAMIC && DynamicColors.isDynamicColorAvailable()
+
+    /**
+     * Activity 在 super.onCreate 之前调用。
+     * 动态取色走 App 里 DynamicColors 的 precondition, 不在这里叠;
+     * 预设色在这里 applyStyle。注意 applyStyle 无法撤销, 同一 Activity 主题上
+     * 禁止连续叠加两套覆盖层(属性残留互相污染)——切换预设色必须 recreate。
+     */
+    @JvmStatic
+    fun applyPresetOverlay(activity: Activity) {
+        if (useDynamicColor()) return
+        presetOf(colorScheme())?.let { activity.theme.applyStyle(it.overlayRes, true) }
+    }
+
+    /**
+     * 显式主题的 Dialog 窗口在 setContentView 前调用:
+     * activity 上的覆盖层(动态或预设)不会传导进 CustomDialogStyle 这类显式主题,
+     * 需要对 window theme 再叠一次, 弹窗颜色才能跟随全局。
+     */
+    @JvmStatic
+    fun applyOverlayToDialogTheme(theme: Resources.Theme) {
+        if (DynamicColors.isDynamicColorAvailable() && colorScheme() == COLOR_DYNAMIC) {
+            theme.applyStyle(R.style.ThemeOverlay_Material3_DynamicColors_DayNight, true)
+            return
+        }
+        presetOf(colorScheme())?.let { theme.applyStyle(it.overlayRes, true) }
+    }
+}

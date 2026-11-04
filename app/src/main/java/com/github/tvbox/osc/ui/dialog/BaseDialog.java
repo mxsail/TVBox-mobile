@@ -13,6 +13,7 @@ import android.view.WindowManager;
 import androidx.annotation.NonNull;
 
 import com.github.tvbox.osc.R;
+import com.github.tvbox.osc.base.ThemeManager;
 
 import xyz.doikki.videoplayer.util.CutoutUtil;
 
@@ -21,12 +22,22 @@ public class BaseDialog extends Dialog {
 
     public BaseDialog(@NonNull Context context) {
         super(context, R.style.CustomDialogStyle);
+        applyThemeOverlay();
         requestWindowFeature(Window.FEATURE_NO_TITLE);
     }
 
     public BaseDialog(Context context, int customDialogStyle) {
         super(context, customDialogStyle);
+        applyThemeOverlay();
         requestWindowFeature(Window.FEATURE_NO_TITLE);
+    }
+
+    /**
+     * 弹窗显式主题(CustomDialogStyle 等)不会继承 Activity 上的主题色覆盖层,
+     * 在子类 setContentView 之前对窗口主题补叠动态取色/预设色板
+     */
+    private void applyThemeOverlay() {
+        ThemeManager.applyOverlayToDialogTheme(getContext().getTheme());
     }
 
     @Override

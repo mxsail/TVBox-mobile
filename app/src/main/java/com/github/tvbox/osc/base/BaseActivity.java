@@ -55,6 +55,8 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        // 预设主题色覆盖层必须在 setContentView 之前叠上主题(动态取色由 App 的 precondition 处理)
+        ThemeManager.applyPresetOverlay(this);
         super.onCreate(savedInstanceState);
         EventBus.getDefault().register(this);
 

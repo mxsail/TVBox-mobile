@@ -25,6 +25,7 @@ import com.github.tvbox.osc.util.OkGoHelper;
 import com.github.tvbox.osc.util.PlayerHelper;
 import com.github.tvbox.osc.util.Utils;
 import com.google.android.material.color.DynamicColors;
+import com.google.android.material.color.DynamicColorsOptions;
 import com.kingja.loadsir.core.LoadSir;
 import com.orhanobut.hawk.Hawk;
 import com.whl.quickjs.android.QuickJSLoader;
@@ -51,8 +52,11 @@ public class App extends MultiDexApplication {
         super.onCreate();
         instance = this;
         initParams();
-        // Material You 动态取色(Android 12+ 跟随壁纸, 低版本无操作保持品牌蓝)
-        DynamicColors.applyToActivitiesIfAvailable(this);
+        // Material You 动态取色(Android 12+ 跟随壁纸, 低版本无操作保持品牌蓝)。
+        // 是否生效由 ThemeManager 按用户设置逐 Activity 裁决: 选了预设色板时不套动态覆盖层
+        DynamicColors.applyToActivitiesIfAvailable(this, new DynamicColorsOptions.Builder()
+                .setPrecondition((activity, theme) -> ThemeManager.useDynamicColor())
+                .build());
         // OKGo
         OkGoHelper.init(); //台标获取
         // 初始化Web服务器
@@ -100,6 +104,12 @@ public class App extends MultiDexApplication {
         putDefault(HawkConfig.DOH_URL, 0);                   //安全DNS: 0=关闭, 1=腾讯, 2=阿里, 3=360, 4=Google, 5=AdGuard, 6=Quad9
         putDefault(HawkConfig.PLAY_SCALE, 0);                //画面缩放: 0=默认, 1=16:9, 2=4:3, 3=填充, 4=原始, 5=裁剪
         putDefault(HawkConfig.HISTORY_NUM, 2);                //历史记录数量: 0=30, 1=50, 2=70
+        putDefault(HawkConfig.THEME_COLOR, ThemeManager.COLOR_DYNAMIC); //主题颜色: dynamic=动态取色
+        putDefault(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_SOLID); //界面材质: 实底
+        putDefault(HawkConfig.FONT_PATH, "");                 //自定义字体: 空=系统默认
+        putDefault(HawkConfig.PREDICTIVE_BACK, false);        //预见性返回手势
+        putDefault(HawkConfig.BAR_FLOATING, false);           //悬浮底栏
+        putDefault(HawkConfig.BAR_AUTO_HIDE, false);          //底栏随滚动隐藏
         putDefault(HawkConfig.SYNC_ENABLED, false);
         putDefault(HawkConfig.SYNC_SPACE_ID, "default");
         putDefault(HawkConfig.SYNC_AUTO, true);

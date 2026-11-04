@@ -49,6 +49,30 @@ public class HawkConfig {
      */
     public static final String THEME_TAG = "theme_tag";
     /**
+     * 主题颜色: dynamic=动态取色(Android 12+), 其余为预设色 id(见 ThemeManager.PRESETS)
+     */
+    public static final String THEME_COLOR = "theme_color";
+    /**
+     * 界面材质: solid实底/半透明translucent/高斯模糊blur/液态玻璃liquid(见 ThemeManager.MATERIAL_*)
+     */
+    public static final String UI_MATERIAL = "ui_material";
+    /**
+     * 自定义字体文件路径(空串=系统默认)
+     */
+    public static final String FONT_PATH = "font_path";
+    /**
+     * 预见性返回手势(API 33+ 系统预览动画)
+     */
+    public static final String PREDICTIVE_BACK = "predictive_back";
+    /**
+     * 悬浮底栏(HyperOS 风格胶囊)
+     */
+    public static final String BAR_FLOATING = "bar_floating";
+    /**
+     * 底栏随滚动隐藏(上滑收起/下滑呼出)
+     */
+    public static final String BAR_AUTO_HIDE = "bar_auto_hide";
+    /**
      * 后台播放模式 0 关闭,1 开启,2 画中画
      */
     public static final String BACKGROUND_PLAY_TYPE = "background_play_type";
