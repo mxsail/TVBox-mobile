@@ -101,7 +101,8 @@ object MaterialBarHelper {
                 }
                 blurView.setupWith(root, algorithm)
                     .setFrameClearDrawable(activity.window.decorView.background)
-                    .setBlurRadius(if (liquid) 30f else 18f)
+                    // RenderScript 模糊半径上限 25(RenderEffectBlur 回退路径也走它), 越界直接崩溃
+                    .setBlurRadius(if (liquid) 25f else 16f)
                     .setBlurAutoUpdate(true)
                 // 模糊之上叠 surface 着色(液态玻璃更透亮), 保证内容可读性
                 val surface = MaterialColors.getColor(container, com.google.android.material.R.attr.colorSurface)

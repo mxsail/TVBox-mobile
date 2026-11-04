@@ -104,6 +104,10 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         initBarInsets()
         applyBarStyle()
 
+        // 冷启动窗口背景(launch_bg 浅色)只服务启动动画衔接; 首帧后换成主题背景,
+        // 否则底栏让出的导航栏避让区域会透出浅色(深色模式下刺眼)
+        mBinding.vp.post { window.setBackgroundDrawableResource(R.color.md_background) }
+
         goToTab(intent.getIntExtra(EXTRA_TAB, 0))
     }
 
