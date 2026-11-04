@@ -49,20 +49,29 @@ android {
 
     signingConfigs {
         config {
-            keyAlias 'kertou'
-            keyPassword 'uE=XdNG5UE5Q+^cGVep9v7gR'
-            storeFile file('../kertou-tvplayer.jks')
-            storePassword 'uE=XdNG5UE5Q+^cGVep9v7gR'
+            def store = file('../kertou-tvplayer.jks')
+            if (store.exists()) {
+                keyAlias 'kertou'
+                keyPassword 'uE=XdNG5UE5Q+^cGVep9v7gR'
+                storeFile store
+                storePassword 'uE=XdNG5UE5Q+^cGVep9v7gR'
+            }
         }
     }
 
     buildTypes {
         debug {
-            signingConfig signingConfigs.config
+            def store = file('../kertou-tvplayer.jks')
+            if (store.exists()) {
+                signingConfig signingConfigs.config
+            }
         }
 
         release {
-            signingConfig signingConfigs.config
+            def store = file('../kertou-tvplayer.jks')
+            if (store.exists()) {
+                signingConfig signingConfigs.config
+            }
             minifyEnabled false
         }
     }

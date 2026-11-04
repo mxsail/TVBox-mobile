@@ -84,6 +84,7 @@ public class App extends MultiDexApplication {
                     EpgUtil.init();
                     FileUtils.cleanPlayerCache();
                     DownloadTaskManager.get().recoverOnStart();
+                    com.tvbox.sync.SyncTrigger.init();
                 }), 2000);
     }
 
@@ -99,6 +100,15 @@ public class App extends MultiDexApplication {
         putDefault(HawkConfig.DOH_URL, 0);                   //安全DNS: 0=关闭, 1=腾讯, 2=阿里, 3=360, 4=Google, 5=AdGuard, 6=Quad9
         putDefault(HawkConfig.PLAY_SCALE, 0);                //画面缩放: 0=默认, 1=16:9, 2=4:3, 3=填充, 4=原始, 5=裁剪
         putDefault(HawkConfig.HISTORY_NUM, 2);                //历史记录数量: 0=30, 1=50, 2=70
+        putDefault(HawkConfig.SYNC_ENABLED, false);
+        putDefault(HawkConfig.SYNC_SPACE_ID, "default");
+        putDefault(HawkConfig.SYNC_AUTO, true);
+        putDefault(HawkConfig.SYNC_WIFI_ONLY, false);
+        putDefault(HawkConfig.SYNC_SCOPE_CONFIG, true);
+        putDefault(HawkConfig.SYNC_SCOPE_HISTORY, true);
+        putDefault(HawkConfig.SYNC_SCOPE_COLLECT, true);
+        putDefault(HawkConfig.SYNC_SCOPE_PROGRESS, true);
+        putDefault(HawkConfig.SYNC_SCOPE_PLAYER_SETTINGS, true);
         putDefaultApi();
     }
 

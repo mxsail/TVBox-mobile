@@ -152,6 +152,18 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
             }
         }
 
+        val syncEnabled = Hawk.get(HawkConfig.SYNC_ENABLED, false)
+        mBinding.tvCloudSyncStatus.text = if (syncEnabled) "已启用" else "未启用"
+        mBinding.llCloudSync.setOnClickListener { v: View? ->
+            FastClickCheckUtil.check(v)
+            val dialog = com.github.tvbox.osc.ui.dialog.SyncDialog(this@SettingActivity)
+            dialog.setOnDismissListener {
+                val enabled = Hawk.get(HawkConfig.SYNC_ENABLED, false)
+                mBinding.tvCloudSyncStatus.text = if (enabled) "已启用" else "未启用"
+            }
+            dialog.show()
+        }
+
         mBinding.llDns.setOnClickListener { v: View? ->
             FastClickCheckUtil.check(v)
             val dohUrl = Hawk.get(HawkConfig.DOH_URL, 0)

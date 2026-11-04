@@ -15,6 +15,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 import com.orhanobut.hawk.Hawk;
+import com.tvbox.sync.adapter.AppRoomSyncAdapter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -56,6 +57,7 @@ public class RoomDataManger {
         record.updateTime = System.currentTimeMillis();
         record.dataJson = getVodInfoGson().toJson(vodInfo);
         AppDataManager.get().getVodRecordDao().insert(record);
+        AppRoomSyncAdapter.recordHistoryUpsert(sourceKey, record);
     }
 
     public static VodInfo getVodInfo(String sourceKey, String vodId) {
@@ -78,6 +80,7 @@ public class RoomDataManger {
         VodRecord record = AppDataManager.get().getVodRecordDao().getVodRecord(sourceKey, vodInfo.id);
         if (record != null) {
             AppDataManager.get().getVodRecordDao().delete(record);
+            AppRoomSyncAdapter.recordHistoryDelete(sourceKey, vodInfo.id);
         }
     }
 
@@ -124,16 +127,22 @@ public class RoomDataManger {
         record.name = vodInfo.name;
         record.pic = vodInfo.pic;
         AppDataManager.get().getVodCollectDao().insert(record);
+        AppRoomSyncAdapter.recordCollectUpsert(sourceKey, record);
     }
 
     public static void deleteVodCollect(int id) {
+        VodCollect record = AppDataManager.get().getVodCollectDao().getVodCollect(id);
         AppDataManager.get().getVodCollectDao().delete(id);
+        if (record != null) {
+            AppRoomSyncAdapter.recordCollectDelete(record.sourceKey, record.vodId);
+        }
     }
 
     public static void deleteVodCollect(String sourceKey, VodInfo vodInfo) {
         VodCollect record = AppDataManager.get().getVodCollectDao().getVodCollect(sourceKey, vodInfo.id);
         if (record != null) {
             AppDataManager.get().getVodCollectDao().delete(record);
+            AppRoomSyncAdapter.recordCollectDelete(sourceKey, vodInfo.id);
         }
     }
 
@@ -151,6 +160,7 @@ public class RoomDataManger {
      */
     public static void deleteVodCollectAll() {
         AppDataManager.get().getVodCollectDao().deleteAll();
+        AppRoomSyncAdapter.recordCollectClear();
     }
 
     /**
@@ -158,6 +168,7 @@ public class RoomDataManger {
      */
     public static void deleteVodRecordAll() {
         AppDataManager.get().getVodRecordDao().deleteAll();
+        AppRoomSyncAdapter.recordHistoryClear();
     }
 
     public static List<DownloadEpisode> getAllDownloadEpisodes() {

@@ -53,6 +53,8 @@ import com.github.tvbox.osc.bean.VodInfo;
 import com.github.tvbox.osc.cache.CacheManager;
 import com.github.tvbox.osc.cache.DownloadEpisode;
 import com.github.tvbox.osc.cache.RoomDataManger;
+import com.tvbox.sync.SyncTrigger;
+import com.tvbox.sync.adapter.AppRoomSyncAdapter;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.player.EXOmPlayer;
 import com.github.tvbox.osc.player.IjkMediaPlayer;
@@ -219,7 +221,10 @@ public class PlayFragment extends BaseLazyFragment {
         ProgressManager progressManager = new ProgressManager() {
             @Override
             public void saveProgress(String url, long progress) {
-                CacheManager.save(MD5.string2MD5(url), progress);
+                if (Hawk.get(HawkConfig.PRIVATE_BROWSING, false)) return;
+                String key = MD5.string2MD5(url);
+                CacheManager.save(key, progress);
+                AppRoomSyncAdapter.recordProgressUpsert(key, progress, mVideoView != null ? mVideoView.getDuration() : 0);
             }
 
             @Override
@@ -240,8 +245,11 @@ public class PlayFragment extends BaseLazyFragment {
             public void playNext(boolean rmProgress) {
                 String preProgressKey = progressKey;
                 PlayFragment.this.playNext(rmProgress);
-                if (rmProgress && preProgressKey != null)
-                    CacheManager.delete(MD5.string2MD5(preProgressKey), 0);
+                if (rmProgress && preProgressKey != null) {
+                    String pKey = MD5.string2MD5(preProgressKey);
+                    CacheManager.delete(pKey, 0);
+                    AppRoomSyncAdapter.recordProgressDelete(pKey);
+                }
             }
 
             @Override
@@ -1161,6 +1169,7 @@ public class PlayFragment extends BaseLazyFragment {
         }
         stopLoadWebView(true);
         stopParse();
+        SyncTrigger.get().triggerFlushSync();
     }
 
     private VodInfo mVodInfo;
@@ -1182,6 +1191,7 @@ public class PlayFragment extends BaseLazyFragment {
             mVodInfo.playIndex++;
         }
         play(false);
+        SyncTrigger.get().triggerFlushSync();
     }
 
     public void playPrevious() {
@@ -1246,8 +1256,10 @@ public class PlayFragment extends BaseLazyFragment {
         this.subtitleCacheKey = subtitleCacheKey;
         //重新播放清除现有进度
         if (reset) {
-            CacheManager.delete(MD5.string2MD5(progressKey), 0);
+            String pKey = MD5.string2MD5(progressKey);
+            CacheManager.delete(pKey, 0);
             CacheManager.delete(MD5.string2MD5(subtitleCacheKey), 0);
+            AppRoomSyncAdapter.recordProgressDelete(pKey);
         }
         //离线缓存命中:直接播放应用内已缓存的本地文件
         String cachedPath = findCachedLocalPath(vs);

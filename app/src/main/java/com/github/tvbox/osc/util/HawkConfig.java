@@ -76,4 +76,21 @@ public class HawkConfig {
      * 应用内缓存:已请求过电池优化白名单(只弹一次)
      */
     public static final String DOWNLOAD_BATTERY_PROMPTED = "download_battery_prompted";
+
+    // --- 云同步 tvbox.sync/1 ---
+    public static final String SYNC_ENABLED = "sync_enabled";
+    public static final String SYNC_BACKEND = "sync_backend";
+    public static final String SYNC_URL = "sync_url";
+    public static final String SYNC_USER = "sync_user";
+    public static final String SYNC_PASSWORD = "sync_password";
+    public static final String SYNC_SPACE_ID = "sync_space_id";
+    public static final String SYNC_AUTO = "sync_auto";
+    public static final String SYNC_WIFI_ONLY = "sync_wifi_only";
+    public static final String SYNC_SCOPE_CONFIG = "sync_scope_config";
+    public static final String SYNC_SCOPE_HISTORY = "sync_scope_history";
+    public static final String SYNC_SCOPE_COLLECT = "sync_scope_collect";
+    public static final String SYNC_SCOPE_PROGRESS = "sync_scope_progress";
+    public static final String SYNC_SCOPE_PLAYER_SETTINGS = "sync_scope_player_settings";
+    public static final String SYNC_DEVICE_ID = "sync_device_id";
+    public static final String SYNC_DEVICE_NAME = "sync_device_name";
 }

@@ -141,6 +141,7 @@ public class BackupDialog extends BaseDialog {
                 SharedPreferences sharedPreferences = App.getInstance().getSharedPreferences("Hawk2", Context.MODE_PRIVATE);
                 JSONObject jsonObject = new JSONObject();
                 for (String key : sharedPreferences.getAll().keySet()) {
+                    if (key != null && key.startsWith("sync_")) continue;
                     jsonObject.put(key, sharedPreferences.getString(key, ""));
                 }
                 sharedPreferences = App.getInstance().getSharedPreferences("crypto.KEY_256", Context.MODE_PRIVATE);

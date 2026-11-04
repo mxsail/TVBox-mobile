@@ -354,6 +354,9 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
         // 更新缓存
         Hawk.put(HawkConfig.API_URL, mSelectedUrl)
         Hawk.put<List<Subscription>?>(HawkConfig.SUBSCRIPTIONS, mSubscriptions)
+        if (mBeforeUrl != mSelectedUrl) {
+            com.tvbox.sync.adapter.AppRoomSyncAdapter.recordContentConfigUpsert()
+        }
     }
 
     override fun finish() {
