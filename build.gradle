@@ -1,16 +1,17 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 buildscript {
-    ext.kotlin_version = '1.9.24'
+    ext.kotlin_version = '2.2.20'
     repositories {
-        gradlePluginPortal()
-        maven { url "https://maven.aliyun.com/repository/releases" }
+        maven { url "https://maven.aliyun.com/repository/google" }
         maven { url "https://maven.aliyun.com/repository/public" }
         google()
         mavenCentral()
+        gradlePluginPortal()
+        maven { url "https://maven.aliyun.com/repository/releases" }
         maven { url "https://jitpack.io" }
     }
     dependencies {
-        classpath "com.android.tools.build:gradle:8.13.2"
+        classpath "com.android.tools.build:gradle:9.3.1"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         // Baseline Profile: 启动路径 AOT 预编译, 缩短冷启动首帧(点击图标→主界面)
         // 注: aliyun google 镜像未收录 baselineprofile 组, 用其指向的真实实现 artifact
@@ -23,19 +24,24 @@ buildscript {
 
 allprojects {
     repositories {
-        gradlePluginPortal()
-        maven { url "https://maven.aliyun.com/repository/releases" }
-        maven { url "https://maven.aliyun.com/repository/public" }
         maven { url "https://maven.aliyun.com/repository/google" }
+        maven { url "https://maven.aliyun.com/repository/public" }
+        maven { url "https://maven.aliyun.com/repository/releases" }
+        google()
+        mavenCentral()
+        gradlePluginPortal()
         //dlna-cast中cling仓
         maven {
             url 'http://4thline.org/m2'
             allowInsecureProtocol true
         }
         maven { url "https://jitpack.io" }
-        google()
-        mavenCentral()
     }
+}
+
+subprojects {
+    plugins.withId('com.android.application') { android.buildToolsVersion = '37.0.0' }
+    plugins.withId('com.android.library') { android.buildToolsVersion = '37.0.0' }
 }
 
 task clean(type: Delete) {

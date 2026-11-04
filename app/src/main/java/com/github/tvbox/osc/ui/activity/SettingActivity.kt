@@ -161,8 +161,7 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
                 override fun click(value: String?, pos: Int) {
                     mBinding.tvDns.text = OkGoHelper.dnsHttpsList[pos]
                     Hawk.put(HawkConfig.DOH_URL, pos)
-                    val url = OkGoHelper.getDohUrl(pos)
-                    OkGoHelper.dnsOverHttps.setUrl(if (url.isEmpty()) null else HttpUrl.get(url))
+                    OkGoHelper.updateDns()
                     IjkMediaPlayer.toggleDotPort(pos > 0)
                 }
 

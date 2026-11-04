@@ -11,10 +11,11 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 
 import okhttp3.Interceptor;
+import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
-import okhttp3.internal.http.RealResponseBody;
+import okio.BufferedSource;
 import okio.GzipSource;
 import okio.Okio;
 import okio.Source;
@@ -54,10 +55,27 @@ public class BrotliInterceptor implements Interceptor {
                 } else {
                     return response;
                 }
+                final BufferedSource bufferedSource = Okio.buffer(brotliSource);
                 return response.newBuilder()
                         .removeHeader("Content-Encoding")
                         .removeHeader("Content-Length")
-                        .body(RealResponseBody.create(body.contentType(), -1L, Okio.buffer(brotliSource)))
+                        .body(new ResponseBody() {
+                            @Override
+                            public MediaType contentType() {
+                                return body.contentType();
+                            }
+
+                            @Override
+                            public long contentLength() {
+                                return -1L;
+                            }
+
+                            @NotNull
+                            @Override
+                            public BufferedSource source() {
+                                return bufferedSource;
+                            }
+                        })
                         .build();
             } else {
                 return response;

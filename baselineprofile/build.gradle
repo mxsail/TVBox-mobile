@@ -4,11 +4,11 @@ apply plugin: 'androidx.baselineprofile'
 
 android {
     namespace 'com.github.tvbox.osc.baselineprofile'
-    compileSdk 36
+    compileSdk 37
 
     defaultConfig {
         minSdk 24
-        targetSdk 36
+        targetSdk 37
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
 
@@ -17,8 +17,13 @@ android {
 
     experimentalProperties["android.experimental.self-instrumenting"] = true
 
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '21'
     }
 }
 
