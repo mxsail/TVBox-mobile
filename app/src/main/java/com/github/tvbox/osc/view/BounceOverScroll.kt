@@ -76,7 +76,8 @@ object BounceOverScroll {
                 MotionEvent.ACTION_MOVE -> {
                     val dy = e.y - lastY
                     lastY = e.y
-                    if (!active && dy != 0f && !rv.canScrollVertically(if (dy < 0) -1 else 1)) {
+                    // dy<0=手指上滑看下方内容 → 检查能否向下滚 canScroll(1); 反之检查 canScroll(-1)
+                    if (!active && dy != 0f && !rv.canScrollVertically(if (dy < 0) 1 else -1)) {
                         active = true
                     }
                     if (active) {
@@ -130,7 +131,8 @@ object BounceOverScroll {
                 MotionEvent.ACTION_MOVE -> {
                     val dy = e.y - lastY
                     lastY = e.y
-                    if (!active && dy != 0f && !view.canScrollVertically(if (dy < 0) -1 else 1)) {
+                    // 同上: 方向语义与 RecyclerView 版一致
+                    if (!active && dy != 0f && !view.canScrollVertically(if (dy < 0) 1 else -1)) {
                         active = true
                     }
                     if (active) {
