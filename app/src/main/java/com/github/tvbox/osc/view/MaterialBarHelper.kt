@@ -104,21 +104,47 @@ object MaterialBarHelper {
                     // RenderScript 模糊半径上限 25(RenderEffectBlur 回退路径也走它), 越界直接崩溃
                     .setBlurRadius(if (liquid) 25f else 16f)
                     .setBlurAutoUpdate(true)
-                // 模糊之上叠 surface 着色(液态玻璃更透亮), 保证内容可读性
                 val surface = MaterialColors.getColor(container, com.google.android.material.R.attr.colorSurface)
-                val tint = ColorUtils.setAlphaComponent(surface, if (liquid) 0x59 else 0x73)
-                blurView.setOverlayColor(tint)
+                if (liquid) {
+                    // 液态玻璃(iOS 26 LiquidGlass 风格的 View 体系近似): 清透白罩保持通透,
+                    // 质感主要靠前景高光层(顶部高光渐变+内高光描边)而非表面色罩
+                    val lightSurface = ColorUtils.calculateLuminance(surface) > 0.5
+                    blurView.setOverlayColor(if (lightSurface) 0x24FFFFFF else 0x1AFFFFFF)
+                } else {
+                    // 普通高斯模糊: surface 着色保证内容可读性
+                    blurView.setOverlayColor(ColorUtils.setAlphaComponent(surface, 0x59))
+                }
                 container.addView(
                     blurView, 0,
                     FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
                     )
                 )
-                // 液态玻璃: 高光描边
-                container.foreground = if (liquid) highlightStroke(ctx, cornerRadiusPx) else null
+                // 液态玻璃: 顶部高光渐变 + 内高光描边
+                container.foreground = if (liquid) liquidGlassForeground(ctx, cornerRadiusPx) else null
                 return blurView
             }
         }
+    }
+
+    /**
+     * 液态玻璃前景(参考 Kyant0/AndroidLiquidGlass 的观感做 View 体系近似):
+     * 顶部白色高光渐变(玻璃受光面) + 1.5dp 内高光描边(玻璃边缘反光)。
+     * 注: 完整的边缘折射/色散需 Compose/自绘渲染, 此处为静态高光近似。
+     */
+    fun liquidGlassForeground(ctx: android.content.Context, radiusPx: Int): android.graphics.drawable.Drawable {
+        val highlight = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(0x36FFFFFF, 0x0DFFFFFF, 0x00FFFFFF)
+        )
+        highlight.shape = GradientDrawable.RECTANGLE
+        if (radiusPx > 0) highlight.cornerRadius = radiusPx.toFloat()
+        val stroke = GradientDrawable()
+        stroke.shape = GradientDrawable.RECTANGLE
+        stroke.setColor(Color.TRANSPARENT)
+        stroke.setStroke(dp(ctx, 1.5f).coerceAtLeast(1), 0x59FFFFFF)
+        if (radiusPx > 0) stroke.cornerRadius = radiusPx.toFloat()
+        return android.graphics.drawable.LayerDrawable(arrayOf(highlight, stroke))
     }
 
     /** 普通弹窗(BaseDialog 系)跨窗背景模糊: API31+, 省电模式关闭跨窗模糊时系统自动跳过 */
@@ -169,19 +195,15 @@ object MaterialBarHelper {
         return gd
     }
 
-    /** 液态玻璃高光描边(顶部亮/底部暗的渐变边) */
-    private fun highlightStroke(ctx: android.content.Context, radiusPx: Int): GradientDrawable {
-        val gd = GradientDrawable()
-        gd.shape = GradientDrawable.RECTANGLE
-        gd.setColor(Color.TRANSPARENT)
-        if (radiusPx > 0) gd.cornerRadius = radiusPx.toFloat()
-        gd.setStroke(dp(ctx, 1), 0x40FFFFFF)
-        return gd
-    }
-
     private fun dp(ctx: android.content.Context, v: Int): Int {
         return TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), ctx.resources.displayMetrics
+        ).toInt()
+    }
+
+    private fun dp(ctx: android.content.Context, v: Float): Int {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, v, ctx.resources.displayMetrics
         ).toInt()
     }
 }

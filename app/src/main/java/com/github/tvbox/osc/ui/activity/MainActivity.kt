@@ -11,6 +11,7 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentPagerAdapter
 import androidx.viewpager.widget.ViewPager.SimpleOnPageChangeListener
@@ -179,32 +180,42 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         val content = findViewById<View>(android.R.id.content)
         ViewCompat.setOnApplyWindowInsetsListener(content) { _, insets ->
             navInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-            updateContentInset()
+            applyBarStyle()
             insets
         }
         // insets 沿视图树可能被中间层级错过, 首帧布局后从 window 根兜底再取一次
         content.post {
             ViewCompat.getRootWindowInsets(content)?.let {
                 navInset = it.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-                updateContentInset()
+                applyBarStyle()
             }
         }
     }
 
-    /** 按当前设置(悬浮/停靠/材质)装配底栏外观, 外观变更时经 EventBus 触发重刷 */
+    /**
+     * 按当前设置(悬浮/停靠/材质/是否显示名称)装配底栏外观, 外观变更时经 EventBus 触发重刷。
+     * 布局关系: barContainer 贴屏幕底(FrameLayout gravity=bottom, content 无 bottom padding,
+     * 若用 content padding 留位会把底栏一起顶离屏幕底, 出现空白带)——
+     * 停靠: 导航栏避让由 bottomNav 自身 padding 承担, 底栏背景延伸到屏幕底;
+     *      页面内容经 ViewPager 的 bottom padding 避让底栏内容区。
+     * 悬浮: 胶囊悬在导航栏上方(bottomMargin=navInset+10dp), 内容从玻璃底栏后滚过。
+     */
     fun applyBarStyle() {
         val floating = Hawk.get(HawkConfig.BAR_FLOATING, false)
         val material = MaterialBarHelper.effectiveMaterial()
+        val showLabels = Hawk.get(HawkConfig.BAR_SHOW_LABELS, true)
         val lp = mBinding.barContainer.layoutParams as FrameLayout.LayoutParams
         val radius = if (floating) dp(28) else 0
         if (floating) {
             lp.leftMargin = dp(12)
             lp.rightMargin = dp(12)
-            lp.bottomMargin = dp(10)
+            lp.bottomMargin = navInset + dp(10)
+            mBinding.bottomNav.updatePadding(bottom = 0)
         } else {
             lp.leftMargin = 0
             lp.rightMargin = 0
             lp.bottomMargin = 0
+            mBinding.bottomNav.updatePadding(bottom = navInset)
         }
         mBinding.barContainer.layoutParams = lp
         mBinding.barContainer.elevation = if (floating) dp(6).toFloat() else 0f
@@ -214,32 +225,36 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         } else {
             mBinding.barContainer.clipToOutline = false
         }
-        mBinding.bottomNav.labelVisibilityMode = NavigationBarView.LABEL_VISIBILITY_LABELED
+        mBinding.bottomNav.labelVisibilityMode =
+            if (showLabels) NavigationBarView.LABEL_VISIBILITY_LABELED
+            else NavigationBarView.LABEL_VISIBILITY_UNLABELED
         if (!floating && material == ThemeManager.MATERIAL_SOLID) {
-            // 停靠+实底: 即原始形态, 底栏用组件自带 M3 surface 背景
+            // 停靠+实底: 即原始形态, 底栏用组件自带 M3 surface 背景(延伸到屏底)
             mBinding.barContainer.background = null
             mBinding.barContainer.foreground = null
-            return
-        }
-        // 其余形态: 底栏本体透明, 由容器承载材质
-        mBinding.bottomNav.background = null
-        if (material == ThemeManager.MATERIAL_SOLID) {
-            // 悬浮+实底: 圆角 surface 胶囊
-            mBinding.barContainer.background = MaterialBarHelper.solidBarBackground(this, radius)
         } else {
-            mBinding.barContainer.background = null
-            MaterialBarHelper.applyToBar(mBinding.barContainer, this, radius)
+            // 其余形态: 底栏本体透明, 由容器承载材质
+            mBinding.bottomNav.background = null
+            if (material == ThemeManager.MATERIAL_SOLID) {
+                // 悬浮+实底: 圆角 surface 胶囊
+                mBinding.barContainer.background = MaterialBarHelper.solidBarBackground(this, radius)
+            } else {
+                mBinding.barContainer.background = null
+                MaterialBarHelper.applyToBar(mBinding.barContainer, this, radius)
+            }
         }
-        mBinding.barContainer.post { updateContentInset() }
+        mBinding.barContainer.post { updateVpPadding() }
     }
 
-    /** content 底部内边距 = 导航栏 inset + 停靠底栏占位(隐藏/悬浮时不占位) */
-    private fun updateContentInset() {
+    /** 页面内容对停靠底栏的避让: vp bottom padding = 底栏内容区高度(height 已含导航栏 padding, 减掉) */
+    private fun updateVpPadding() {
         val floating = Hawk.get(HawkConfig.BAR_FLOATING, false)
-        val extra = if (barShown && !floating) mBinding.barContainer.height else 0
-        val content = findViewById<View>(android.R.id.content)
-        val target = navInset + extra
-        if (content.paddingBottom != target) content.setPadding(0, 0, 0, target)
+        val extra = if (barShown && !floating) {
+            (mBinding.bottomNav.height - navInset).coerceAtLeast(0)
+        } else {
+            0
+        }
+        if (mBinding.vp.paddingBottom != extra) mBinding.vp.updatePadding(bottom = extra)
     }
 
     override fun onMainScrollDelta(dy: Int) {
@@ -261,7 +276,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         barShown = shown
         val container = mBinding.barContainer
         val lp = container.layoutParams as FrameLayout.LayoutParams
-        val hideY = container.height + lp.bottomMargin + navInset + dp(4)
+        val hideY = container.height + dp(4)
         container.animate()
             .translationY(if (shown) 0f else hideY.toFloat())
             .setDuration(220)
@@ -269,21 +284,19 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
             .start()
         if (Hawk.get(HawkConfig.BAR_FLOATING, false)) {
             // 悬浮模式不占内容位, 只动底栏本身
-            updateContentInset()
-        } else if (container.height > 0) {
-            // 停靠模式收起时把占位还给内容(动画同步)
-            val content = findViewById<View>(android.R.id.content)
-            val from = content.paddingBottom
-            val to = navInset + if (shown) container.height else 0
+        } else {
+            // 停靠模式收起时把内容区占位还给内容(动画同步); 导航栏区被底栏背景
+            // 常驻填充, 不参与动画
+            val extra = (mBinding.bottomNav.height - navInset).coerceAtLeast(0)
+            val from = mBinding.vp.paddingBottom
+            val to = if (shown) extra else navInset
             ValueAnimator.ofInt(from, to).apply {
                 duration = 220
                 addUpdateListener { anim ->
-                    content.setPadding(0, 0, 0, anim.animatedValue as Int)
+                    mBinding.vp.updatePadding(bottom = anim.animatedValue as Int)
                 }
                 start()
             }
-        } else {
-            updateContentInset()
         }
     }
 

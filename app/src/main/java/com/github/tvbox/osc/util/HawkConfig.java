@@ -69,6 +69,10 @@ public class HawkConfig {
      */
     public static final String BAR_FLOATING = "bar_floating";
     /**
+     * 底栏显示文字名称(false=纯图标)
+     */
+    public static final String BAR_SHOW_LABELS = "bar_show_labels";
+    /**
      * 底栏随滚动隐藏(上滑收起/下滑呼出)
      */
     public static final String BAR_AUTO_HIDE = "bar_auto_hide";

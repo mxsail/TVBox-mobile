@@ -1,19 +1,49 @@
 package com.github.tvbox.osc.ui.activity
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import androidx.activity.compose.setContent
+import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.recyclerview.widget.DiffUtil
 import com.blankj.utilcode.util.ToastUtils
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.api.ApiConfig
-import com.github.tvbox.osc.base.BaseVbActivity
+import com.github.tvbox.osc.base.BaseActivity
 import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.bean.IJKCode
 import com.github.tvbox.osc.constant.IntentKey
-import com.github.tvbox.osc.databinding.ActivitySettingBinding
 import com.github.tvbox.osc.event.AppearanceChangedEvent
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
+import com.github.tvbox.osc.ui.compose.GroupCard
+import com.github.tvbox.osc.ui.compose.HintText
+import com.github.tvbox.osc.ui.compose.MenuRow
+import com.github.tvbox.osc.ui.compose.SectionTitle
+import com.github.tvbox.osc.ui.compose.SwitchRow
+import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.dialog.BackupDialog
 import com.github.tvbox.osc.ui.dialog.LiveApiDialog
 import com.github.tvbox.osc.ui.dialog.SelectDialog
@@ -23,411 +53,141 @@ import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.HistoryHelper
 import com.github.tvbox.osc.util.OkGoHelper
 import com.github.tvbox.osc.util.PlayerHelper
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.hjq.permissions.OnPermissionCallback
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
 import com.lxj.xpopup.XPopup
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.orhanobut.hawk.Hawk
-import okhttp3.HttpUrl
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
 import java.io.File
 
 /**
- * @author pj567
- * @date :2020/12/23
- * @description:
+ * 设置页(Compose): 常规/播放与缓存/数据 三组配置。
+ * 选择交互沿用既有 View 版弹窗(SelectDialog/LiveApiDialog/BackupDialog/SyncDialog),
+ * 通过 Compose↔View 互操作调用, 避免同轮重写全部弹窗。
  */
-class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
+class SettingActivity : BaseActivity() {
 
     private var homeRec = Hawk.get(HawkConfig.HOME_REC, 0)
     private var dnsOpt = Hawk.get(HawkConfig.DOH_URL, 0)
     private var currentLiveApi = Hawk.get(HawkConfig.LIVE_URL, "")
+
+    override fun getLayoutResID(): Int = -1
+
+    override fun initVb() {
+        val composeView = androidx.compose.ui.platform.ComposeView(this)
+        setContentView(composeView)
+        composeView.setContent { TvBoxTheme { SettingScreen() } }
+    }
+
     override fun init() {
+    }
 
-        mBinding.titleBar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
-        mBinding.tvMediaCodec.text = Hawk.get(HawkConfig.IJK_CODEC, "")
+    // ---------------- 交互(互操作调用既有弹窗) ----------------
 
-        mBinding.tvDns.text = OkGoHelper.dnsHttpsList[Hawk.get(HawkConfig.DOH_URL, 0)]
-        mBinding.tvHomeRec.text = getHomeRecName(Hawk.get(HawkConfig.HOME_REC, 0))
-        mBinding.tvHistoryNum.text =
-            HistoryHelper.getHistoryNumName(Hawk.get(HawkConfig.HISTORY_NUM, 0))
-        mBinding.tvScaleType.text = PlayerHelper.getScaleName(Hawk.get(HawkConfig.PLAY_SCALE, 0))
-        mBinding.tvPlay.text = PlayerHelper.getPlayerName(Hawk.get(HawkConfig.PLAY_TYPE, 0))
-        mBinding.tvRenderType.text =
-            PlayerHelper.getRenderName(Hawk.get(HawkConfig.PLAY_RENDER, 0))
+    private fun showSelect(
+        tip: String,
+        options: List<String>,
+        defaultPos: Int,
+        onPick: (Int) -> Unit
+    ) {
+        val dialog = SelectDialog<String>(this)
+        dialog.setTip(tip)
+        dialog.setAdapter(object : SelectDialogInterface<String?> {
+            override fun click(value: String?, pos: Int) = onPick(pos)
 
-        mBinding.switchPrivateBrowsing.setChecked(Hawk.get(HawkConfig.PRIVATE_BROWSING, false))
-        mBinding.llPrivateBrowsing.setOnClickListener { view: View? ->
-            val newConfig = !Hawk.get(HawkConfig.PRIVATE_BROWSING, false)
-            mBinding.switchPrivateBrowsing.setChecked(newConfig)
-            Hawk.put(HawkConfig.PRIVATE_BROWSING, newConfig)
-        }
+            override fun getDisplay(name: String?): String = name ?: ""
+        }, SelectDialogAdapter.stringDiff, ArrayList(options), defaultPos)
+        dialog.show()
+    }
 
-        mBinding.llLiveApi.setOnClickListener {
-            XPopup.Builder(mContext).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
-                .autoFocusEditText(false)
-                .asCustom(LiveApiDialog(this))
-                .show()
-        }
+    private fun openAppearance() {
+        jumpActivity(AppearanceActivity::class.java)
+    }
 
-        val defaultBgPlayTypePos = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0)
-        val bgPlayTypes = ArrayList<String>()
-        bgPlayTypes.add("关闭")
-        bgPlayTypes.add("开启")
-        bgPlayTypes.add("画中画")
-        mBinding.tvBackgroundPlayType.text = bgPlayTypes[defaultBgPlayTypePos]
-        mBinding.llBackgroundPlay.setOnClickListener { view: View? ->
-            FastClickCheckUtil.check(view)
-            val dialog = SelectDialog<String>(this@SettingActivity)
-            dialog.setTip("请选择")
-            dialog.setAdapter(object : SelectDialogInterface<String?> {
-                override fun click(value: String?, pos: Int) {
-                    mBinding.tvBackgroundPlayType.text = value
-                    Hawk.put(HawkConfig.BACKGROUND_PLAY_TYPE, pos)
-                }
+    private fun openLiveApi() {
+        XPopup.Builder(this)
+            .autoFocusEditText(false)
+            .asCustom(LiveApiDialog(this))
+            .show()
+    }
 
-                override fun getDisplay(name: String?): String {
-                    return name?:""
-                }
-            },SelectDialogAdapter.stringDiff, bgPlayTypes, defaultBgPlayTypePos)
-            dialog.show()
-        }
+    private fun openBackup() {
+        if (XXPermissions.isGranted(this, Permission.MANAGE_EXTERNAL_STORAGE)) {
+            BackupDialog(this).show()
+        } else {
+            XXPermissions.with(this)
+                .permission(Permission.MANAGE_EXTERNAL_STORAGE)
+                .request(object : OnPermissionCallback {
+                    override fun onGranted(permissions: List<String>, all: Boolean) {
+                        if (all) BackupDialog(this@SettingActivity).show()
+                    }
 
-        mBinding.tvSpeed.text = Hawk.get(HawkConfig.VIDEO_SPEED, 2.0f).toString()
-        mBinding.llPressSpeed.setOnClickListener {
-            val types = ArrayList<String>()
-            types.add("2.0")
-            types.add("3.0")
-            types.add("4.0")
-            types.add("5.0")
-            types.add("6.0")
-            types.add("8.0")
-            types.add("10.0")
-            val defaultPos = types.indexOf(Hawk.get(HawkConfig.VIDEO_SPEED, 2.0f).toString())
-            val dialog = SelectDialog<String>(this@SettingActivity)
-            dialog.setTip("请选择")
-            dialog.setAdapter(object : SelectDialogInterface<String?> {
-                override fun click(value: String?, pos: Int) {
-                    Hawk.put(HawkConfig.VIDEO_SPEED, value?.toFloat())
-                    mBinding.tvSpeed.text = value
-                }
-
-                override fun getDisplay(name: String?): String {
-                    return name ?: ""
-                }
-            }, SelectDialogAdapter.stringDiff, types, defaultPos)
-            dialog.show()
-        }
-
-        mBinding.llBackup.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            if (XXPermissions.isGranted(this@SettingActivity, Permission.MANAGE_EXTERNAL_STORAGE)) {
-                val dialog = BackupDialog(this@SettingActivity)
-                dialog.show()
-            } else {
-                XXPermissions.with(this@SettingActivity)
-                    .permission(Permission.MANAGE_EXTERNAL_STORAGE)
-                    .request(object : OnPermissionCallback {
-                        override fun onGranted(permissions: List<String>, all: Boolean) {
-                            if (all) {
-                                val dialog = BackupDialog(this@SettingActivity)
-                                dialog.show()
-                            }
+                    override fun onDenied(permissions: List<String>, never: Boolean) {
+                        if (never) {
+                            ToastUtils.showLong("获取存储权限失败,请在系统设置中开启")
+                            XXPermissions.startPermissionActivity(this@SettingActivity, permissions)
+                        } else {
+                            ToastUtils.showShort("获取存储权限失败")
                         }
-
-                        override fun onDenied(permissions: List<String>, never: Boolean) {
-                            if (never) {
-                                ToastUtils.showLong("获取存储权限失败,请在系统设置中开启")
-                                XXPermissions.startPermissionActivity(
-                                    this@SettingActivity,
-                                    permissions
-                                )
-                            } else {
-                                ToastUtils.showShort("获取存储权限失败")
-                            }
-                        }
-                    })
-            }
-        }
-
-        val syncEnabled = Hawk.get(HawkConfig.SYNC_ENABLED, false)
-        mBinding.tvCloudSyncStatus.text = if (syncEnabled) "已启用" else "未启用"
-        mBinding.llCloudSync.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            val dialog = com.github.tvbox.osc.ui.dialog.SyncDialog(this@SettingActivity)
-            dialog.setOnDismissListener {
-                val enabled = Hawk.get(HawkConfig.SYNC_ENABLED, false)
-                mBinding.tvCloudSyncStatus.text = if (enabled) "已启用" else "未启用"
-            }
-            dialog.show()
-        }
-
-        mBinding.llDns.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            val dohUrl = Hawk.get(HawkConfig.DOH_URL, 0)
-            val dialog = SelectDialog<String>(this@SettingActivity)
-            dialog.setTip("请选择安全DNS")
-            dialog.setAdapter(object : SelectDialogInterface<String?> {
-                override fun click(value: String?, pos: Int) {
-                    mBinding.tvDns.text = OkGoHelper.dnsHttpsList[pos]
-                    Hawk.put(HawkConfig.DOH_URL, pos)
-                    OkGoHelper.updateDns()
-                    IjkMediaPlayer.toggleDotPort(pos > 0)
-                }
-
-                override fun getDisplay(name: String?): String {
-                    return name ?: ""
-                }
-            },SelectDialogAdapter.stringDiff, OkGoHelper.dnsHttpsList, dohUrl)
-            dialog.show()
-        }
-
-        mBinding.llMediaCodec.setOnClickListener { v: View? ->
-            val ijkCodes = ApiConfig.get().ijkCodes
-            if (ijkCodes == null || ijkCodes.size == 0) return@setOnClickListener
-            FastClickCheckUtil.check(v)
-            var defaultPos = 0
-            val ijkSel = Hawk.get(HawkConfig.IJK_CODEC, "")
-            for (j in ijkCodes.indices) {
-                if (ijkSel == ijkCodes[j].name) {
-                    defaultPos = j
-                    break
-                }
-            }
-            val dialog = SelectDialog<IJKCode>(this@SettingActivity)
-            dialog.setTip("请选择IJK解码")
-            dialog.setAdapter(object : SelectDialogInterface<IJKCode?> {
-                override fun click(value: IJKCode?, pos: Int) {
-                    value?.selected(true)
-                    mBinding.tvMediaCodec.text = value?.name
-                }
-
-                override fun getDisplay(code: IJKCode?): String {
-                    return code?.name ?: ""
-                }
-            }, object : DiffUtil.ItemCallback<IJKCode>() {
-                override fun areItemsTheSame(oldItem: IJKCode, newItem: IJKCode): Boolean {
-                    return oldItem === newItem
-                }
-
-                override fun areContentsTheSame(oldItem: IJKCode, newItem: IJKCode): Boolean {
-                    return oldItem.name.contentEquals(newItem.name)
-                }
-            }, ijkCodes, defaultPos)
-            dialog.show()
-        }
-
-        mBinding.llScale.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            val defaultPos = Hawk.get(HawkConfig.PLAY_SCALE, 0)
-            val players = ArrayList<Int>()
-            players.add(0)
-            players.add(1)
-            players.add(2)
-            players.add(3)
-            players.add(4)
-            players.add(5)
-            val dialog = SelectDialog<Int>(this@SettingActivity)
-            dialog.setTip("请选择画面缩放")
-            dialog.setAdapter(object : SelectDialogInterface<Int?> {
-                override fun click(value: Int?, pos: Int) {
-                    Hawk.put(HawkConfig.PLAY_SCALE, value)
-                    mBinding.tvScaleType.text = value?.let { PlayerHelper.getScaleName(it) }
-                }
-
-                override fun getDisplay(value: Int?): String {
-                    return PlayerHelper.getScaleName(value ?: 0)
-                }
-            }, object : DiffUtil.ItemCallback<Int>() {
-                override fun areItemsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-
-                override fun areContentsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-            }, players, defaultPos)
-            dialog.show()
-        }
-
-        mBinding.llPlay.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            val playerType = Hawk.get(HawkConfig.PLAY_TYPE, 0)
-            var defaultPos = 0
-            val players = PlayerHelper.getExistPlayerTypes()
-            val renders = ArrayList<Int>()
-            for (p in players.indices) {
-                renders.add(p)
-                if (players[p] == playerType) {
-                    defaultPos = p
-                }
-            }
-            val dialog = SelectDialog<Int>(this@SettingActivity)
-            dialog.setTip("请选择默认播放器")
-            dialog.setAdapter(object : SelectDialogInterface<Int?> {
-                override fun click(value: Int?, pos: Int) {
-                    val thisPlayerType = players[pos]
-                    Hawk.put(HawkConfig.PLAY_TYPE, thisPlayerType)
-                    mBinding.tvPlay.text = PlayerHelper.getPlayerName(thisPlayerType)
-                    PlayerHelper.init()
-                }
-
-                override fun getDisplay(value: Int?): String {
-                    return PlayerHelper.getPlayerName(players[value?:0])
-                }
-            }, object : DiffUtil.ItemCallback<Int>() {
-                override fun areItemsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-
-                override fun areContentsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-            }, renders, defaultPos)
-            dialog.show()
-        }
-
-        mBinding.llRender.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            val defaultPos = Hawk.get(HawkConfig.PLAY_RENDER, 0)
-            val renders = ArrayList<Int>()
-            renders.add(0)
-            renders.add(1)
-            val dialog = SelectDialog<Int>(this@SettingActivity)
-            dialog.setTip("请选择默认渲染方式")
-            dialog.setAdapter(object : SelectDialogInterface<Int?> {
-                override fun click(value: Int?, pos: Int) {
-                    Hawk.put(HawkConfig.PLAY_RENDER, value)
-                    mBinding.tvRenderType.text = PlayerHelper.getRenderName(value?:0)
-                    PlayerHelper.init()
-                }
-
-                override fun getDisplay(value: Int?): String {
-                    return PlayerHelper.getRenderName(value?:0)
-                }
-            }, object : DiffUtil.ItemCallback<Int>() {
-                override fun areItemsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-
-                override fun areContentsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-            }, renders, defaultPos)
-            dialog.show()
-        }
-        mBinding.llHomeRec.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            val defaultPos = Hawk.get(HawkConfig.HOME_REC, 0)
-            val types = ArrayList<Int>()
-            types.add(0)
-            types.add(1)
-            types.add(2)
-            val dialog = SelectDialog<Int>(this@SettingActivity)
-            dialog.setTip("主页内容显示")
-            dialog.setAdapter(object : SelectDialogInterface<Int?> {
-                override fun click(value: Int?, pos: Int) {
-                    Hawk.put(HawkConfig.HOME_REC, value)
-                    mBinding.tvHomeRec.text = getHomeRecName(value?:0)
-                }
-
-                override fun getDisplay(value: Int?): String {
-                    return getHomeRecName(value?:0)
-                }
-            }, object : DiffUtil.ItemCallback<Int>() {
-                override fun areItemsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-
-                override fun areContentsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-            }, types, defaultPos)
-            dialog.show()
-        }
-        
-        mBinding.llHistoryNum.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            val defaultPos = Hawk.get(HawkConfig.HISTORY_NUM, 0)
-            val types = ArrayList<Int>()
-            types.add(0)
-            types.add(1)
-            types.add(2)
-            val dialog = SelectDialog<Int>(this@SettingActivity)
-            dialog.setTip("保留历史记录数量")
-            dialog.setAdapter(object : SelectDialogInterface<Int?> {
-                override fun click(value: Int?, pos: Int) {
-                    Hawk.put(HawkConfig.HISTORY_NUM, value)
-                    mBinding.tvHistoryNum.text = HistoryHelper.getHistoryNumName(value?:0)
-                }
-
-                override fun getDisplay(value: Int?): String {
-                    return HistoryHelper.getHistoryNumName(value?:0)
-                }
-            }, object : DiffUtil.ItemCallback<Int>() {
-                override fun areItemsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-
-                override fun areContentsTheSame(oldItem: Int, newItem: Int): Boolean {
-                    return oldItem == newItem
-                }
-            }, types, defaultPos)
-            dialog.show()
-        }
-        mBinding.llClearCache.setOnClickListener { view: View ->
-            MaterialAlertDialogBuilder(this)
-                .setTitle("提示")
-                .setMessage("确定清空吗？")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("确定") { _, _ -> onClickClearCache(view) }
-                .show()
-        }
-        mBinding.tvAppearance.text = themeColorLabel()
-        mBinding.llAppearance.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            jumpActivity(AppearanceActivity::class.java)
-        }
-
-        mBinding.switchVideoPurify.setChecked(Hawk.get(HawkConfig.VIDEO_PURIFY, true))
-        // toggle purify video -------------------------------------
-        mBinding.llVideoPurify.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            val newConfig = !Hawk.get(HawkConfig.VIDEO_PURIFY, true)
-            mBinding.switchVideoPurify.setChecked(newConfig)
-            Hawk.put(HawkConfig.VIDEO_PURIFY, newConfig)
-        }
-        mBinding.switchIjkCachePlay.setChecked(Hawk.get(HawkConfig.IJK_CACHE_PLAY, false))
-        mBinding.llIjkCachePlay.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            val newConfig = !Hawk.get(HawkConfig.IJK_CACHE_PLAY, false)
-            mBinding.switchIjkCachePlay.setChecked(newConfig)
-            Hawk.put(HawkConfig.IJK_CACHE_PLAY, newConfig)
-        }
-        // 应用内缓存:仅Wi-Fi下载 -------------------------------------
-        mBinding.switchDownloadWifiOnly.setChecked(Hawk.get(HawkConfig.DOWNLOAD_WIFI_ONLY, false))
-        mBinding.llDownloadWifiOnly.setOnClickListener { v: View? ->
-            FastClickCheckUtil.check(v)
-            val newConfig = !Hawk.get(HawkConfig.DOWNLOAD_WIFI_ONLY, false)
-            mBinding.switchDownloadWifiOnly.setChecked(newConfig)
-            Hawk.put(HawkConfig.DOWNLOAD_WIFI_ONLY, newConfig)
+                    }
+                })
         }
     }
 
-    // 有配置变更跳转逻辑, 保持自行拦截
+    private fun confirmClearCache() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("提示")
+            .setMessage("确定清空吗？")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确定") { _, _ -> clearCache() }
+            .show()
+    }
+
+    private fun clearCache() {
+        val cacheDir = File(FileUtils.getCachePath())
+        if (!cacheDir.exists()) return
+        Thread {
+            try {
+                FileUtils.cleanDirectory(cacheDir)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
+        ToastUtils.showLong("缓存已清空")
+    }
+
+    private fun homeRecName(type: Int): String = when (type) {
+        0 -> "豆瓣热播"
+        1 -> "站点推荐"
+        else -> "关闭"
+    }
+
+    private fun themeColorLabel(): String {
+        return if (ThemeManager.useDynamicColor()) "动态取色"
+        else ThemeManager.presetOf(ThemeManager.colorScheme())?.label ?: "动态取色"
+    }
+
+    /** 主题级变化(外观页触发)时刷新本页 */
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    fun onAppearanceChanged(event: AppearanceChangedEvent) {
+        if (event.type == AppearanceChangedEvent.TYPE_RECREATE) {
+            recreate()
+        }
+    }
+
+    // 返回键: 常规配置有变更时重载主页(与历史版本行为一致)
     override fun keepBackIntercept(): Boolean = true
 
     override fun onBackHandled() {
         if (homeRec != Hawk.get(HawkConfig.HOME_REC, 0) || dnsOpt != Hawk.get(
-                HawkConfig.DOH_URL,
-                0
+                HawkConfig.DOH_URL, 0
             ) || currentLiveApi != Hawk.get(HawkConfig.LIVE_URL, "")
-        ) { // 首页类型/dns/doh/直播源有更改,需重载页面
-            //AppManager.getInstance().finishAllActivity()
-            if (currentLiveApi == Hawk.get(HawkConfig.LIVE_URL, "")) { //未更改直播源,不需重载api等
+        ) {
+            if (currentLiveApi == Hawk.get(HawkConfig.LIVE_URL, "")) {
                 val bundle = Bundle()
                 bundle.putBoolean(IntentKey.CACHE_CONFIG_CHANGED, true)
                 jumpActivity(MainActivity::class.java, bundle)
@@ -440,41 +200,193 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
         }
     }
 
-    private fun onClickClearCache(v: View) {
-        FastClickCheckUtil.check(v)
-        val cachePath = FileUtils.getCachePath()
-        val cacheDir = File(cachePath)
-        if (!cacheDir.exists()) return
-        Thread {
-            try {
-                FileUtils.cleanDirectory(cacheDir)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }.start()
-        ToastUtils.showLong("缓存已清空")
-    }
+    // ---------------- Compose 界面 ----------------
 
-    private fun getHomeRecName(type: Int): String {
-        return when (type) {
-            0 -> "豆瓣热播"
-            1 -> "站点推荐"
-            else -> "关闭"
+    @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+    @Composable
+    private fun SettingScreen() {
+        var appearanceValue by remember { mutableStateOf(themeColorLabel()) }
+        var homeRecValue by remember { mutableStateOf(homeRecName(Hawk.get(HawkConfig.HOME_REC, 0))) }
+        var privateBrowsing by remember { mutableStateOf(Hawk.get(HawkConfig.PRIVATE_BROWSING, false)) }
+        var playValue by remember { mutableStateOf(PlayerHelper.getPlayerName(Hawk.get(HawkConfig.PLAY_TYPE, 0))) }
+        var videoPurify by remember { mutableStateOf(Hawk.get(HawkConfig.VIDEO_PURIFY, true)) }
+        var wifiOnly by remember { mutableStateOf(Hawk.get(HawkConfig.DOWNLOAD_WIFI_ONLY, false)) }
+        var speedValue by remember { mutableStateOf(Hawk.get(HawkConfig.VIDEO_SPEED, 2.0f).toString()) }
+        var bgPlayValue by remember {
+            mutableStateOf(
+                listOf("关闭", "开启", "画中画")[Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0)]
+            )
         }
-    }
+        var ijkCodecValue by remember { mutableStateOf(Hawk.get(HawkConfig.IJK_CODEC, "")) }
+        var renderValue by remember { mutableStateOf(PlayerHelper.getRenderName(Hawk.get(HawkConfig.PLAY_RENDER, 0))) }
+        var scaleValue by remember { mutableStateOf(PlayerHelper.getScaleName(Hawk.get(HawkConfig.PLAY_SCALE, 0))) }
+        var ijkCache by remember { mutableStateOf(Hawk.get(HawkConfig.IJK_CACHE_PLAY, false)) }
+        var syncValue by remember { mutableStateOf(if (Hawk.get(HawkConfig.SYNC_ENABLED, false)) "已启用" else "未启用") }
+        var dnsValue by remember { mutableStateOf(OkGoHelper.dnsHttpsList[Hawk.get(HawkConfig.DOH_URL, 0)]) }
+        var historyValue by remember { mutableStateOf(HistoryHelper.getHistoryNumName(Hawk.get(HawkConfig.HISTORY_NUM, 0))) }
 
-    /** 外观入口行显示当前主题颜色 */
-    private fun themeColorLabel(): String {
-        return if (ThemeManager.useDynamicColor()) "动态取色"
-        else ThemeManager.presetOf(ThemeManager.colorScheme())?.label ?: "动态取色"
-    }
+        Scaffold(
+            containerColor = colorScheme.background,
+            topBar = {
+                TopAppBar(
+                    title = { Text("设置", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = { onBackPressedDispatcher.onBackPressed() }) {
+                            Icon(
+                                painterResource(R.drawable.ic_arrow_back),
+                                contentDescription = "返回",
+                                tint = colorScheme.onSurface
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
+                )
+            }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+            ) {
+                SectionTitle("常规")
+                GroupCard {
+                    MenuRow(R.drawable.ic_palette_48, "外观设置", appearanceValue) { openAppearance() }
+                    MenuRow(R.drawable.ic_home, "主页内容", homeRecValue) {
+                        showSelect("主页内容显示", listOf("豆瓣热播", "站点推荐", "关闭"), Hawk.get(HawkConfig.HOME_REC, 0)) { pos ->
+                            Hawk.put(HawkConfig.HOME_REC, pos)
+                            homeRecValue = homeRecName(pos)
+                        }
+                    }
+                    MenuRow(R.drawable.ic_live_tv_48, "直播源", null) { openLiveApi() }
+                    SwitchRow(R.drawable.ic_incognito_48, "无痕浏览", privateBrowsing) { newValue ->
+                        privateBrowsing = newValue
+                        Hawk.put(HawkConfig.PRIVATE_BROWSING, newValue)
+                    }
+                }
 
-    /** 主题色/字体等主题级变化(在外观页触发)时, 刷新入口行文字并重建本页套新覆盖层 */
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    fun onAppearanceChanged(event: AppearanceChangedEvent) {
-        if (event.type == AppearanceChangedEvent.TYPE_RECREATE) {
-            mBinding.tvAppearance.text = themeColorLabel()
-            recreate()
+                SectionTitle("播放与缓存")
+                GroupCard {
+                    MenuRow(R.drawable.ic_m3_play_arrow, "播放器", playValue) {
+                        val players = PlayerHelper.getExistPlayerTypes()
+                        val names = players.map { PlayerHelper.getPlayerName(it) }
+                        val playerType = Hawk.get(HawkConfig.PLAY_TYPE, 0)
+                        var defaultPos = 0
+                        players.indices.forEach { if (players[it] == playerType) defaultPos = it }
+                        showSelect("请选择默认播放器", names, defaultPos) { pos ->
+                            Hawk.put(HawkConfig.PLAY_TYPE, players[pos])
+                            playValue = PlayerHelper.getPlayerName(players[pos])
+                            PlayerHelper.init()
+                        }
+                    }
+                    SwitchRow(R.drawable.ic_filter_list, "广告过滤", videoPurify) { newValue ->
+                        videoPurify = newValue
+                        Hawk.put(HawkConfig.VIDEO_PURIFY, newValue)
+                    }
+                    SwitchRow(R.drawable.ic_download_18, "缓存仅Wi-Fi下载", wifiOnly) { newValue ->
+                        wifiOnly = newValue
+                        Hawk.put(HawkConfig.DOWNLOAD_WIFI_ONLY, newValue)
+                    }
+                    MenuRow(R.drawable.ic_speed_48, "长按倍速", speedValue) {
+                        val types = listOf("2.0", "3.0", "4.0", "5.0", "6.0", "8.0", "10.0")
+                        val defaultPos = types.indexOf(Hawk.get(HawkConfig.VIDEO_SPEED, 2.0f).toString())
+                        showSelect("请选择倍速", types, if (defaultPos < 0) 0 else defaultPos) { pos ->
+                            Hawk.put(HawkConfig.VIDEO_SPEED, types[pos].toFloat())
+                            speedValue = types[pos]
+                        }
+                    }
+                    MenuRow(R.drawable.ic_m3_pip, "后台播放", bgPlayValue) {
+                        val types = listOf("关闭", "开启", "画中画")
+                        showSelect("后台播放", types, Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0)) { pos ->
+                            Hawk.put(HawkConfig.BACKGROUND_PLAY_TYPE, pos)
+                            bgPlayValue = types[pos]
+                        }
+                    }
+                    MenuRow(R.drawable.ic_memory_48, "IJK解码方式", ijkCodecValue) {
+                        val ijkCodes = ApiConfig.get().ijkCodes
+                        if (ijkCodes.isNullOrEmpty()) return@MenuRow
+                        val ijkSel = Hawk.get(HawkConfig.IJK_CODEC, "")
+                        var defaultPos = 0
+                        ijkCodes.indices.forEach { if (ijkSel == ijkCodes[it].name) defaultPos = it }
+                        val dialog = SelectDialog<IJKCode>(this@SettingActivity)
+                        dialog.setTip("请选择IJK解码")
+                        dialog.setAdapter(object : SelectDialogInterface<IJKCode?> {
+                            override fun click(value: IJKCode?, pos: Int) {
+                                value?.selected(true)
+                                ijkCodecValue = value?.name ?: ""
+                            }
+
+                            override fun getDisplay(code: IJKCode?): String = code?.name ?: ""
+                        }, object : DiffUtil.ItemCallback<IJKCode>() {
+                            override fun areItemsTheSame(oldItem: IJKCode, newItem: IJKCode): Boolean =
+                                oldItem === newItem
+
+                            override fun areContentsTheSame(oldItem: IJKCode, newItem: IJKCode): Boolean =
+                                oldItem.name.contentEquals(newItem.name)
+                        }, ijkCodes, defaultPos)
+                        dialog.show()
+                    }
+                    MenuRow(R.drawable.ic_material_48, "渲染方式", renderValue) {
+                        showSelect("请选择默认渲染方式", listOf("SurfaceView", "TextureView"), Hawk.get(HawkConfig.PLAY_RENDER, 0)) { pos ->
+                            Hawk.put(HawkConfig.PLAY_RENDER, pos)
+                            renderValue = PlayerHelper.getRenderName(pos)
+                            PlayerHelper.init()
+                        }
+                    }
+                    MenuRow(R.drawable.ic_scale_48, "画面缩放", scaleValue) {
+                        val scales = (0..5).toList()
+                        showSelect(
+                            "请选择画面缩放",
+                            scales.map { PlayerHelper.getScaleName(it) },
+                            Hawk.get(HawkConfig.PLAY_SCALE, 0)
+                        ) { pos ->
+                            Hawk.put(HawkConfig.PLAY_SCALE, pos)
+                            scaleValue = PlayerHelper.getScaleName(pos)
+                        }
+                    }
+                    SwitchRow(R.drawable.ic_cache_48, "IJK缓存", ijkCache) { newValue ->
+                        ijkCache = newValue
+                        Hawk.put(HawkConfig.IJK_CACHE_PLAY, newValue)
+                    }
+                }
+
+                SectionTitle("数据")
+                GroupCard {
+                    MenuRow(R.drawable.ic_backup_48, "数据备份还原", null) { openBackup() }
+                    MenuRow(R.drawable.ic_sync_48, "多设备数据同步", syncValue) {
+                        val dialog = com.github.tvbox.osc.ui.dialog.SyncDialog(this@SettingActivity)
+                        dialog.setOnDismissListener {
+                            syncValue = if (Hawk.get(HawkConfig.SYNC_ENABLED, false)) "已启用" else "未启用"
+                        }
+                        dialog.show()
+                    }
+                    MenuRow(R.drawable.ic_dns_48, "安全DNS", dnsValue) {
+                        val dohUrl = Hawk.get(HawkConfig.DOH_URL, 0)
+                        showSelect("请选择安全DNS", OkGoHelper.dnsHttpsList, dohUrl) { pos ->
+                            Hawk.put(HawkConfig.DOH_URL, pos)
+                            dnsValue = OkGoHelper.dnsHttpsList[pos]
+                            OkGoHelper.updateDns()
+                            IjkMediaPlayer.toggleDotPort(pos > 0)
+                        }
+                    }
+                    MenuRow(R.drawable.ic_history_48, "历史记录", historyValue) {
+                        showSelect(
+                            "保留历史记录数量",
+                            listOf(0, 1, 2).map { HistoryHelper.getHistoryNumName(it) },
+                            Hawk.get(HawkConfig.HISTORY_NUM, 0)
+                        ) { pos ->
+                            Hawk.put(HawkConfig.HISTORY_NUM, pos)
+                            historyValue = HistoryHelper.getHistoryNumName(pos)
+                        }
+                    }
+                    MenuRow(R.drawable.ic_clear, "清空缓存", null) { confirmClearCache() }
+                }
+                HintText(
+                    "部分配置(主页内容/直播源/安全DNS)在返回主页时自动重载",
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
+            }
         }
     }
 }

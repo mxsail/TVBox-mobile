@@ -237,6 +237,28 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/llBarLabels"
+                    style="@style/M3MenuRow">
+
+                    <ImageView
+                        style="@style/M3MenuIcon"
+                        android:src="@drawable/ic_label_48" />
+
+                    <TextView
+                        style="@style/M3MenuText"
+                        android:text="底栏显示名称" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swBarLabels"
+                        style="@style/M3MenuSwitch" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:id="@+id/llBarAutoHide"
                     style="@style/M3MenuRowLast">
 

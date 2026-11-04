@@ -1,105 +1,109 @@
 package com.github.tvbox.osc.ui.activity
 
 import android.os.Bundle
-import android.view.View
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.GridLayoutManager
-import com.chad.library.adapter.base.BaseQuickAdapter
-import com.github.tvbox.osc.base.BaseVbActivity
+import com.github.tvbox.osc.api.ApiConfig
+import com.github.tvbox.osc.base.BaseActivity
 import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.cache.RoomDataManger
-import com.github.tvbox.osc.databinding.ActivityHistoryBinding
-import com.github.tvbox.osc.ui.adapter.HistoryAdapter
-import com.github.tvbox.osc.util.FastClickCheckUtil
-import com.github.tvbox.osc.util.Utils
-import com.lxj.xpopup.XPopup
+import com.github.tvbox.osc.ui.compose.VodCard
+import com.github.tvbox.osc.ui.compose.VodGridScreen
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.owen.tvrecyclerview.widget.V7GridLayoutManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class HistoryActivity : BaseVbActivity<ActivityHistoryBinding>() {
-    private var historyAdapter: HistoryAdapter? = null
-    override fun init() {
-        initView()
+/**
+ * 观看历史(Compose): 3 列海报网格, 点击续播, 长按删除, 右上清空。
+ */
+class HistoryActivity : BaseActivity() {
+
+    private val cards = mutableStateOf<List<VodCard>>(emptyList())
+
+    override fun getLayoutResID(): Int = -1
+
+    override fun initVb() {
+        val composeView = androidx.compose.ui.platform.ComposeView(this)
+        setContentView(composeView)
+        composeView.setContent {
+            com.github.tvbox.osc.ui.compose.TvBoxTheme {
+                VodGridScreen(
+                    title = "观看历史",
+                    cards = cards.value,
+                    onBack = { finish() },
+                    onClear = { confirmClear() },
+                    onItemClick = { card ->
+                        val bundle = Bundle()
+                        bundle.putString("id", card.key.substringAfter('|'))
+                        bundle.putString("sourceKey", card.key.substringBefore('|'))
+                        jumpActivity(DetailActivity::class.java, bundle)
+                    },
+                    onItemLongClick = { card ->
+                        val info = rawInfos.firstOrNull {
+                            it.sourceKey + "|" + it.id == card.key
+                        } ?: return@VodGridScreen
+                        RoomDataManger.deleteVodRecord(info.sourceKey, info)
+                        cards.value = cards.value.filterNot { it == card }
+                        rawInfos.removeAll { it.sourceKey + "|" + it.id == card.key }
+                    }
+                )
+            }
+        }
         initData()
     }
 
-    private fun initView() {
-        setLoadSir(mBinding.mGridView)
-
-        mBinding.mGridView.setHasFixedSize(true)
-        mBinding.mGridView.setLayoutManager(GridLayoutManager(this, 3))
-        historyAdapter = HistoryAdapter()
-        mBinding.mGridView.setAdapter(historyAdapter)
-
-        historyAdapter!!.onItemLongClickListener =
-            BaseQuickAdapter.OnItemLongClickListener { _: BaseQuickAdapter<*, *>?, view: View?, position: Int ->
-                FastClickCheckUtil.check(view)
-                val vodInfo = historyAdapter!!.data[position]
-                historyAdapter!!.remove(position)
-                RoomDataManger.deleteVodRecord(vodInfo.sourceKey, vodInfo)
-                if (historyAdapter!!.data.isEmpty()) {
-                    mBinding.topTip.visibility = View.GONE
-                }
-                true
-            }
-
-        mBinding.rightView.setOnClickListener { view: View? ->
-            MaterialAlertDialogBuilder(this)
-                .setTitle("提示")
-                .setMessage("确定清空?")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("确定") { _, _ ->
-
-                    showLoadingDialog()
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        RoomDataManger.deleteVodRecordAll()
-                        // 在主线程更新数据
-                        withContext(Dispatchers.Main) {
-                            dismissLoadingDialog()
-                            historyAdapter!!.setNewData(ArrayList())
-                            mBinding.topTip.visibility = View.GONE
-                            showEmpty()
-                        }
-                    }
-
-                }
-.show()
-        }
-
-        historyAdapter!!.onItemClickListener =
-            BaseQuickAdapter.OnItemClickListener { _: BaseQuickAdapter<*, *>?, view: View?, position: Int ->
-                FastClickCheckUtil.check(view)
-                val vodInfo = historyAdapter!!.data[position]
-                val bundle = Bundle()
-                bundle.putString("id", vodInfo.id)
-                bundle.putString("sourceKey", vodInfo.sourceKey)
-                jumpActivity(DetailActivity::class.java, bundle)
-            }
+    override fun init() {
     }
 
     private fun initData() {
-
         lifecycleScope.launch(Dispatchers.IO) {
-            val allVodRecord = RoomDataManger.getAllVodRecord(100)
-            val vodInfoList: MutableList<VodInfo> = ArrayList()
-            for (vodInfo in allVodRecord) {
-                if (vodInfo.playNote != null && vodInfo.playNote.isNotEmpty()) vodInfo.note =
-                    vodInfo.playNote
-                vodInfoList.add(vodInfo)
-            }
-
-            withContext(Dispatchers.Main) {
-                historyAdapter!!.setNewData(vodInfoList)
-                if (vodInfoList.isNotEmpty()) {
-                    showSuccess()
-                    mBinding.topTip.visibility = View.VISIBLE
-                } else {
-                    showEmpty()
+            val all = RoomDataManger.getAllVodRecord(100)
+            val list = ArrayList<Pair<VodCard, VodInfo>>()
+            for (vodInfo in all) {
+                if (vodInfo.playNote != null && vodInfo.playNote.isNotEmpty()) vodInfo.note = vodInfo.playNote
+                val sourceName = try {
+                    ApiConfig.get().getSource(vodInfo.sourceKey)?.name ?: ""
+                } catch (e: Exception) {
+                    ""
                 }
+                list.add(
+                    VodCard(
+                        key = vodInfo.sourceKey + "|" + vodInfo.id,
+                        name = vodInfo.name ?: "",
+                        pic = vodInfo.pic ?: "",
+                        badge = sourceName,
+                        note = vodInfo.note
+                    ) to vodInfo
+                )
+            }
+            withContext(Dispatchers.Main) {
+                // 保留原始 VodInfo 供删除使用
+                cards.value = list.map { it.first }
+                rawInfos.clear()
+                rawInfos.addAll(list.map { it.second })
             }
         }
+    }
+
+    private val rawInfos = mutableListOf<VodInfo>()
+
+    private fun confirmClear() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("提示")
+            .setMessage("确定清空?")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确定") { _, _ ->
+                showLoadingDialog()
+                lifecycleScope.launch(Dispatchers.IO) {
+                    RoomDataManger.deleteVodRecordAll()
+                    withContext(Dispatchers.Main) {
+                        dismissLoadingDialog()
+                        cards.value = emptyList()
+                    }
+                }
+            }
+            .show()
     }
 }

@@ -302,4 +302,10 @@
     </style>
 
 
+<!-- 全部分类下拉弹窗动画(自分类栏顶部向下展开) -->
+<style name="CategoryDropdownAnimation">
+    <item name="android:windowEnterAnimation">@anim/category_dropdown_enter</item>
+    <item name="android:windowExitAnimation">@anim/category_dropdown_exit</item>
+</style>
+
 </resources>

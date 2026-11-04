@@ -109,6 +109,7 @@ public class App extends MultiDexApplication {
         putDefault(HawkConfig.FONT_PATH, "");                 //自定义字体: 空=系统默认
         putDefault(HawkConfig.PREDICTIVE_BACK, false);        //预见性返回手势
         putDefault(HawkConfig.BAR_FLOATING, false);           //悬浮底栏
+        putDefault(HawkConfig.BAR_SHOW_LABELS, true);         //底栏显示名称: true=图标+文字
         putDefault(HawkConfig.BAR_AUTO_HIDE, false);          //底栏随滚动隐藏
         putDefault(HawkConfig.SYNC_ENABLED, false);
         putDefault(HawkConfig.SYNC_SPACE_ID, "default");

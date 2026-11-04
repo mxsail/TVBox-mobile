@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 下拉展开: 自顶部锚点缩放+淡入 -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:interpolator/decelerate_quad"
+    android:duration="180"
+    android:shareInterpolator="true">
+    <scale
+        android:fromXScale="0.92" android:toXScale="1"
+        android:fromYScale="0.55" android:toYScale="1"
+        android:pivotX="85%" android:pivotY="0%" />
+    <alpha android:fromAlpha="0" android:toAlpha="1" />
+</set>
