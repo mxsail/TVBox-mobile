@@ -120,7 +120,10 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         mBinding.vp.currentItem = index
     }
 
-    override fun onBackPressed() {
+    // 主页返回层级复杂(直播层/首页网格栈/双击退出), 预见性模式下也保持自行拦截
+    override fun keepBackIntercept(): Boolean = true
+
+    override fun onBackHandled() {
         if (mBinding.vp.currentItem != 0) {
             // 直播 tab 内部有可回退层(侧边设置/全屏)时先消化,否则切回首页 tab
             val liveFragment = fragments[1] as LiveFragment

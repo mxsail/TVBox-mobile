@@ -28,6 +28,7 @@ object ThemeManager {
 
     class Preset(val id: String, val label: String, val overlayRes: Int, val swatchRes: Int)
 
+    @JvmStatic
     val PRESETS = listOf(
         Preset("blue", "经典蓝", R.style.ThemeOverlay_Preset_Blue, R.color.md_primary),
         Preset("teal", "青绿", R.style.ThemeOverlay_Preset_Teal, R.color.preset_teal_primary),

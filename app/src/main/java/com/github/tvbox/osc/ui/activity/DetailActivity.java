@@ -786,8 +786,14 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         toggleScreenShotListen(false);
     }
 
+    // 播放页返回层级复杂(选集弹窗/播放控制层/全屏预览), 预见性模式下也保持自行拦截
     @Override
-    public void onBackPressed() {
+    protected boolean keepBackIntercept() {
+        return true;
+    }
+
+    @Override
+    protected void onBackHandled() {
         if (mAllSeriesRightDialog != null && mAllSeriesRightDialog.isShow()) {
             mAllSeriesRightDialog.dismiss();
             return;
@@ -804,7 +810,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             mBinding.mGridView.requestFocus();
             return;
         }
-        super.onBackPressed();
+        finish();
     }
 
     @Override

@@ -26,6 +26,8 @@ public class MyFragment extends BaseVbFragment<FragmentMyBinding> {
         com.github.tvbox.osc.view.BarAutoHide.attachScrollView(mBinding.myScroll,
                 mActivity instanceof com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost
                         ? (com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost) mActivity : null);
+        // 滚动回弹
+        com.github.tvbox.osc.view.BounceOverScroll.attach(mBinding.myScroll);
 
         mBinding.tvLive.setOnClickListener(v -> {
             if (mActivity instanceof MainActivity) ((MainActivity) mActivity).goToTab(1);

@@ -53,6 +53,7 @@ public class SelectDialog<T> extends BaseDialog {
         SelectDialogAdapter<T> adapter = new SelectDialogAdapter(sourceBeanSelectDialogInterface, sourceBeanItemCallback);
         adapter.setData(data, select);
         TvRecyclerView tvRecyclerView = ((TvRecyclerView) findViewById(R.id.list));
+        com.github.tvbox.osc.view.BounceOverScroll.attach(tvRecyclerView);
         tvRecyclerView.setAdapter(adapter);
         tvRecyclerView.setSelectedPosition(select);
         tvRecyclerView.post(new Runnable() {

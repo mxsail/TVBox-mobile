@@ -66,6 +66,7 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
             getLayoutInflater().setFactory2(new FontFactory2((LayoutInflater.Factory2) getDelegate()));
         }
         super.onCreate(savedInstanceState);
+        setupBackCallback();
         EventBus.getDefault().register(this);
 
         if (getLayoutResID()==-1){
@@ -87,6 +88,44 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void refresh(RefreshEvent event) {
 
+    }
+
+    // ---------------- 返回键统一处理(预见性返回) ----------------
+
+    private androidx.activity.OnBackPressedCallback mBackCallback;
+
+    /**
+     * 返回键统一走 OnBackPressedDispatcher(manifest 已开 enableOnBackInvokedCallback):
+     *  - 预见性返回关闭(默认): 回调常开, 行为与旧版重写 onBackPressed 完全一致;
+     *  - 预见性返回开启: 默认放行系统(API33+ 出预见性预览动画, 到根由系统收尾),
+     *    需要自行消化返回的页面覆写 keepBackIntercept()=true, 或运行时 setBackIntercept()。
+     */
+    private void setupBackCallback() {
+        boolean predictive = Hawk.get(HawkConfig.PREDICTIVE_BACK, false);
+        mBackCallback = new androidx.activity.OnBackPressedCallback(!predictive || keepBackIntercept()) {
+            @Override
+            public void handleOnBackPressed() {
+                onBackHandled();
+            }
+        };
+        getOnBackPressedDispatcher().addCallback(this, mBackCallback);
+    }
+
+    /** 预见性返回模式下本页是否仍拦截返回(复杂页面/播放页覆写 true) */
+    protected boolean keepBackIntercept() {
+        return false;
+    }
+
+    /** 运行时切换本页拦截态(内层弹窗/播放控制层出现时开, 关闭后关) */
+    protected void setBackIntercept(boolean enable) {
+        if (mBackCallback != null) {
+            mBackCallback.setEnabled(enable);
+        }
+    }
+
+    /** 返回键处理入口(替代旧版重写 onBackPressed), 默认退出本页 */
+    protected void onBackHandled() {
+        finish();
     }
 
 

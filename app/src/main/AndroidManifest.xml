@@ -30,6 +30,7 @@
         android:name=".base.App"
         android:allowBackup="true"
         android:extractNativeLibs="true"
+        android:enableOnBackInvokedCallback="true"
         android:configChanges="orientation|keyboardHidden|screenSize"
         android:hardwareAccelerated="true"
         android:icon="@drawable/app_icon"

@@ -40,6 +40,7 @@ public class CategoryDropdownDialog extends BottomPopupView {
     protected void onCreate() {
         super.onCreate();
         RecyclerView rv = findViewById(R.id.rv_categories);
+        com.github.tvbox.osc.view.BounceOverScroll.attach(rv);
         rv.setLayoutManager(new GridLayoutManager(getActivity(), 4));
         CategoryChipAdapter adapter = new CategoryChipAdapter(position -> {
             dismissWith(() -> {

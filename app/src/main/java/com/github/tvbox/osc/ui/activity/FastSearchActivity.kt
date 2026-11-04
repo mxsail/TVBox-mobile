@@ -122,6 +122,7 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
         mBinding.mGridView.setHasFixedSize(true)
         mBinding.mGridView.setLayoutManager(LinearLayoutManager(this))
         mBinding.mGridView.adapter = searchAdapter
+        com.github.tvbox.osc.view.BounceOverScroll.attach(mBinding.mGridView)
         searchAdapter.setOnItemClickListener { _, view, position ->
             FastClickCheckUtil.check(view)
             val video = searchAdapter.data[position]
@@ -140,6 +141,7 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
             jumpActivity(DetailActivity::class.java, bundle)
         }
         mBinding.mGridViewFilter.setLayoutManager(LinearLayoutManager(this))
+        com.github.tvbox.osc.view.BounceOverScroll.attach(mBinding.mGridViewFilter)
 
         mBinding.mGridViewFilter.adapter = searchAdapterFilter
         searchAdapterFilter.setOnItemClickListener { _, view, position ->

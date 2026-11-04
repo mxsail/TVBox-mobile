@@ -154,7 +154,10 @@ class VideoListActivity : BaseVbActivity<ActivityMovieFoldersBinding>() {
         mLocalVideoAdapter.setNewData(collect)
     }
 
-    override fun onBackPressed() {
+    // 选择模式需要先消化返回
+    override fun keepBackIntercept(): Boolean = true
+
+    override fun onBackHandled() {
         if (mLocalVideoAdapter.isSelectMode) {
             if (mSelectedCount > 0) {
                 cancelAll()
@@ -162,7 +165,7 @@ class VideoListActivity : BaseVbActivity<ActivityMovieFoldersBinding>() {
                 toggleListSelectMode(false)
             }
         } else {
-            super.onBackPressed()
+            finish()
         }
     }
 }

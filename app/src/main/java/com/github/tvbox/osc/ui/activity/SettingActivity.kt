@@ -47,7 +47,7 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
     private var currentLiveApi = Hawk.get(HawkConfig.LIVE_URL, "")
     override fun init() {
 
-        mBinding.titleBar.setNavigationOnClickListener { onBackPressed() }
+        mBinding.titleBar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
         mBinding.tvMediaCodec.text = Hawk.get(HawkConfig.IJK_CODEC, "")
 
         mBinding.tvDns.text = OkGoHelper.dnsHttpsList[Hawk.get(HawkConfig.DOH_URL, 0)]
@@ -417,7 +417,10 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
         }
     }
 
-    override fun onBackPressed() {
+    // 有配置变更跳转逻辑, 保持自行拦截
+    override fun keepBackIntercept(): Boolean = true
+
+    override fun onBackHandled() {
         if (homeRec != Hawk.get(HawkConfig.HOME_REC, 0) || dnsOpt != Hawk.get(
                 HawkConfig.DOH_URL,
                 0
@@ -433,7 +436,7 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
             }
             overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
         } else {
-            super.onBackPressed()
+            finish()
         }
     }
 

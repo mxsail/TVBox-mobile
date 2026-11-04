@@ -42,9 +42,14 @@ object MaterialBarHelper {
 
     /** 实际生效的材质: 低版本把 blur/liquid 降级为 translucent */
     @JvmStatic
-    fun effectiveMaterial(): String {
-        val m = material()
-        return if ((m == ThemeManager.MATERIAL_BLUR || m == ThemeManager.MATERIAL_LIQUID) && !blurSupported()) {
+    fun effectiveMaterial(): String = normalizeMaterial(material(), Build.VERSION.SDK_INT)
+
+    /** 纯逻辑(供单测): 材质降级规则 */
+    @JvmStatic
+    fun normalizeMaterial(m: String, sdkInt: Int): String {
+        return if ((m == ThemeManager.MATERIAL_BLUR || m == ThemeManager.MATERIAL_LIQUID)
+            && sdkInt < Build.VERSION_CODES.S
+        ) {
             ThemeManager.MATERIAL_TRANSLUCENT
         } else {
             m

@@ -306,7 +306,8 @@ public class PlayFragment extends BaseLazyFragment {
 
             @Override
             public void exit() {
-                activity.onBackPressed();
+                // 走 dispatcher(等价旧 activity.onBackPressed(), 兼容预见性返回链路)
+                ((com.github.tvbox.osc.base.BaseActivity) activity).getOnBackPressedDispatcher().onBackPressed();
             }
 
             @Override

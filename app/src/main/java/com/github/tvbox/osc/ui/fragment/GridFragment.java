@@ -177,6 +177,8 @@ public class GridFragment extends BaseLazyFragment {
         com.github.tvbox.osc.view.BarAutoHide.attach(mGridView,
                 mActivity instanceof com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost
                         ? (com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost) mActivity : null);
+        // 滚动回弹
+        com.github.tvbox.osc.view.BounceOverScroll.attach(mGridView);
     }
 
     private void initView() {

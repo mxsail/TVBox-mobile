@@ -392,14 +392,20 @@ public class LocalPlayActivity extends BaseVbActivity<ActivityLocalPlayBinding> 
     }
 
 
+    // 本地播放页返回层级(全屏/播放控制)交给播放器消化
     @Override
-    public void onBackPressed() {
+    protected boolean keepBackIntercept() {
+        return true;
+    }
+
+    @Override
+    protected void onBackHandled() {
         if (mIsFullScreen) {
             setFullScreen(false);
             return;
         }
         if (!mVideoView.onBackPressed()) {
-            super.onBackPressed();
+            finish();
         }
     }
 

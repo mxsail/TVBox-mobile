@@ -87,6 +87,8 @@ public class CacheFragment extends BaseVbFragment<FragmentCacheBinding> {
         com.github.tvbox.osc.view.BarAutoHide.attach(rv,
                 mActivity instanceof com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost
                         ? (com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost) mActivity : null);
+        // 滚动回弹
+        com.github.tvbox.osc.view.BounceOverScroll.attach(rv);
         // 总量在后台计算,先给占位文案;重置去重标记,保证视图重建后(值未变)也会回填真实总量
         mBinding.tvStorage.setText("已占用: …");
         lastAppliedTotal = -1;
