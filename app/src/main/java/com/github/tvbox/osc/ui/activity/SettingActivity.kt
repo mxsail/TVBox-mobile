@@ -11,6 +11,7 @@ import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.bean.IJKCode
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.databinding.ActivitySettingBinding
+import com.github.tvbox.osc.event.AppearanceChangedEvent
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
 import com.github.tvbox.osc.ui.dialog.BackupDialog
@@ -29,6 +30,8 @@ import com.lxj.xpopup.XPopup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.orhanobut.hawk.Hawk
 import okhttp3.HttpUrl
+import org.greenrobot.eventbus.Subscribe
+import org.greenrobot.eventbus.ThreadMode
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
 import java.io.File
 
@@ -461,5 +464,14 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
     private fun themeColorLabel(): String {
         return if (ThemeManager.useDynamicColor()) "动态取色"
         else ThemeManager.presetOf(ThemeManager.colorScheme())?.label ?: "动态取色"
+    }
+
+    /** 主题色/字体等主题级变化(在外观页触发)时, 刷新入口行文字并重建本页套新覆盖层 */
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    fun onAppearanceChanged(event: AppearanceChangedEvent) {
+        if (event.type == AppearanceChangedEvent.TYPE_RECREATE) {
+            mBinding.tvAppearance.text = themeColorLabel()
+            recreate()
+        }
     }
 }

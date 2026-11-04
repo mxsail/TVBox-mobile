@@ -83,6 +83,10 @@ public class CacheFragment extends BaseVbFragment<FragmentCacheBinding> {
         }
         RecyclerView rv = mBinding.rvList;
         rv.setLayoutManager(new GridLayoutManager(requireActivity(), 3));
+        // 滚动联动底栏隐藏
+        com.github.tvbox.osc.view.BarAutoHide.attach(rv,
+                mActivity instanceof com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost
+                        ? (com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost) mActivity : null);
         // 总量在后台计算,先给占位文案;重置去重标记,保证视图重建后(值未变)也会回填真实总量
         mBinding.tvStorage.setText("已占用: …");
         lastAppliedTotal = -1;

@@ -22,6 +22,11 @@ public class MyFragment extends BaseVbFragment<FragmentMyBinding> {
     protected void init() {
         mBinding.tvVersion.setText("v"+ AppUtils.getAppVersionName());
 
+        // 滚动联动底栏隐藏(我的页是 ScrollView)
+        com.github.tvbox.osc.view.BarAutoHide.attachScrollView(mBinding.myScroll,
+                mActivity instanceof com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost
+                        ? (com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost) mActivity : null);
+
         mBinding.tvLive.setOnClickListener(v -> {
             if (mActivity instanceof MainActivity) ((MainActivity) mActivity).goToTab(1);
         });

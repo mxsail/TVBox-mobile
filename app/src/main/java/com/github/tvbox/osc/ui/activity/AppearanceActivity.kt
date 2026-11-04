@@ -96,7 +96,7 @@ class AppearanceActivity : BaseVbActivity<ActivityAppearanceBinding>() {
             Hawk.put(HawkConfig.THEME_COLOR, id)
             updateThemeColorLabel()
             // 预设色覆盖层在 Activity 创建时叠加, applyStyle 不可撤销, 必须 recreate
-            EventBus.getDefault().post(AppearanceChangedEvent())
+            EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_RECREATE))
             recreate()
         }
         mBinding.rvSwatches.layoutManager = GridLayoutManager(this, 5)
@@ -129,7 +129,7 @@ class AppearanceActivity : BaseVbActivity<ActivityAppearanceBinding>() {
                 override fun click(value: String?, pos: Int) {
                     Hawk.put(HawkConfig.UI_MATERIAL, MATERIAL_OPTIONS[pos].first)
                     mBinding.tvMaterial.text = MATERIAL_OPTIONS[pos].second
-                    EventBus.getDefault().post(AppearanceChangedEvent())
+                    EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
                 }
 
                 override fun getDisplay(name: String?): String {
@@ -163,7 +163,7 @@ class AppearanceActivity : BaseVbActivity<ActivityAppearanceBinding>() {
                     Hawk.put(HawkConfig.FONT_PATH, "")
                     FontApplier.invalidate()
                     updateFontLabel()
-                    EventBus.getDefault().post(AppearanceChangedEvent())
+                    EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_RECREATE))
                     recreate()
                 }
             }))
@@ -220,7 +220,7 @@ class AppearanceActivity : BaseVbActivity<ActivityAppearanceBinding>() {
                 ThreadUtils.runOnUiThread {
                     ToastUtils.showShort("字体已应用")
                     updateFontLabel()
-                    EventBus.getDefault().post(AppearanceChangedEvent())
+                    EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_RECREATE))
                     recreate()
                 }
             } catch (e: Exception) {
@@ -250,7 +250,7 @@ class AppearanceActivity : BaseVbActivity<ActivityAppearanceBinding>() {
             val newValue = !Hawk.get(HawkConfig.BAR_FLOATING, false)
             mBinding.swBarFloating.setChecked(newValue)
             Hawk.put(HawkConfig.BAR_FLOATING, newValue)
-            EventBus.getDefault().post(AppearanceChangedEvent())
+            EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
         }
 
         mBinding.swBarAutoHide.setChecked(Hawk.get(HawkConfig.BAR_AUTO_HIDE, false))
@@ -259,7 +259,7 @@ class AppearanceActivity : BaseVbActivity<ActivityAppearanceBinding>() {
             val newValue = !Hawk.get(HawkConfig.BAR_AUTO_HIDE, false)
             mBinding.swBarAutoHide.setChecked(newValue)
             Hawk.put(HawkConfig.BAR_AUTO_HIDE, newValue)
-            EventBus.getDefault().post(AppearanceChangedEvent())
+            EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
         }
     }
 

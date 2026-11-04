@@ -126,12 +126,27 @@ object MaterialBarHelper {
         window.attributes = lp
     }
 
-    private fun roundedOutline(radiusPx: Int): ViewOutlineProvider {
+    /** 圆角裁剪 outline(材质圆角与悬浮胶囊底栏共用) */
+    @JvmStatic
+    fun roundedOutline(radiusPx: Int): ViewOutlineProvider {
         return object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) {
                 outline.setRoundRect(0, 0, view.width, view.height, radiusPx.toFloat())
             }
         }
+    }
+
+    /** 实底材质的悬浮胶囊底(浮动+实底时容器用, 圆角 surface + 细描边) */
+    @JvmStatic
+    fun solidBarBackground(ctx: android.content.Context, radiusPx: Int): GradientDrawable {
+        val surface = MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorSurface, Color.BLACK)
+        val gd = GradientDrawable()
+        gd.shape = GradientDrawable.RECTANGLE
+        gd.setColor(surface)
+        if (radiusPx > 0) gd.cornerRadius = radiusPx.toFloat()
+        val outline = MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorOutlineVariant, Color.TRANSPARENT)
+        gd.setStroke(dp(ctx, 1), ColorUtils.setAlphaComponent(outline, 0x80))
+        return gd
     }
 
     /** 半透明 surface 底 + 可选细描边 */
