@@ -52,13 +52,13 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
 
         mSubscriptionAdapter.setNewData(mSubscriptions)
         mBinding.ivUseTip.setOnClickListener {
-            XPopup.Builder(this)
+            XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                 .asCustom(SubsTipDialog(this))
                 .show()
         }
 
         mBinding.rightView.setOnClickListener {//添加订阅
-            XPopup.Builder(this)
+            XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                 .autoFocusEditText(false)
                 .asCustom(
                     SubsciptionDialog(
@@ -131,7 +131,7 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
         mSubscriptionAdapter.onItemLongClickListener =
             BaseQuickAdapter.OnItemLongClickListener { adapter: BaseQuickAdapter<*, *>?, view: View, position: Int ->
                 val item = mSubscriptions[position]
-                XPopup.Builder(this)
+                XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                     .atView(view.findViewById(R.id.tv_name))
                     .hasShadowBg(false)
                     .asAttachList(
@@ -148,7 +148,7 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
                                 mSubscriptionAdapter.setNewData(mSubscriptions)
                             }
                             1 -> {
-                                XPopup.Builder(this)
+                                XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                                     .asInputConfirm(
                                         "更改为",
                                         "",
@@ -289,7 +289,7 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
                                         val url = obj["sourceUrl"].asString.trim { it <= ' ' }
                                         mSources.add(Source(name, url))
                                     }
-                                    XPopup.Builder(this@SubscriptionActivity)
+                                    XPopup.Builder(this@SubscriptionActivity).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                                         .asCustom(
                                             ChooseSourceDialog(
                                                 this@SubscriptionActivity,

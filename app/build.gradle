@@ -153,6 +153,8 @@ dependencies {
     implementation 'com.lzy.net:okgo:3.0.4'
     // implementation 'com.tencent.bugly:crashreport_upgrade:latest.release'
     implementation 'com.owen:tv-recyclerview:3.0.0'
+    // 界面材质(高斯模糊/液态玻璃): 实时采样根视图做背景模糊, API31+ 走 RenderEffect, 低版本 RenderScript
+    implementation 'com.github.Dimezis:BlurView:version-2.0.6'
 
     implementation 'com.github.getActivity:XXPermissions:13.6'
     implementation 'org.jsoup:jsoup:1.14.1'

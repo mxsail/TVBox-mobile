@@ -377,7 +377,7 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
 
             // 查询完成后更新UI
             if (vodInfoList.isNotEmpty() && vodInfoList[0] != null) {
-                XPopup.Builder(context)
+                XPopup.Builder(context).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                     .hasShadowBg(false)
                     .isDestroyOnDismiss(true)
                     .isCenterHorizontal(true)

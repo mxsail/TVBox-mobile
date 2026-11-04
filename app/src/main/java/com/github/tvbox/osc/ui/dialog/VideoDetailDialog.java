@@ -74,7 +74,7 @@ public class VideoDetailDialog extends BottomPopupView {
 
             binding.llThum.setOnClickListener(view -> {
                 // 单张图片场景
-                new XPopup.Builder(getContext())
+                new XPopup.Builder(getContext()).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                         .asImageViewer(binding.ivThum, picUrl, new SmartGlideImageLoader())
                         .show();
             });

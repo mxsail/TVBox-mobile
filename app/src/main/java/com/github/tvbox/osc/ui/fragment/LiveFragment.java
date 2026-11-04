@@ -1123,7 +1123,7 @@ public class LiveFragment extends BaseLazyFragment {
     }
 
     public void showAllChannelDialog() {
-        mAllChannelRightDialog = new XPopup.Builder(requireActivity())
+        mAllChannelRightDialog = new XPopup.Builder(requireActivity()).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                 .isViewMode(true)
                 .hasShadowBg(false)
                 .popupHeight(ScreenUtils.getScreenHeight())
@@ -1134,7 +1134,7 @@ public class LiveFragment extends BaseLazyFragment {
 
     public void showCastDialog() {
         if (currentLiveChannelItem != null) {
-            new XPopup.Builder(requireActivity())
+            new XPopup.Builder(requireActivity()).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                     .maxWidth(ConvertUtils.dp2px(360))
                     .asCustom(new CastListDialog(requireActivity(), new CastVideo(currentLiveChannelItem.getChannelName(), currentLiveChannelItem.getUrl())))
                     .show();
@@ -1185,7 +1185,7 @@ public class LiveFragment extends BaseLazyFragment {
             return;
         }
         if (fullScreenStyle) {
-            mSettingRightDialog = new XPopup.Builder(requireActivity())
+            mSettingRightDialog = new XPopup.Builder(requireActivity()).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                     .isViewMode(true)
                     .hasShadowBg(false)
                     .popupHeight(ScreenUtils.getScreenHeight())
@@ -1194,7 +1194,7 @@ public class LiveFragment extends BaseLazyFragment {
                     .asCustom(new LiveSettingRightDialog(this));
             mSettingRightDialog.show();
         } else {
-            mSettingBottomDialog = new XPopup.Builder(requireActivity())
+            mSettingBottomDialog = new XPopup.Builder(requireActivity()).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                     .isViewMode(true)
                     .popupHeight(ScreenUtils.getScreenHeight() / 2)
                     .hasShadowBg(false)

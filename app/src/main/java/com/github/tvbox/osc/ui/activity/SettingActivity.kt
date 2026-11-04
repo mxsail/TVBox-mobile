@@ -64,7 +64,7 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
         }
 
         mBinding.llLiveApi.setOnClickListener {
-            XPopup.Builder(mContext)
+            XPopup.Builder(mContext).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                 .autoFocusEditText(false)
                 .asCustom(LiveApiDialog(this))
                 .show()

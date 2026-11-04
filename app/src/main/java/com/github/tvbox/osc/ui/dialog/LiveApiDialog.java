@@ -43,7 +43,7 @@ public class LiveApiDialog extends CenterPopupView {
                 ToastUtils.showShort("暂无历史记录");
                 return;
             }
-            new XPopup.Builder(getContext())
+            new XPopup.Builder(getContext()).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                     .asCustom(new ApiHistoryDialog(getContext(),liveApi, this::updateEt))
                     .show();
         });

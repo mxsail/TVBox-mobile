@@ -44,7 +44,8 @@ public class BaseDialog extends Dialog {
     protected void onCreate(Bundle savedInstanceState) {
         CutoutUtil.adaptCutoutAboveAndroidP(this, true);//设置刘海
         super.onCreate(savedInstanceState);
-
+        // 界面材质=高斯模糊/液态玻璃时, 弹窗背后内容实时模糊(Android 12+ 跨窗模糊)
+        com.github.tvbox.osc.view.MaterialBarHelper.applyDialogBlur(getWindow());
 
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams();
         lp.copyFrom(getWindow().getAttributes());

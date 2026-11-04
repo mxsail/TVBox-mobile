@@ -410,7 +410,7 @@ public class LocalPlayActivity extends BaseVbActivity<ActivityLocalPlayBinding> 
     }
 
     public void showAllSeriesDialog(){
-        mAllSeriesRightDialog = new XPopup.Builder(this)
+        mAllSeriesRightDialog = new XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                 .isViewMode(true)//隐藏导航栏(手势条)在dialog模式下会闪一下,改为view模式,但需处理onBackPress的隐藏,下方同理
                 .popupHeight(com.blankj.utilcode.util.ScreenUtils.getScreenHeight())
                 .popupPosition(PopupPosition.Right)

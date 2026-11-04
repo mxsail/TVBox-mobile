@@ -196,7 +196,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         }
 
         findViewById(R.id.ll_title).setOnClickListener(view -> {
-            new XPopup.Builder(this)
+            new XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                     .isViewMode(true)
                     .asCustom(new VideoDetailDialog(this, vodInfo))
                     .show();
@@ -326,7 +326,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     public void showCastDialog() {
 
         VodInfo.VodSeries vodSeries = vodInfo.seriesMap.get(vodInfo.playFlag).get(vodInfo.playIndex);
-        new XPopup.Builder(this)
+        new XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                 .maxWidth(ConvertUtils.dp2px(360))
                 .asCustom(new CastListDialog(this, new CastVideo(vodSeries.name
                         , TextUtils.isEmpty(playFragment.getFinalUrl()) ? vodSeries.url : playFragment.getFinalUrl())))
@@ -335,7 +335,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
 
     public void showAllSeriesDialog() {
         if (fullWindows) {
-            mAllSeriesRightDialog = new XPopup.Builder(this)
+            mAllSeriesRightDialog = new XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                     .isViewMode(true)//隐藏导航栏(手势条)在dialog模式下会闪一下,改为view模式,但需处理onBackPress的隐藏,下方同理
                     .popupHeight(ScreenUtils.getScreenHeight())
                     .popupPosition(PopupPosition.Right)
@@ -343,7 +343,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                     .asCustom(new AllVodSeriesRightDialog(this));
             mAllSeriesRightDialog.show();
         } else {
-            mAllSeriesBottomDialog = new XPopup.Builder(this)
+            mAllSeriesBottomDialog = new XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                     .isViewMode(true)
                     .maxHeight(ScreenUtils.getScreenHeight() - (ScreenUtils.getScreenHeight() / 4))
                     .asCustom(new AllVodSeriesBottomDialog(this, seriesAdapter.getData(), (position, text) -> {
@@ -865,7 +865,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             return;
         }
         HashSet<String> cachedUrls = getCachedUrls();
-        new XPopup.Builder(this)
+        new XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                 .isViewMode(true)
                 .maxHeight(ScreenUtils.getScreenHeight() - (ScreenUtils.getScreenHeight() / 4))
                 .asCustom(new CacheSelectDialog(this, vodInfo, cachedUrls))
@@ -1135,7 +1135,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
 
                 if (playFragment.getPlayer().isInPlaybackState())return;
 
-                new XPopup.Builder(this)
+                new XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                         .isDarkTheme(Utils.isDarkTheme())
                         .asCenterList("",new String[]{"跳转阿狸","跳转优汐","跳转夸父","关闭"}, null, (position, text) -> {
                             String pkg = "";

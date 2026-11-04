@@ -153,7 +153,7 @@ class AppearanceActivity : BaseVbActivity<ActivityAppearanceBinding>() {
     }
 
     private fun showFontDialog() {
-        com.lxj.xpopup.XPopup.Builder(mContext)
+        com.lxj.xpopup.XPopup.Builder(mContext).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
             .asCustom(FontDialog(this, object : FontDialog.Callback {
                 override fun onImport() {
                     launchFontPicker()

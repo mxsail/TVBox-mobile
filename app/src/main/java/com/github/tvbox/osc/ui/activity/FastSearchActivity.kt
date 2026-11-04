@@ -348,7 +348,7 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
                     LogUtils.d("搜索:$text")
                     mSearchSuggestionsDialog!!.dismissWith { search(text) }
                 }
-            XPopup.Builder(this@FastSearchActivity)
+            XPopup.Builder(this@FastSearchActivity).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                 .atView(mBinding.etSearch)
                 .notDismissWhenTouchInView(mBinding.etSearch)
                 .isViewMode(true) //开启View实现
@@ -614,7 +614,7 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
                         return
                     }
 
-                    XPopup.Builder(this@FastSearchActivity)
+                    XPopup.Builder(this@FastSearchActivity).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                         .maxHeight(ScreenUtils.getScreenHeight() - (ScreenUtils.getScreenHeight() / 4))
                         .asCustom(DoubanSuggestDialog(this@FastSearchActivity,filterList.subList(0,1)))
                         .show()
