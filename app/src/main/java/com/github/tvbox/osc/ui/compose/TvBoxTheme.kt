@@ -226,3 +226,30 @@ fun HintText(text: String, modifier: Modifier = Modifier) {
 /** swatch 背景色桥接便利 */
 fun colorFromRes(res: Int, ctx: android.content.Context): Color =
     Color(ContextCompat.getColor(ctx, res))
+
+/**
+ * LazyGrid 滚动增量 → 底栏滚动隐藏联动(替代 View 版 BarAutoHide.attach):
+ * 用可见首项 index/offset 的差分近似 dy; 回到顶部时强制呼出。
+ */
+@Composable
+fun androidx.compose.foundation.lazy.grid.LazyGridState.ObserveBarHideDeltas(
+    onDelta: (Int) -> Unit
+) {
+    androidx.compose.runtime.LaunchedEffect(this) {
+        var lastIndex = 0
+        var lastOffset = 0
+        androidx.compose.runtime.snapshotFlow { firstVisibleItemIndex to firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                if (index == 0 && offset == 0) {
+                    lastIndex = 0
+                    lastOffset = 0
+                    onDelta(-100) // 到顶, 强制呼出
+                    return@collect
+                }
+                val dy = (index - lastIndex) * 500 + (offset - lastOffset)
+                lastIndex = index
+                lastOffset = offset
+                if (dy > 8 || dy < -8) onDelta(dy)
+            }
+    }
+}
