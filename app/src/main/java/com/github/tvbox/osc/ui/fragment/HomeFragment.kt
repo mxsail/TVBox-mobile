@@ -39,6 +39,7 @@ import com.github.tvbox.osc.util.DefaultConfig
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.HeavyTaskUtil
 import com.github.tvbox.osc.viewmodel.SourceViewModel
+import com.github.tvbox.osc.util.FastClickCheckUtil
 import com.lxj.xpopup.XPopup
 import com.orhanobut.hawk.Hawk
 import com.owen.tvrecyclerview.widget.TvRecyclerView
@@ -69,6 +70,11 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
      * 顶部tabs分类集合,用于渲染tab页,每个tab对应fragment内的数据
      */
     private var mSortDataList: List<SortData> = ArrayList()
+
+    /**
+     * 「展开全部」弹窗用的分类名列表(与 fragments 一一对应, 含/不含主页 tab 与 HOME_REC 设置一致)
+     */
+    private var allCategoryNames: List<String> = ArrayList()
     private var dataInitOk = false
     private var jarInitOk = false
 
@@ -95,6 +101,24 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
         }
         mBinding.search.setOnClickListener {
             jumpActivity(FastSearchActivity::class.java)
+        }
+        // 右侧固定「展开全部分类」按钮 → 底部网格 chips 弹窗快速切分类
+        mBinding.btnExpandCategories.setOnClickListener { v ->
+            FastClickCheckUtil.check(v)
+            if (allCategoryNames.isEmpty()) {
+                ToastUtils.showShort("分类未加载")
+                return@setOnClickListener
+            }
+            com.lxj.xpopup.XPopup.Builder(requireActivity())
+                .hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
+                .asCustom(
+                    com.github.tvbox.osc.ui.dialog.CategoryDropdownDialog(
+                        requireActivity(), allCategoryNames, mBinding.mViewPager.currentItem
+                    ) { position, _ ->
+                        mBinding.mViewPager.setCurrentItem(position, false)
+                    }
+                )
+                .show()
         }
         setLoadSir(mBinding.contentLayout)
         initViewModel()
@@ -283,6 +307,12 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
                 mBinding.tabLayout.removeViewAt(0)
                 fragments.removeAt(0)
             }
+
+            // 供「展开全部」弹窗使用的分类名(与 fragments 一一对应, HOME_REC=2 时同样去掉主页)
+            val names = ArrayList<String>()
+            for (data in mSortDataList) names.add(data.name)
+            if (Hawk.get(HawkConfig.HOME_REC, 0) == 2 && names.isNotEmpty()) names.removeAt(0)
+            allCategoryNames = names
 
             //重新渲染vp
             mBinding.mViewPager.adapter =
