@@ -10,16 +10,21 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,20 +32,24 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.TabPosition
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.coerceAtLeast
@@ -135,40 +144,48 @@ fun HomeCategoryBar(
             )
     ) {
         if (!isExpanded) {
-            // 常态收起状态: 单行滚动分类条 + 右侧展开向下箭头 (紧凑高度, 纯净无上下边框)
+            // 常态收起状态: 单行滚动分类条 + 右侧展开向下箭头 (紧凑高度, 纯净无上下边框)。
+            // 不用 M3 ScrollableTabRow: 它对每个 tab 施加 ~88dp 最小宽度, 2 字分类会占 4 字宽;
+            // 改自绘 Row + 选中项底部胶囊指示条, 宽度严格自适应文字。
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(38.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ScrollableTabRow(
-                    selectedTabIndex = validIndex,
-                    modifier = Modifier.weight(1f),
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    edgePadding = 6.dp,
-                    indicator = { tabPositions: List<TabPosition> ->
-                        if (validIndex < tabPositions.size) {
-                            Box(
-                                Modifier
-                                    .tabIndicatorOffset(tabPositions[validIndex])
-                                    .height(3.dp)
-                                    .padding(horizontal = 10.dp)
-                                    .background(
-                                        color = MaterialTheme.colorScheme.primary,
-                                        shape = RoundedCornerShape(percent = 50) // 两端圆润胶囊
-                                    )
-                            )
+                val rowScrollState = rememberScrollState()
+                val tabWidths = remember { mutableStateMapOf<Int, Int>() }
+                // 切换分类(含展开面板点选远处分类)时把选中项滚到可见
+                LaunchedEffect(validIndex, displayCategories.size) {
+                    var target = 0
+                    var found = false
+                    for (i in 0 until displayCategories.size) {
+                        val w = tabWidths[i] ?: break
+                        if (i == validIndex) {
+                            found = true
+                            break
                         }
-                    },
-                    divider = {}
+                        target += w
+                    }
+                    if (found && target > 0) rowScrollState.animateScrollTo(target)
+                }
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rowScrollState)
                 ) {
+                    Spacer(Modifier.width(4.dp)) // 4dp + 分类内边距 6dp = 10dp, 与网格卡片左缘对齐
                     displayCategories.forEachIndexed { index, name ->
                         val isSelected = index == validIndex
-                        Box(
+                        val indicatorColor = MaterialTheme.colorScheme.primary
+                        Text(
+                            text = name,
+                            fontSize = if (isSelected) 16.sp else 14.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false,
                             modifier = Modifier
-                                .height(32.dp) // 文字紧贴指示条, 条高收缩把空间还给内容区
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
@@ -176,17 +193,23 @@ fun HomeCategoryBar(
                                 ) {
                                     onTabSelected(index)
                                 }
-                                .padding(horizontal = 8.dp), // 相邻分类间距 ≈ 1 个字符宽
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = name,
-                                fontSize = if (isSelected) 16.sp else 14.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                                .padding(start = 6.dp, end = 6.dp, bottom = 4.dp)
+                                .onSizeChanged { tabWidths[index] = it.width }
+                                .drawBehind {
+                                    // 选中指示条: 紧贴文字底部的两端圆润胶囊, 宽度=文字宽度
+                                    if (isSelected) {
+                                        val pill = 3.dp.toPx()
+                                        drawRoundRect(
+                                            color = indicatorColor,
+                                            topLeft = Offset(0f, size.height - pill),
+                                            size = Size(size.width, pill),
+                                            cornerRadius = CornerRadius(pill / 2f, pill / 2f)
+                                        )
+                                    }
+                                }
+                        )
                     }
+                    Spacer(Modifier.width(4.dp))
                 }
 
                 // 右侧展开按钮 (分类数大于1时展示)
