@@ -1,0 +1,63 @@
+package com.kyant.backdrop.internal
+
+import android.os.Build
+import androidx.annotation.RequiresApi
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.RenderEffect
+import androidx.compose.ui.graphics.asAndroidColorFilter
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import com.kyant.backdrop.RuntimeShader
+import com.kyant.backdrop.asAndroidRuntimeShader
+
+// Source: https://github.com/Kyant0/AndroidLiquidGlass (Apache 2.0)
+// Android-only implementation (commonMain expect merged)
+
+@RequiresApi(Build.VERSION_CODES.S)
+internal fun RenderEffect.asAndroidRenderEffect(): android.graphics.RenderEffect {
+    val targetType = android.graphics.RenderEffect::class.java
+    val field = this.javaClass.declaredFields.firstOrNull { targetType.isAssignableFrom(it.type) }
+        ?: this.javaClass.superclass?.declaredFields?.firstOrNull { targetType.isAssignableFrom(it.type) }
+        ?: throw IllegalStateException("Cannot obtain android.graphics.RenderEffect from $this")
+    field.isAccessible = true
+    return field.get(this) as android.graphics.RenderEffect
+}
+
+@RequiresApi(Build.VERSION_CODES.S)
+internal fun RenderEffect?.chain(other: RenderEffect): RenderEffect {
+    return if (this != null) {
+        android.graphics.RenderEffect.createChainEffect(
+            other.asAndroidRenderEffect(),
+            this.asAndroidRenderEffect()
+        ).asComposeRenderEffect()
+    } else {
+        other
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+internal fun RuntimeShaderEffect(
+    runtimeShader: RuntimeShader,
+    uniformShaderName: String
+): RenderEffect {
+    return android.graphics.RenderEffect.createRuntimeShaderEffect(
+        runtimeShader.asAndroidRuntimeShader(),
+        uniformShaderName
+    ).asComposeRenderEffect()
+}
+
+@RequiresApi(Build.VERSION_CODES.S)
+internal fun ColorFilterEffect(
+    renderEffect: RenderEffect? = null,
+    colorFilter: ColorFilter
+): RenderEffect {
+    return if (renderEffect != null) {
+        android.graphics.RenderEffect.createColorFilterEffect(
+            colorFilter.asAndroidColorFilter(),
+            renderEffect.asAndroidRenderEffect()
+        ).asComposeRenderEffect()
+    } else {
+        android.graphics.RenderEffect.createColorFilterEffect(
+            colorFilter.asAndroidColorFilter(),
+        ).asComposeRenderEffect()
+    }
+}

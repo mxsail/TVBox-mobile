@@ -29,19 +29,41 @@ public class DefaultConfig {
         List<MovieSort.SortData> data = new ArrayList<>();
         if (sourceKey != null) {
             SourceBean sb = ApiConfig.get().getSource(sourceKey);
-            ArrayList<String> categories = sb.getCategories();
-            if (!categories.isEmpty()) {
-                for (String cate : categories) {
+            if (sb != null) {
+                ArrayList<String> categories = sb.getCategories();
+                if (categories != null && !categories.isEmpty()) {
+                    for (String cate : categories) {
+                        if (list != null) {
+                            for (MovieSort.SortData sortData : list) {
+                                if (sortData != null && sortData.name != null && sortData.name.equals(cate)) {
+                                    if (sortData.filters == null)
+                                        sortData.filters = new ArrayList<>();
+                                    data.add(sortData);
+                                }
+                            }
+                        }
+                    }
+                } else if (list != null) {
                     for (MovieSort.SortData sortData : list) {
-                        if (sortData.name.equals(cate)) {
+                        if (sortData != null) {
                             if (sortData.filters == null)
                                 sortData.filters = new ArrayList<>();
                             data.add(sortData);
                         }
                     }
                 }
-            } else {
+            } else if (list != null) {
                 for (MovieSort.SortData sortData : list) {
+                    if (sortData != null) {
+                        if (sortData.filters == null)
+                            sortData.filters = new ArrayList<>();
+                        data.add(sortData);
+                    }
+                }
+            }
+        } else if (list != null) {
+            for (MovieSort.SortData sortData : list) {
+                if (sortData != null) {
                     if (sortData.filters == null)
                         sortData.filters = new ArrayList<>();
                     data.add(sortData);
@@ -50,7 +72,10 @@ public class DefaultConfig {
         }
         if (withMy)
             data.add(0, new MovieSort.SortData("my0", "主页"));
-        Collections.sort(data);
+        try {
+            Collections.sort(data);
+        } catch (Throwable ignored) {
+        }
         return data;
     }
 

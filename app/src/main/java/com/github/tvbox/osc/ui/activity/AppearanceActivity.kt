@@ -34,6 +34,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -41,6 +43,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -285,7 +288,11 @@ class AppearanceActivity : BaseActivity() {
     private fun AppearanceScreenContent() {
         var themeMode by remember { mutableStateOf(Hawk.get(HawkConfig.THEME_TAG, 0)) }
         var themeColor by remember { mutableStateOf(ThemeManager.colorScheme()) }
-        var material by remember { mutableStateOf(Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_SOLID)) }
+        var material by remember { mutableStateOf(Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID)) }
+        var liquidBlurRadius by remember { mutableFloatStateOf(Hawk.get(HawkConfig.LIQUID_BLUR_RADIUS, 16f)) }
+        var liquidRefractionHeight by remember { mutableFloatStateOf(Hawk.get(HawkConfig.LIQUID_REFRACTION_HEIGHT, 20f)) }
+        var liquidRefractionAmount by remember { mutableFloatStateOf(Hawk.get(HawkConfig.LIQUID_REFRACTION_AMOUNT, 14f)) }
+        var liquidDispersion by remember { mutableStateOf(Hawk.get(HawkConfig.LIQUID_DISPERSION, true)) }
         var fontPath by remember { mutableStateOf(Hawk.get(HawkConfig.FONT_PATH, "")) }
         var predictive by remember { mutableStateOf(Hawk.get(HawkConfig.PREDICTIVE_BACK, false)) }
         var barFloating by remember { mutableStateOf(Hawk.get(HawkConfig.BAR_FLOATING, false)) }
@@ -403,6 +410,55 @@ class AppearanceActivity : BaseActivity() {
                     modifier = Modifier
                         .padding(start = 6.dp, top = 6.dp)
                 )
+
+                if (material == ThemeManager.MATERIAL_LIQUID) {
+                    SectionTitle("液态玻璃微调")
+                    GroupCard {
+                        SliderRow(
+                            title = "模糊半径",
+                            value = liquidBlurRadius,
+                            valueRange = 8f..32f,
+                            displayValue = "${liquidBlurRadius.toInt()} dp",
+                            onValueChange = { newValue ->
+                                liquidBlurRadius = newValue
+                                Hawk.put(HawkConfig.LIQUID_BLUR_RADIUS, newValue)
+                                EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
+                            }
+                        )
+                        SliderRow(
+                            title = "折射高度",
+                            value = liquidRefractionHeight,
+                            valueRange = 0f..40f,
+                            displayValue = "${liquidRefractionHeight.toInt()} dp",
+                            onValueChange = { newValue ->
+                                liquidRefractionHeight = newValue
+                                Hawk.put(HawkConfig.LIQUID_REFRACTION_HEIGHT, newValue)
+                                EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
+                            }
+                        )
+                        SliderRow(
+                            title = "折射强度",
+                            value = liquidRefractionAmount,
+                            valueRange = 0f..30f,
+                            displayValue = "${liquidRefractionAmount.toInt()} dp",
+                            onValueChange = { newValue ->
+                                liquidRefractionAmount = newValue
+                                Hawk.put(HawkConfig.LIQUID_REFRACTION_AMOUNT, newValue)
+                                EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
+                            }
+                        )
+                        SwitchRow(
+                            icon = R.drawable.ic_material_48,
+                            title = "色散彩虹效果",
+                            checked = liquidDispersion,
+                            onToggle = { newValue ->
+                                liquidDispersion = newValue
+                                Hawk.put(HawkConfig.LIQUID_DISPERSION, newValue)
+                                EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
+                            }
+                        )
+                    }
+                }
 
                 SectionTitle("字体")
                 GroupCard {
@@ -582,6 +638,41 @@ class AppearanceActivity : BaseActivity() {
                     .weight(1f)
             )
             Switch(checked = checked, onCheckedChange = { onToggle(it) })
+        }
+    }
+
+    @Composable
+    private fun SliderRow(
+        title: String,
+        value: Float,
+        valueRange: ClosedFloatingPointRange<Float>,
+        displayValue: String,
+        onValueChange: (Float) -> Unit
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(title, color = colorScheme.onSurface, fontSize = 15.sp)
+                Text(displayValue, color = colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                valueRange = valueRange,
+                colors = SliderDefaults.colors(
+                    thumbColor = colorScheme.primary,
+                    activeTrackColor = colorScheme.primary,
+                    inactiveTrackColor = colorScheme.surfaceVariant
+                ),
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
     }
 

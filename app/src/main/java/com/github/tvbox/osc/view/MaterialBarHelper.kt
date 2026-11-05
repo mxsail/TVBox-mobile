@@ -34,7 +34,7 @@ object MaterialBarHelper {
     private const val TAG_BLUR_LAYER = "material_blur_layer"
 
     @JvmStatic
-    fun material(): String = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_SOLID)
+    fun material(): String = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID)
 
     /** 原生跨窗口/视图层级真模糊需要 Android 12+ */
     @JvmStatic

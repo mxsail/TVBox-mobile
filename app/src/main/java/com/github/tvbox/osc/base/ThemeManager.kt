@@ -21,10 +21,10 @@ object ThemeManager {
     const val COLOR_DYNAMIC = "dynamic"
 
     // 界面材质取值(HawkConfig.UI_MATERIAL)
-    const val MATERIAL_SOLID = "solid"             // 实底(默认, 即现状)
+    const val MATERIAL_SOLID = "solid"             // 实底
     const val MATERIAL_TRANSLUCENT = "translucent" // 半透明
     const val MATERIAL_BLUR = "blur"               // 高斯模糊(Android 12+, 低版本降级半透明)
-    const val MATERIAL_LIQUID = "liquid"           // 液态玻璃(Android 12+, 低版本降级半透明)
+    const val MATERIAL_LIQUID = "liquid"           // 液态玻璃(默认, Android 12+, 低版本降级半透明)
 
     class Preset(val id: String, val label: String, val overlayRes: Int, val swatchRes: Int)
 

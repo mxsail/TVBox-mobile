@@ -62,50 +62,46 @@
 
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/contentLayout"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_weight="1">
 
         <FrameLayout
+            android:id="@+id/contentLayout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp">
+            android:layout_height="match_parent"
+            android:layout_marginTop="46dp">
 
-            <com.angcyo.tablayout.DslTabLayout
-                android:id="@+id/tab_layout"
+            <androidx.viewpager.widget.ViewPager
+                android:id="@+id/mViewPager"
                 android:layout_width="match_parent"
-                android:layout_height="40dp"
-                app:tab_select_color="?attr/colorPrimary"
-                app:tab_text_min_size="14dp"
-                app:tab_text_max_size="16dp"
-                app:tab_enable_gradient_text_size="false"
-                android:paddingEnd="48dp"
-                >
-
-            </com.angcyo.tablayout.DslTabLayout>
-
-            <!-- 固定在右侧的「展开全部分类」按钮: tab 超长时快速切换, 无底色纯图标 -->
-            <ImageView
-                android:id="@+id/btn_expand_categories"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_gravity="end|center_vertical"
-                android:layout_marginEnd="4dp"
-                android:padding="10dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_expand_all_18"
-                android:importantForAccessibility="no" />
+                android:layout_height="match_parent" />
 
         </FrameLayout>
 
-        <androidx.viewpager.widget.ViewPager
-            android:id="@+id/mViewPager"
+        <!-- 内容区压暗遮罩: 分类栏展开时淡入, 点击任意处平滑收起展开卡片 -->
+        <View
+            android:id="@+id/tab_mask_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginTop="10dp"
-            />
-    </LinearLayout>
+            android:background="#73000000"
+            android:alpha="0"
+            android:visibility="gone" />
+
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/compose_tabs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp" />
+
+        <!-- 固定在右侧的「展开全部分类」按钮已融合进 Compose 面板，此处保留节点避免兼容性空指针 -->
+        <ImageView
+            android:id="@+id/btn_expand_categories"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone"
+            android:importantForAccessibility="no" />
+
+    </FrameLayout>
 </LinearLayout>

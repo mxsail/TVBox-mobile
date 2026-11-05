@@ -5,12 +5,13 @@ import android.os.Bundle
 import android.os.Handler
 import android.view.Gravity
 import android.widget.TextView
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentStatePagerAdapter
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
-import com.angcyo.tablayout.delegate.ViewPager1Delegate.Companion.install
 import com.blankj.utilcode.util.ConvertUtils
 import com.blankj.utilcode.util.ScreenUtils
 import com.blankj.utilcode.util.ToastUtils
@@ -20,6 +21,7 @@ import com.github.tvbox.osc.api.ApiConfig.LoadConfigCallback
 import com.github.tvbox.osc.base.App
 import com.github.tvbox.osc.base.BaseLazyFragment
 import com.github.tvbox.osc.base.BaseVbFragment
+import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.bean.AbsSortXml
 import com.github.tvbox.osc.bean.MovieSort.SortData
 import com.github.tvbox.osc.bean.SourceBean
@@ -27,11 +29,14 @@ import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.cache.RoomDataManger
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.databinding.FragmentHomeBinding
+import com.github.tvbox.osc.event.AppearanceChangedEvent
 import com.github.tvbox.osc.server.ControlManager
 import com.github.tvbox.osc.ui.activity.FastSearchActivity
 import com.github.tvbox.osc.ui.activity.MainActivity
 import com.github.tvbox.osc.ui.activity.SubscriptionActivity
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
+import com.github.tvbox.osc.ui.compose.HomeCategoryBar
+import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.dialog.LastViewedDialog
 import com.github.tvbox.osc.ui.dialog.SelectDialog
 import com.github.tvbox.osc.ui.dialog.TipDialog
@@ -50,11 +55,44 @@ import kotlinx.coroutines.withContext
 
 class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
 
+    private val selectedTabState = mutableIntStateOf(0)
+    private val categoriesState = mutableStateOf<List<String>>(listOf("主页"))
+    private val materialState = mutableStateOf(Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID))
+    private val isTabsExpandedState = mutableStateOf(false)
+
+    fun collapseTabsIfExpanded(): Boolean {
+        if (isTabsExpandedState.value) {
+            setTabsExpanded(false)
+            return true
+        }
+        return false
+    }
+
+    private fun setTabsExpanded(expanded: Boolean) {
+        if (isTabsExpandedState.value == expanded) return
+        isTabsExpandedState.value = expanded
+        if (expanded) {
+            mBinding.tabMaskView.visibility = android.view.View.VISIBLE
+            mBinding.tabMaskView.animate().alpha(1f).setDuration(240).start()
+        } else {
+            mBinding.tabMaskView.animate().alpha(0f).setDuration(200).withEndAction {
+                mBinding.tabMaskView.visibility = android.view.View.GONE
+            }.start()
+        }
+    }
+
+    @org.greenrobot.eventbus.Subscribe(threadMode = org.greenrobot.eventbus.ThreadMode.MAIN)
+    fun onAppearanceChanged(event: AppearanceChangedEvent) {
+        if (event.type == AppearanceChangedEvent.TYPE_STYLE) {
+            materialState.value = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID)
+        }
+    }
+
     /**
      * 提供给主页返回操作
      */
     val tabIndex: Int
-        get() = mBinding.tabLayout.currentItemIndex
+        get() = selectedTabState.intValue
 
     /**
      * 提供给主页返回操作
@@ -119,6 +157,34 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
             }
             categoryDropdown?.show(v)
         }
+        mBinding.tabMaskView.setOnClickListener {
+            setTabsExpanded(false)
+        }
+        mBinding.mViewPager.addOnPageChangeListener(object : androidx.viewpager.widget.ViewPager.SimpleOnPageChangeListener() {
+            override fun onPageSelected(position: Int) {
+                selectedTabState.intValue = position
+            }
+        })
+        mBinding.composeTabs.setViewCompositionStrategy(
+            androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+        )
+        mBinding.composeTabs.setContent {
+            TvBoxTheme {
+                HomeCategoryBar(
+                    categories = categoriesState.value,
+                    selectedIndex = selectedTabState.intValue,
+                    onTabSelected = { pos ->
+                        selectedTabState.intValue = pos
+                        mBinding.mViewPager.setCurrentItem(pos, false)
+                    },
+                    material = materialState.value,
+                    isExpanded = isTabsExpandedState.value,
+                    onExpandChanged = { expanded ->
+                        setTabsExpanded(expanded)
+                    }
+                )
+            }
+        }
         setLoadSir(mBinding.contentLayout)
         initViewModel()
         initData()
@@ -128,15 +194,16 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
         sourceViewModel = ViewModelProvider(this).get(SourceViewModel::class.java)
         sourceViewModel?.sortResult?.observe(this) { absXml: AbsSortXml? ->
             showSuccess()
+            val homeKey = ApiConfig.get().homeSourceBean?.key
             mSortDataList =
                 if (absXml?.classes != null && absXml.classes.sortList != null) {
                     DefaultConfig.adjustSort(
-                        ApiConfig.get().homeSourceBean.key,
+                        homeKey,
                         absXml.classes.sortList,
                         true
                     )
                 } else {
-                    DefaultConfig.adjustSort(ApiConfig.get().homeSourceBean.key, ArrayList(), true)
+                    DefaultConfig.adjustSort(homeKey, ArrayList(), true)
                 }
             initViewPager(absXml)
         }
@@ -222,8 +289,13 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
                     override fun retry() {}
                     override fun error(msg: String) {
                         jarInitOk = true
+                        android.util.Log.e("TVBox", "loadJar failed: $msg")
                         mHandler.post {
-                            ToastUtils.showShort("更新订阅失败")
+                            if (!msg.isNullOrEmpty()) {
+                                ToastUtils.showShort(msg)
+                            } else {
+                                ToastUtils.showShort("更新订阅失败")
+                            }
                             initData()
                         }
                     }
@@ -269,25 +341,10 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
         if (!errorTipDialog!!.isShowing) errorTipDialog!!.show()
     }
 
-    private fun getTabTextView(text: String): TextView {
-        val textView = TextView(mContext)
-        textView.text = text
-        textView.gravity = Gravity.CENTER
-        textView.setPadding(
-            ConvertUtils.dp2px(20f),
-            ConvertUtils.dp2px(10f),
-            ConvertUtils.dp2px(5f),
-            ConvertUtils.dp2px(10f)
-        )
-        return textView
-    }
-
     private fun initViewPager(absXml: AbsSortXml?) {
         if (mSortDataList.isNotEmpty()) {
-            mBinding.tabLayout.removeAllViews()
             fragments.clear()
             for (data in mSortDataList) {
-                mBinding.tabLayout.addView(getTabTextView(data.name))
                 if (data.id == "my0") { //tab是主页,添加主页fragment 根据设置项显示豆瓣热门/站点推荐(每个源不一样)/历史记录
                     if (Hawk.get(
                             HawkConfig.HOME_REC,
@@ -303,16 +360,18 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
                 }
             }
             if (Hawk.get(HawkConfig.HOME_REC, 0) == 2) { //关闭主页
-                mBinding.tabLayout.removeViewAt(0)
                 fragments.removeAt(0)
             }
 
-            // 供「展开全部」弹窗使用的分类名(与 fragments 一一对应, HOME_REC=2 时同样去掉主页)
+            // 供「展开全部」使用的分类名(与 fragments 一一对应, HOME_REC=2 时同样去掉主页)
             val names = ArrayList<String>()
             for (data in mSortDataList) names.add(data.name)
             if (Hawk.get(HawkConfig.HOME_REC, 0) == 2 && names.isNotEmpty()) names.removeAt(0)
             allCategoryNames = names
-            categoryDropdown = null // 换源/刷新后重建, 弹窗数据与 fragments 同步
+            categoryDropdown = null
+
+            // 驱动 Compose 响应式刷新分类栏 (彻底解决异步加载分类不展示的问题)
+            categoriesState.value = names.toList()
 
             //重新渲染vp
             mBinding.mViewPager.adapter =
@@ -325,8 +384,6 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
                         return fragments.size
                     }
                 }
-            //tab和vp绑定
-            install(mBinding.mViewPager, mBinding.tabLayout, true)
         }
     }
 
@@ -334,7 +391,8 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
      * 提供给主页返回操作
      */
     fun scrollToFirstTab(): Boolean {
-        return if (mBinding.tabLayout.currentItemIndex != 0) {
+        return if (selectedTabState.intValue != 0) {
+            selectedTabState.intValue = 0
             mBinding.mViewPager.setCurrentItem(0, false)
             true
         } else {
@@ -379,8 +437,8 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
     }
 
     private fun refreshHomeSources() {
-        val intent = Intent(App.getInstance(), MainActivity::class.java)
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        val intent = Intent(requireActivity(), MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
         val bundle = Bundle()
         bundle.putBoolean(IntentKey.CACHE_CONFIG_CHANGED, true)
         intent.putExtras(bundle)

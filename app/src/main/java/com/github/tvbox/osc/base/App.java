@@ -105,7 +105,11 @@ public class App extends MultiDexApplication {
         putDefault(HawkConfig.PLAY_SCALE, 0);                //画面缩放: 0=默认, 1=16:9, 2=4:3, 3=填充, 4=原始, 5=裁剪
         putDefault(HawkConfig.HISTORY_NUM, 2);                //历史记录数量: 0=30, 1=50, 2=70
         putDefault(HawkConfig.THEME_COLOR, ThemeManager.COLOR_DYNAMIC); //主题颜色: dynamic=动态取色
-        putDefault(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_SOLID); //界面材质: 实底
+        putDefault(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID); //界面材质: 默认液态玻璃
+        putDefault(HawkConfig.LIQUID_BLUR_RADIUS, 16f);       //液态玻璃: 模糊半径(dp)
+        putDefault(HawkConfig.LIQUID_REFRACTION_HEIGHT, 20f);  //液态玻璃: 折射高度(dp)
+        putDefault(HawkConfig.LIQUID_REFRACTION_AMOUNT, 14f);  //液态玻璃: 折射强度(dp)
+        putDefault(HawkConfig.LIQUID_DISPERSION, true);        //液态玻璃: 色散彩虹开关
         putDefault(HawkConfig.FONT_PATH, "");                 //自定义字体: 空=系统默认
         putDefault(HawkConfig.PREDICTIVE_BACK, false);        //预见性返回手势
         putDefault(HawkConfig.BAR_FLOATING, false);           //悬浮底栏

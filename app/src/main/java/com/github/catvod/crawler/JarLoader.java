@@ -43,6 +43,11 @@ public class JarLoader {
     private boolean loadClassLoader(String jar, String key) {
         boolean success = false;
         try {
+            File jarFile = new File(jar);
+            if (jarFile.exists()) {
+                // Android 14+ (API 34+) 强制要求: 动态加载的代码文件必须标记为只读, 否则 DexClassLoader 抛出 SecurityException
+                jarFile.setReadOnly();
+            }
             File cacheDir = new File(App.getInstance().getCacheDir().getAbsolutePath() + "/catvod_csp");
             if (!cacheDir.exists())
                 cacheDir.mkdirs();
@@ -88,11 +93,16 @@ public class JarLoader {
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/" + key + ".jar");
         if (!md5.isEmpty()) {
             if (cache.exists() && MD5.getFileMd5(cache).equalsIgnoreCase(md5)) {
+                cache.setReadOnly();
                 loadClassLoader(cache.getAbsolutePath(), key);
                 return classLoaders.get(key);
             }
         }
         try {
+            if (cache.exists()) {
+                cache.setWritable(true);
+                cache.delete();
+            }
             Response response = OkGo.<File>get(jar).execute();
             InputStream is = response.body().byteStream();
             OutputStream os = new FileOutputStream(cache);
@@ -110,6 +120,7 @@ public class JarLoader {
                     e.printStackTrace();
                 }
             }
+            cache.setReadOnly();
             loadClassLoader(cache.getAbsolutePath(), key);
             return classLoaders.get(key);
         } catch (Throwable e) {

@@ -57,6 +57,13 @@ public class HawkConfig {
      */
     public static final String UI_MATERIAL = "ui_material";
     /**
+     * 液态玻璃微调配置项: 模糊半径 / 折射高度 / 折射强度 / 色散开关
+     */
+    public static final String LIQUID_BLUR_RADIUS = "liquid_blur_radius";
+    public static final String LIQUID_REFRACTION_HEIGHT = "liquid_refraction_height";
+    public static final String LIQUID_REFRACTION_AMOUNT = "liquid_refraction_amount";
+    public static final String LIQUID_DISPERSION = "liquid_dispersion";
+    /**
      * 自定义字体文件路径(空串=系统默认)
      */
     public static final String FONT_PATH = "font_path";

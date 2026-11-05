@@ -202,10 +202,14 @@ public class ApiConfig {
         if (cache.exists() && shouldUseCachedJar(useCache, md5, cache)) {
             // 本方法由 HomeFragment 的后台任务线程调用, DexClassLoader(首次 dexopt 可达数百 ms)
             // 在该线程执行, 符合 JarLoader"不要在主线程调用"的契约
+            try {
+                cache.setReadOnly();
+            } catch (Throwable ignored) {
+            }
             if (jarLoader.load(cache.getAbsolutePath())) {
                 callback.success();
             } else {
-                callback.error("");
+                callback.error("本地爬虫包加载失败");
             }
             return;
         }
@@ -222,8 +226,13 @@ public class ApiConfig {
                 File cacheDir = cache.getParentFile();
                 if (!cacheDir.exists())
                     cacheDir.mkdirs();
-                if (cache.exists())
+                if (cache.exists()) {
+                    try {
+                        cache.setWritable(true);
+                    } catch (Throwable ignored) {
+                    }
                     cache.delete();
+                }
                 FileOutputStream fos = new FileOutputStream(cache);
                 if(isJarInImg) {
                     String respData = response.body().string();
@@ -234,6 +243,10 @@ public class ApiConfig {
                 }
                 fos.flush();
                 fos.close();
+                try {
+                    cache.setReadOnly();
+                } catch (Throwable ignored) {
+                }
                 return cache;
             }
 
