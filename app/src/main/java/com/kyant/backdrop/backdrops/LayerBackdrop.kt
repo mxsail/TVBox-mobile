@@ -18,6 +18,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Density
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.internal.InverseLayerScope
+import com.kyant.backdrop.internal.isHardwareAccelerated
 
 // Source: https://github.com/Kyant0/AndroidLiquidGlass (Apache 2.0)
 
@@ -66,7 +67,9 @@ class LayerBackdrop internal constructor(
                 }
             translate(-offset.x, -offset.y)
         }) {
-            drawLayer(graphicsLayer)
+            if (isHardwareAccelerated()) {
+                drawLayer(graphicsLayer)
+            }
         }
     }
 

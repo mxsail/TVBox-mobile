@@ -23,6 +23,7 @@ import com.kyant.backdrop.RuntimeShaderCacheImpl
 import com.kyant.backdrop.internal.ShapeProvider
 import com.kyant.backdrop.internal.blur
 import com.kyant.backdrop.internal.clipOutline
+import com.kyant.backdrop.internal.isHardwareAccelerated
 import com.kyant.backdrop.internal.setRuntimeShader
 import com.kyant.backdrop.isRuntimeShaderSupported
 import kotlin.math.ceil
@@ -91,6 +92,8 @@ internal class HighlightNode(
         }
 
         drawContent()
+
+        if (!isHardwareAccelerated()) return
 
         val highlightLayer = highlightLayer
         if (highlightLayer != null) {

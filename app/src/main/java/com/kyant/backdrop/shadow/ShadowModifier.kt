@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import com.kyant.backdrop.internal.ShapeProvider
+import com.kyant.backdrop.internal.isHardwareAccelerated
 import com.kyant.backdrop.internal.blur
 import kotlin.math.ceil
 
@@ -70,6 +71,7 @@ internal class ShadowNode(
 
     override fun ContentDrawScope.draw() {
         val shadow = shadow() ?: return drawContent()
+        if (!isHardwareAccelerated()) return drawContent()
 
         val shadowLayer = shadowLayer
         if (shadowLayer != null) {

@@ -20,6 +20,7 @@ import androidx.compose.ui.node.requireGraphicsContext
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.Density
 import com.kyant.backdrop.internal.ShapeProvider
+import com.kyant.backdrop.internal.isHardwareAccelerated
 import com.kyant.backdrop.internal.clipOutline
 import com.kyant.backdrop.isRenderEffectSupported
 
@@ -77,6 +78,7 @@ internal class InnerShadowNode(
         drawContent()
 
         if (!isRenderEffectSupported()) return
+        if (!isHardwareAccelerated()) return
 
         val shadow = shadow() ?: return
 
