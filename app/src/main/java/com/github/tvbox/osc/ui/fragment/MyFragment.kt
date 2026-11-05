@@ -58,14 +58,17 @@ import com.github.tvbox.osc.ui.activity.MainActivity
 import com.github.tvbox.osc.ui.activity.SettingActivity
 import com.github.tvbox.osc.ui.activity.SubscriptionActivity
 import com.github.tvbox.osc.ui.compose.GroupCard
-import com.github.tvbox.osc.ui.compose.PosterImage
+import com.github.tvbox.osc.ui.compose.PosterFileImage
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.util.DefaultConfig
 import com.github.tvbox.osc.util.MD5
+import com.github.tvbox.osc.util.UA
 import com.kyant.backdrop.backdrops.layerBackdrop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.jessyan.autosize.AutoSize
+import java.io.File
 
 /**
  * 我的页(Compose): 观看历史卡片(横向海报墙, 右下角已播放时间, 下方名称+集数) +
@@ -73,11 +76,39 @@ import me.jessyan.autosize.AutoSize
  */
 class MyFragment : Fragment() {
 
-    /** 观看历史条目: 记录 + 当前集已播放时间(无进度为 null) */
-    private data class HistoryEntry(val vod: VodInfo, val progressText: String?)
+    /** 观看历史条目: 记录 + 已持久缓存的海报文件(未下载完为 null) + 当前集已播放时间 */
+    private data class HistoryEntry(val vod: VodInfo, val posterFile: File?, val progressText: String?)
 
     /** null=加载中, empty=无记录, 非空=海报墙数据(fragment 字段跨视图重建保留, 避免首访空白) */
     private val historyItems = mutableStateOf<List<HistoryEntry>?>(null)
+
+    /** 海报持久缓存目录(filesDir, 不受"清空缓存"影响): 一次下载, 长期复用 */
+    private val posterDir: File by lazy {
+        File(requireContext().filesDir, "history_posters").apply { mkdirs() }
+    }
+
+    private val posterHttpClient by lazy { okhttp3.OkHttpClient() }
+
+    /** 海报持久缓存: 已缓存直接返回文件; 未缓存走本地代理下载并落盘 */
+    private fun downloadPoster(url: String): File? {
+        return try {
+            val target = posterDir.resolve(MD5.string2MD5(url) + ".jpg")
+            if (target.exists() && target.length() > 0) return target
+            val request = okhttp3.Request.Builder()
+                .url(DefaultConfig.checkReplaceProxy(url))
+                .header("User-Agent", UA.random())
+                .build()
+            posterHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val bytes = resp.body?.bytes()
+                if (bytes == null || bytes.isEmpty()) return null
+                target.outputStream().use { it.write(bytes) }
+                target
+            }
+        } catch (t: Throwable) {
+            null
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -102,22 +133,32 @@ class MyFragment : Fragment() {
 
     private fun loadHistory() {
         viewLifecycleOwner.lifecycleScope.launch {
-            val list = withContext(Dispatchers.IO) {
+            // 第一步: 立即装载记录(名称/集数/进度), 海报以占位图先行, 不阻塞任何元素
+            val entries = withContext(Dispatchers.IO) {
                 try {
                     RoomDataManger.getAllVodRecord(20).mapNotNull { vod ->
                         vod ?: return@mapNotNull null
-                        // 预热海报缓存: 首次进入我的页即有图可看, 不等网络逐张加载
-                        vod.pic.takeIf { p -> !p.isNullOrEmpty() }?.let {
-                            runCatching { com.squareup.picasso.Picasso.get().load(it).fetch() }
-                        }
-                        HistoryEntry(vod, currentProgressText(vod))
+                        HistoryEntry(vod, null, currentProgressText(vod))
                     }
                 } catch (t: Throwable) {
                     android.util.Log.w("MyFragment", "loadHistory failed", t)
                     emptyList<HistoryEntry>()
                 }
             }
-            historyItems.value = list
+            historyItems.value = entries
+
+            // 第二步: 后台逐个下载/复用海报文件(filesDir 持久缓存), 完成一个刷新一个
+            withContext(Dispatchers.IO) {
+                entries.forEachIndexed { index, entry ->
+                    val file = entry.vod.pic.takeIf { p -> !p.isNullOrEmpty() }
+                        ?.let { downloadPoster(it) }
+                    if (file != null) {
+                        historyItems.value = historyItems.value?.mapIndexed { i, e ->
+                            if (i == index) e.copy(posterFile = file) else e
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -277,7 +318,7 @@ class MyFragment : Fragment() {
                     .clip(RoundedCornerShape(12.dp))
                     .background(colorScheme.surfaceContainerHigh)
             ) {
-                PosterImage(entry.vod.pic, Modifier.fillMaxSize())
+                PosterFileImage(entry.posterFile, entry.vod.pic, Modifier.fillMaxSize())
                 entry.progressText?.let { progress ->
                     // 右下角: 已播放时间
                     Text(

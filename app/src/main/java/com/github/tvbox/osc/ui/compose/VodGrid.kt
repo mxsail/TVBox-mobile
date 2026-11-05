@@ -43,6 +43,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.util.DefaultConfig
 import com.squareup.picasso.Picasso
+import java.io.File
 
 /**
  * 海报网格(历史/收藏/本地视频等 Compose 页共用): 复刻 item_grid 观感
@@ -76,6 +77,40 @@ fun PosterImage(url: String, modifier: Modifier = Modifier) {
                     .into(iv)
             } else {
                 iv.setImageResource(R.drawable.img_loading_placeholder)
+            }
+        },
+        modifier = modifier
+    )
+}
+
+/**
+ * 本地文件海报(观看历史墙): 海报已持久缓存到本地文件时直接解码显示(零网络等待),
+ * 未缓存时走网络加载并显示占位图(占位图先行, 不阻塞其他元素)。
+ */
+@Composable
+fun PosterFileImage(file: File?, url: String, modifier: Modifier = Modifier) {
+    AndroidView(
+        factory = { ctx ->
+            ImageView(ctx).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageResource(R.drawable.img_loading_placeholder)
+            }
+        },
+        update = { iv ->
+            val placeholder = R.drawable.img_loading_placeholder
+            when {
+                file != null && file.exists() ->
+                    Picasso.get()
+                        .load(file)
+                        .placeholder(placeholder)
+                        .error(placeholder)
+                        .into(iv)
+                url.isNotEmpty() ->
+                    Picasso.get()
+                        .load(DefaultConfig.checkReplaceProxy(url))
+                        .placeholder(placeholder)
+                        .error(placeholder)
+                        .into(iv)
             }
         },
         modifier = modifier
