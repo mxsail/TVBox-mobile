@@ -2,10 +2,12 @@ package com.github.tvbox.osc.ui.activity
 
 import android.animation.ValueAnimator
 import android.content.Intent
+import android.graphics.Rect
 import android.os.Bundle
 import android.os.Process
 import android.view.KeyEvent
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.view.ViewGroup
@@ -14,6 +16,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -36,9 +40,11 @@ import com.github.tvbox.osc.R
 import com.github.tvbox.osc.base.App
 import com.github.tvbox.osc.base.BaseVbActivity
 import com.github.tvbox.osc.base.ThemeManager
+import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.databinding.ActivityMainBinding
 import com.github.tvbox.osc.event.AppearanceChangedEvent
+import com.github.tvbox.osc.ui.compose.LastViewedTip
 import com.github.tvbox.osc.ui.compose.LiquidBarSpec
 import com.github.tvbox.osc.ui.compose.LiquidBottomBar
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
@@ -78,6 +84,28 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
     private val showLabelsState = mutableStateOf(true)
     private val materialState = mutableStateOf(Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID))
     private val navInsetState = mutableIntStateOf(0)
+
+    /** 「上次观看」悬浮条内容(主页内容就绪后由 HomeFragment 置入) */
+    private val lastViewedTipState = mutableStateOf<VodInfo?>(null)
+
+    /** 悬浮条在窗口中的 bounds(用于"点击他处消失"时排除本条的点击) */
+    private var lastViewedTipBounds: Rect? = null
+
+    /** 主页内容就绪后请求显示「上次观看」悬浮条 */
+    fun showLastViewedTip(info: VodInfo) {
+        lastViewedTipState.value = info
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        // 悬浮条不自动消失: 点击其以外任意处即消失(条内点击留给进详情)
+        if (lastViewedTipState.value != null && ev.action == MotionEvent.ACTION_DOWN) {
+            val bounds = lastViewedTipBounds
+            if (bounds == null || !bounds.contains(ev.x.toInt(), ev.y.toInt())) {
+                lastViewedTipState.value = null
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // 启动窗由系统按 manifest 的 LaunchTheme(图标居中背景)绘制, 冷启动期间可见;
@@ -154,6 +182,33 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                         pageScrollFraction = if (pageScrollOffsetState.floatValue >= 0f) pageScrollOffsetState.floatValue else null,
                         backdrop = backdrop
                     )
+
+                    // 「上次观看」悬浮条: matchParentSize 覆盖层 + offset 定位——
+                    // 不参与 Box 测量, 否则会把底栏容器撑高、底栏被顶离屏幕底;
+                    // 位置 = 底栏(OccupiedHeight 64dp / 悬浮 66dp)上方约 10-12dp
+                    Box(Modifier.matchParentSize()) {
+                        val navInsetDp = with(LocalDensity.current) { navInsetState.intValue.toDp() }
+                        LastViewedTip(
+                            tip = lastViewedTipState.value.takeIf { currentTabState.intValue == 0 },
+                            material = materialState.value,
+                            backdrop = backdrop,
+                            onDismiss = { lastViewedTipState.value = null },
+                            onBounds = { lastViewedTipBounds = it },
+                            onOpen = { vod ->
+                                lastViewedTipState.value = null
+                                val bundle = Bundle().apply {
+                                    putString("id", vod.id)
+                                    putString("sourceKey", vod.sourceKey)
+                                }
+                                startActivity(
+                                    Intent(this@MainActivity, DetailActivity::class.java).putExtras(bundle)
+                                )
+                            },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .offset(y = -(navInsetDp + 76.dp))
+                        )
+                    }
                 }
             }
         }
@@ -162,6 +217,10 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
             override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
                 if (isVpUserDragging) {
                     pageScrollOffsetState.floatValue = position + positionOffset
+                    // 横向滑动切页时收起「上次观看」悬浮条
+                    if (lastViewedTipState.value != null && positionOffset > 0f) {
+                        lastViewedTipState.value = null
+                    }
                 }
             }
 
@@ -205,6 +264,9 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
     /** 切换底部 tab(直播标题栏返回/我的页入口/通知点击等统一入口) */
     fun goToTab(index: Int) {
         if (index < 0 || index >= fragments.size) return
+        if (index != 0 && lastViewedTipState.value != null) {
+            lastViewedTipState.value = null // 离开主页 tab 时收起「上次观看」
+        }
         currentTabState.intValue = index
         mBinding.vp.currentItem = index
     }
@@ -322,6 +384,10 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
     }
 
     override fun onMainScrollDelta(dy: Int) {
+        // 「上次观看」悬浮条: 内容区滚动即收起
+        if (lastViewedTipState.value != null && (dy > 8 || dy < -8)) {
+            lastViewedTipState.value = null
+        }
         if (!Hawk.get(HawkConfig.BAR_AUTO_HIDE, false)) return
         if (dy > 8 && barShown) {
             setBarShown(false)

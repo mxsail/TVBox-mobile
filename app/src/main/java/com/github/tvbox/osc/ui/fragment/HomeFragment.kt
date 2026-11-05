@@ -51,7 +51,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.viewpager.widget.ViewPager
-import com.blankj.utilcode.util.ScreenUtils
 import com.blankj.utilcode.util.ToastUtils
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.api.ApiConfig
@@ -74,14 +73,12 @@ import com.github.tvbox.osc.ui.compose.HomeCategoryBar
 import com.github.tvbox.osc.ui.compose.LoadState
 import com.github.tvbox.osc.ui.compose.LoadStateBox
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
-import com.github.tvbox.osc.ui.dialog.LastViewedDialog
 import com.github.tvbox.osc.ui.dialog.SelectDialog
 import com.github.tvbox.osc.ui.dialog.TipDialog
 import com.github.tvbox.osc.util.DefaultConfig
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.HeavyTaskUtil
 import com.github.tvbox.osc.viewmodel.SourceViewModel
-import com.lxj.xpopup.XPopup
 import com.orhanobut.hawk.Hawk
 import com.owen.tvrecyclerview.widget.TvRecyclerView
 import com.owen.tvrecyclerview.widget.V7GridLayoutManager
@@ -156,6 +153,9 @@ class HomeFragment : Fragment() {
     private var dataInitOk = false
     private var jarInitOk = false
 
+    /** 「上次观看」悬浮条待弹标记: jar 就绪后置位, 主页分类装载完成后弹出 */
+    private var historyPending = false
+
     var errorTipDialog: TipDialog? = null
 
     /**
@@ -210,6 +210,11 @@ class HomeFragment : Fragment() {
                     DefaultConfig.adjustSort(homeKey, ArrayList(), true)
                 }
             initViewPager(absXml)
+            // 「上次观看」悬浮条等主页内容就绪后再弹(原来在 loadJar 成功即弹, 会盖在加载页上)
+            if (historyPending) {
+                historyPending = false
+                queryHistory()
+            }
         }
     }
 
@@ -281,10 +286,10 @@ class HomeFragment : Fragment() {
                 object : LoadConfigCallback {
                     override fun success() {
                         jarInitOk = true
+                        if (!onlyConfigChanged) {
+                            historyPending = true
+                        }
                         mHandler.postDelayed({
-                            if (!onlyConfigChanged) {
-                                queryHistory()
-                            }
                             initData()
                         }, 50)
                     }
@@ -469,18 +474,9 @@ class HomeFragment : Fragment() {
                 vodInfoList
             }
 
-            // 查询完成后更新UI
-            if (vodInfoList.isNotEmpty() && vodInfoList[0] != null) {
-                XPopup.Builder(context).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
-                    .hasShadowBg(false)
-                    .isDestroyOnDismiss(true)
-                    .isCenterHorizontal(true)
-                    .isTouchThrough(true)
-                    .offsetY(ScreenUtils.getAppScreenHeight() - 360)
-                    .asCustom(LastViewedDialog(requireContext(), vodInfoList[0]))
-                    .show()
-                    .delayDismiss(4000)
-            }
+            // 有观看记录则交给 MainActivity 在底栏上方展示「上次观看」悬浮条
+            val first = vodInfoList.firstOrNull() ?: return@launch
+            (activity as? MainActivity)?.showLastViewedTip(first)
         }
     }
 
@@ -624,7 +620,9 @@ class HomeFragment : Fragment() {
                                 ) { setTabsExpanded(false) }
                         )
                     }
-                    // 顶部分类栏(常态单行滚动 / 展开全量 chips)
+                    // 顶部分类栏(常态单行滚动 / 展开全量 chips)。
+                    // 不加顶部 padding: 展开面板背景必须从本 Box 顶开始, 否则让位缝里
+                    // 会透出展开遮罩形成一条分割线(面板与搜索框之间的"多余线")
                     HomeCategoryBar(
                         categories = categoriesState.value,
                         selectedIndex = selectedTabState.intValue,
@@ -636,8 +634,7 @@ class HomeFragment : Fragment() {
                         isExpanded = isTabsExpandedState.value,
                         onExpandChanged = { expanded ->
                             setTabsExpanded(expanded)
-                        },
-                        modifier = Modifier.padding(top = 2.dp)
+                        }
                     )
                 }
             }
