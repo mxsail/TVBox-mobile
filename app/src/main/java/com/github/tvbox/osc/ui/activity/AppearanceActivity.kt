@@ -33,6 +33,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -123,21 +126,6 @@ class AppearanceActivity : BaseActivity() {
 
     private fun materialLabel(code: String): String =
         MATERIAL_OPTIONS.firstOrNull { it.first == code }?.second ?: MATERIAL_OPTIONS[0].second
-
-    private fun showThemeModeDialog(current: Int, onPicked: (Int) -> Unit) {
-        val dialog = SelectDialog<String>(this)
-        dialog.setTip("主题模式")
-        dialog.setAdapter(object : SelectDialogInterface<String?> {
-            override fun click(value: String?, pos: Int) {
-                Hawk.put(HawkConfig.THEME_TAG, pos)
-                Utils.initTheme() // setDefaultNightMode 自动重建存活 Activity
-                onPicked(pos)
-            }
-
-            override fun getDisplay(name: String?): String = name ?: ""
-        }, SelectDialogAdapter.stringDiff, ArrayList(THEME_MODES), current)
-        dialog.show()
-    }
 
     private fun showMaterialDialog(current: String, onPicked: (Int) -> Unit) {
         val defaultPos = MATERIAL_OPTIONS.indexOfFirst { it.first == current }
@@ -330,14 +318,34 @@ class AppearanceActivity : BaseActivity() {
             ) {
                 SectionTitle("主题")
                 GroupCard {
-                    MenuRow(
-                        icon = R.drawable.ic_theme_mode_48,
-                        title = "主题模式",
-                        value = THEME_MODES.getOrElse(themeMode) { "跟随系统" },
-                        onClick = {
-                            showThemeModeDialog(themeMode) { picked -> themeMode = picked }
-                        }
+                    Text(
+                        "主题模式",
+                        color = colorScheme.onSurface,
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 10.dp)
                     )
+                    SingleChoiceSegmentedButtonRow(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                    ) {
+                        THEME_MODES.forEachIndexed { index, label ->
+                            SegmentedButton(
+                                selected = themeMode == index,
+                                onClick = {
+                                    Hawk.put(HawkConfig.THEME_TAG, index)
+                                    Utils.initTheme()
+                                    themeMode = index
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = index,
+                                    count = THEME_MODES.size
+                                )
+                            ) {
+                                Text(label, fontSize = 13.sp, maxLines = 1)
+                            }
+                        }
+                    }
                     MenuRow(
                         icon = R.drawable.ic_palette_48,
                         title = "主题颜色",
@@ -403,13 +411,6 @@ class AppearanceActivity : BaseActivity() {
                         }
                     )
                 }
-                Text(
-                    "高斯模糊/液态玻璃需 Android 12+, 低版本自动降级为半透明",
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .padding(start = 6.dp, top = 6.dp)
-                )
 
                 if (material == ThemeManager.MATERIAL_LIQUID) {
                     SectionTitle("液态玻璃微调")
@@ -532,13 +533,7 @@ class AppearanceActivity : BaseActivity() {
                         }
                     )
                 }
-                Text(
-                    "底栏随滚动隐藏: 浏览内容上滑时收起底栏, 反向下滑时呼出",
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .padding(start = 6.dp, top = 6.dp, bottom = 24.dp)
-                )
+                Spacer(Modifier.height(24.dp))
             }
         }
     }

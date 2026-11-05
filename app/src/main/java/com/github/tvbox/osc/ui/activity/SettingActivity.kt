@@ -6,7 +6,9 @@ import android.view.View
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -39,7 +41,6 @@ import com.github.tvbox.osc.event.AppearanceChangedEvent
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
 import com.github.tvbox.osc.ui.compose.GroupCard
-import com.github.tvbox.osc.ui.compose.HintText
 import com.github.tvbox.osc.ui.compose.MenuRow
 import com.github.tvbox.osc.ui.compose.SectionTitle
 import com.github.tvbox.osc.ui.compose.SwitchRow
@@ -382,10 +383,7 @@ class SettingActivity : BaseActivity() {
                     }
                     MenuRow(R.drawable.ic_clear, "清空缓存", null) { confirmClearCache() }
                 }
-                HintText(
-                    "部分配置(主页内容/直播源/安全DNS)在返回主页时自动重载",
-                    modifier = Modifier.padding(bottom = 24.dp)
-                )
+                Spacer(Modifier.height(24.dp))
             }
         }
     }
