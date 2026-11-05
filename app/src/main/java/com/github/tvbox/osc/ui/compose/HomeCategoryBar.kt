@@ -135,11 +135,11 @@ fun HomeCategoryBar(
             )
     ) {
         if (!isExpanded) {
-            // 常态收起状态: 单行滚动分类条 + 右侧展开向下箭头 (高 44dp，纯净无上下边框)
+            // 常态收起状态: 单行滚动分类条 + 右侧展开向下箭头 (紧凑高度, 纯净无上下边框)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp),
+                    .height(38.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ScrollableTabRow(
@@ -154,10 +154,10 @@ fun HomeCategoryBar(
                                 Modifier
                                     .tabIndicatorOffset(tabPositions[validIndex])
                                     .height(3.dp)
-                                    .padding(horizontal = 14.dp)
+                                    .padding(horizontal = 10.dp)
                                     .background(
                                         color = MaterialTheme.colorScheme.primary,
-                                        shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)
+                                        shape = RoundedCornerShape(percent = 50) // 两端圆润胶囊
                                     )
                             )
                         }
@@ -168,7 +168,7 @@ fun HomeCategoryBar(
                         val isSelected = index == validIndex
                         Box(
                             modifier = Modifier
-                                .height(40.dp)
+                                .height(32.dp) // 文字紧贴指示条, 条高收缩把空间还给内容区
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
@@ -176,7 +176,7 @@ fun HomeCategoryBar(
                                 ) {
                                     onTabSelected(index)
                                 }
-                                .padding(horizontal = 12.dp),
+                                .padding(horizontal = 8.dp), // 相邻分类间距 ≈ 1 个字符宽
                             contentAlignment = Alignment.Center
                         ) {
                             Text(

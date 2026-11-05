@@ -576,7 +576,7 @@ class HomeFragment : Fragment() {
 
                 Box(Modifier.weight(1f)) {
                     Column(Modifier.fillMaxSize()) {
-                        Spacer(Modifier.height(46.dp)) // 原 contentLayout marginTop(分类栏让位)
+                        Spacer(Modifier.height(40.dp)) // 分类栏让位(分类栏已收窄至 38dp, 同步收紧)
                         LoadStateBox(pageLoadState.value, Modifier.fillMaxSize()) {
                             AndroidView(
                                 factory = { ctx ->
