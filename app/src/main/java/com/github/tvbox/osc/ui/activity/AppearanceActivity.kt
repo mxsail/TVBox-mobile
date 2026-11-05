@@ -9,6 +9,7 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,10 +31,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -79,6 +86,15 @@ import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.Utils
 import com.google.android.material.color.MaterialColors
 import com.orhanobut.hawk.Hawk
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.isRenderEffectSupported
+import com.kyant.backdrop.isRuntimeShaderSupported
 import org.greenrobot.eventbus.EventBus
 import java.io.File
 
@@ -300,6 +316,17 @@ class AppearanceActivity : BaseActivity() {
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp)
             ) {
+                SectionTitle("预览")
+                PreviewCard(
+                    themeMode = themeMode,
+                    themeColor = themeColor,
+                    material = material,
+                    blurRadius = liquidBlurRadius,
+                    refractionHeight = liquidRefractionHeight,
+                    refractionAmount = liquidRefractionAmount,
+                    dispersion = liquidDispersion
+                )
+
                 SectionTitle("主题")
                 GroupCard {
                     Text(
@@ -384,27 +411,55 @@ class AppearanceActivity : BaseActivity() {
 
                 SectionTitle("界面材质")
                 GroupCard {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    var materialExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = materialExpanded,
+                        onExpandedChange = { materialExpanded = it },
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
-                        MATERIAL_OPTIONS.forEach { (code, label, desc) ->
-                            MaterialCard(
-                                selected = material == code,
-                                label = label,
-                                desc = desc,
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    if (material != code) {
-                                        Hawk.put(HawkConfig.UI_MATERIAL, code)
-                                        material = code
-                                        EventBus.getDefault()
-                                            .post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
+                        OutlinedTextField(
+                            value = materialLabel(material),
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("材质效果") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = materialExpanded)
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                unfocusedContainerColor = colorScheme.surfaceContainerHigh,
+                                focusedContainerColor = colorScheme.surfaceContainerHigh
+                            ),
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = materialExpanded,
+                            onDismissRequest = { materialExpanded = false }
+                        ) {
+                            MATERIAL_OPTIONS.forEach { (code, label, desc) ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                            Text(
+                                                desc,
+                                                fontSize = 11.sp,
+                                                color = colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        if (material != code) {
+                                            Hawk.put(HawkConfig.UI_MATERIAL, code)
+                                            material = code
+                                            EventBus.getDefault()
+                                                .post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
+                                        }
+                                        materialExpanded = false
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
@@ -544,47 +599,170 @@ class AppearanceActivity : BaseActivity() {
     }
 
     @Composable
-    private fun MaterialCard(
-        selected: Boolean,
-        label: String,
-        desc: String,
-        modifier: Modifier = Modifier,
-        onClick: () -> Unit
+    private fun PreviewCard(
+        themeMode: Int,
+        themeColor: String,
+        material: String,
+        blurRadius: Float,
+        refractionHeight: Float,
+        refractionAmount: Float,
+        dispersion: Boolean
     ) {
-        Column(
-            modifier = modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(
-                    if (selected) colorScheme.secondaryContainer
-                    else colorScheme.surfaceContainerHigh,
-                    RoundedCornerShape(14.dp)
-                )
-                .border(
-                    width = if (selected) 2.dp else 1.dp,
-                    color = if (selected) colorScheme.primary
-                    else colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(14.dp)
-                )
-                .clickable { onClick() }
-                .padding(horizontal = 8.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                label,
-                color = if (selected) colorScheme.onSecondaryContainer else colorScheme.onSurface,
-                fontSize = 13.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                maxLines = 1
-            )
-            Text(
-                desc,
-                color = if (selected) colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                else colorScheme.onSurfaceVariant,
-                fontSize = 10.sp,
-                maxLines = 2,
-                modifier = Modifier.padding(top = 3.dp)
-            )
+        val previewDark = when (themeMode) {
+            0 -> (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+            1 -> false
+            else -> true
         }
+        val preset = ThemeManager.presetOf(themeColor)
+        val primary = when {
+            themeColor == ThemeManager.COLOR_DYNAMIC ->
+                Color(themeInt(androidx.appcompat.R.attr.colorPrimary))
+            preset != null -> Color(ContextCompat.getColor(this, preset.swatchRes))
+            else -> Color(themeInt(androidx.appcompat.R.attr.colorPrimary))
+        }
+        val bg = if (previewDark) Color(0xFF141418) else Color(0xFFFAF8FF)
+        val surfaceHigh = if (previewDark) Color(0xFF2A2B31) else Color(0xFFECECF1)
+        val onSurface = if (previewDark) Color(0xFFE4E2E8) else Color(0xFF1B1B1F)
+        val barTint = if (previewDark) Color(0xFF121212).copy(alpha = 0.4f)
+        else Color(0xFFFAFAFA).copy(alpha = 0.4f)
+
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Column(
+                modifier = Modifier
+                    .width(190.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .border(2.dp, colorScheme.outlineVariant, RoundedCornerShape(22.dp))
+                    .background(bg)
+            ) {
+                val previewBackdrop = rememberLayerBackdrop()
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(310.dp)
+                        .layerBackdrop(previewBackdrop)
+                ) {
+                    // 状态栏区
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(10.dp)
+                            .background(if (previewDark) Color.Black else Color(0xFFF2F2F7))
+                    )
+                    // 顶栏
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("TVBox", color = onSurface, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.weight(1f))
+                        Box(Modifier.size(8.dp).background(primary, CircleShape))
+                    }
+                    // 内容区: 搜索条 + 海报墙 + 卡片
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp)) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(14.dp)
+                                .background(surfaceHigh, RoundedCornerShape(7.dp))
+                        )
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            repeat(3) {
+                                Box(
+                                    Modifier
+                                        .weight(1f)
+                                        .aspectRatio(0.75f)
+                                        .background(surfaceHigh, RoundedCornerShape(6.dp))
+                                )
+                            }
+                        }
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                                .height(20.dp)
+                                .background(surfaceHigh, RoundedCornerShape(6.dp))
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    // mini 底栏: 按材质呈现(液态玻璃/磨砂为真背板采样玻璃)
+                    Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(22.dp)
+                                .then(
+                                    miniBarModifier(
+                                        material, previewBackdrop, previewDark,
+                                        blurRadius, refractionHeight, refractionAmount, dispersion
+                                    )
+                                )
+                                .padding(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            repeat(4) { i ->
+                                Box(
+                                    Modifier
+                                        .size(if (i == 0) 12.dp else 7.dp)
+                                        .background(
+                                            if (i == 0) primary else onSurface.copy(alpha = 0.55f),
+                                            CircleShape
+                                        )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** 预览用迷你底栏配方: 与主界面材质三分类一致 */
+    @Composable
+    private fun miniBarModifier(
+        material: String,
+        backdrop: com.kyant.backdrop.Backdrop,
+        dark: Boolean,
+        blurRadius: Float,
+        refractionHeight: Float,
+        refractionAmount: Float,
+        dispersion: Boolean
+    ): Modifier {
+        val shape = RoundedCornerShape(11.dp)
+        if (material == ThemeManager.MATERIAL_YOU || !isRenderEffectSupported()) {
+            val solid = if (dark) Color(0xFF202024) else Color(0xFFF7F7F9)
+            return Modifier.background(solid.copy(alpha = 0.92f), shape)
+        }
+        val tint = if (dark) Color(0xFF121212).copy(alpha = 0.4f) else Color(0xFFFAFAFA).copy(alpha = 0.4f)
+        return Modifier.drawBackdrop(
+            backdrop = backdrop,
+            shape = { shape },
+            effects = {
+                if (material == ThemeManager.MATERIAL_FROSTED) {
+                    blur((blurRadius * 1.2f).coerceAtLeast(10f))
+                } else {
+                    vibrancy()
+                    blur(blurRadius)
+                    if (isRuntimeShaderSupported()) {
+                        lens(
+                            refractionHeight,
+                            refractionAmount,
+                            depthEffect = true,
+                            chromaticAberration = dispersion
+                        )
+                    }
+                }
+            },
+            onDrawSurface = { drawRect(tint) }
+        )
     }
 
     @Composable
