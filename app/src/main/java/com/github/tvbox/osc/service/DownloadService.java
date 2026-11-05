@@ -94,7 +94,8 @@ public class DownloadService extends Service {
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_PAUSE_ALL);
         filter.addAction(ACTION_RESUME_ALL);
-        registerReceiver(actionReceiver, filter);
+        // Android 14+ 要求非系统广播注册必须声明导出标志, 否则 SecurityException
+        ContextCompat.registerReceiver(this, actionReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TVBox:download");
         wakeLock.setReferenceCounted(false);

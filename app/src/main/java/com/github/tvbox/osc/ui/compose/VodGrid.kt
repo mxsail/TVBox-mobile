@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -92,7 +93,10 @@ fun VodCardItem(
     Box(
         modifier = modifier
             .aspectRatio(0.75f)
-            .background(colorScheme.surfaceContainer, RoundedCornerShape(16.dp))
+            // clip 必须在 background 之前: 海报是 AndroidView(ImageView), 不裁剪会
+            // 以方角盖住圆角背景 → 卡片看起来没圆角、行间视觉上挤在一起
+            .clip(RoundedCornerShape(16.dp))
+            .background(colorScheme.surfaceContainer)
             .combinedClickable(onClick = onClick, onLongClick = { onLongClick?.invoke() })
     ) {
         PosterImage(card.pic, Modifier.fillMaxSize())

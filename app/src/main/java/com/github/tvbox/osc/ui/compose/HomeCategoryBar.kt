@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -109,7 +110,11 @@ fun HomeCategoryBar(
             .fillMaxWidth()
             .then(
                 if (isExpanded) {
+                    // 底部阴影留位 + clipToBounds: 面板与顶栏齐平, shadow 四周扩散会把
+                    // 顶边阴影画进顶部内容区形成"上边框"——裁掉上/侧, 只留底部柔和阴影
                     Modifier
+                        .clipToBounds()
+                        .padding(bottom = 12.dp)
                         .shadow(elevation = shadowElevation, shape = drawerShape)
                         .background(
                             color = MaterialTheme.colorScheme.surface,

@@ -51,6 +51,7 @@ import com.github.tvbox.osc.cache.DownloadEpisode;
 import com.github.tvbox.osc.cache.RoomDataManger;
 import com.github.tvbox.osc.constant.IntentKey;
 import com.github.tvbox.osc.databinding.ActivityDetailBinding;
+import androidx.core.content.ContextCompat;
 import com.github.tvbox.osc.download.DownloadTaskManager;
 import com.github.tvbox.osc.event.DownloadEvent;
 import com.github.tvbox.osc.event.RefreshEvent;
@@ -304,7 +305,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                     }
                 }
             };
-            registerReceiver(mHomeKeyReceiver, new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
+            // Android 14+ 要求非系统广播注册必须声明导出标志, 否则 SecurityException
+            ContextCompat.registerReceiver(this, mHomeKeyReceiver,
+                    new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS), ContextCompat.RECEIVER_NOT_EXPORTED);
         }
     }
 
@@ -1060,7 +1063,8 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                     }
                 }
             };
-            registerReceiver(mRemoteActionReceiver, new IntentFilter(IntentKey.BROADCAST_ACTION));
+            ContextCompat.registerReceiver(this, mRemoteActionReceiver,
+                    new IntentFilter(IntentKey.BROADCAST_ACTION), ContextCompat.RECEIVER_NOT_EXPORTED);
         } else {
             if (mRemoteActionReceiver != null) {
                 unregisterReceiver(mRemoteActionReceiver);

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -470,6 +471,7 @@ class FastSearchActivity : BaseActivity() {
         Column(
             Modifier
                 .fillMaxSize()
+                .statusBarsPadding() // 顶栏避开状态栏(原 View 版由 ImmersionBar fitsSystemWindows 承担)
                 .background(colorScheme.background)
         ) {
             // 顶栏: 返回 + 搜索框 + 过滤 + 搜索按钮
