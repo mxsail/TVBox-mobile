@@ -76,7 +76,8 @@ class MyFragment : Fragment() {
     /** 观看历史条目: 记录 + 当前集已播放时间(无进度为 null) */
     private data class HistoryEntry(val vod: VodInfo, val progressText: String?)
 
-    private val historyItems = mutableStateOf<List<HistoryEntry>>(emptyList())
+    /** null=加载中, empty=无记录, 非空=海报墙数据(fragment 字段跨视图重建保留, 避免首访空白) */
+    private val historyItems = mutableStateOf<List<HistoryEntry>?>(null)
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -100,11 +101,20 @@ class MyFragment : Fragment() {
     }
 
     private fun loadHistory() {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val list = withContext(Dispatchers.IO) {
-                RoomDataManger.getAllVodRecord(20).mapNotNull { vod ->
-                    vod ?: return@mapNotNull null
-                    HistoryEntry(vod, currentProgressText(vod))
+                try {
+                    RoomDataManger.getAllVodRecord(20).mapNotNull { vod ->
+                        vod ?: return@mapNotNull null
+                        // 预热海报缓存: 首次进入我的页即有图可看, 不等网络逐张加载
+                        vod.pic.takeIf { p -> !p.isNullOrEmpty() }?.let {
+                            runCatching { com.squareup.picasso.Picasso.get().load(it).fetch() }
+                        }
+                        HistoryEntry(vod, currentProgressText(vod))
+                    }
+                } catch (t: Throwable) {
+                    android.util.Log.w("MyFragment", "loadHistory failed", t)
+                    emptyList<HistoryEntry>()
                 }
             }
             historyItems.value = list
@@ -209,8 +219,23 @@ class MyFragment : Fragment() {
                     )
                 }
                 val items = historyItems.value
-                if (items.isEmpty()) {
-                    Text(
+                when {
+                    // 加载中: 海报骨架占位, 避免首访出现整块空白
+                    items == null -> Row(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        repeat(3) {
+                            Box(
+                                modifier = Modifier
+                                    .width(104.dp)
+                                    .aspectRatio(0.75f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(colorScheme.surfaceContainerHigh)
+                            )
+                        }
+                    }
+                    items.isEmpty() -> Text(
                         "暂无观看记录",
                         color = colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
@@ -218,8 +243,7 @@ class MyFragment : Fragment() {
                             .fillMaxWidth()
                             .padding(vertical = 24.dp)
                     )
-                } else {
-                    LazyRow(
+                    else -> LazyRow(
                         contentPadding = PaddingValues(horizontal = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
