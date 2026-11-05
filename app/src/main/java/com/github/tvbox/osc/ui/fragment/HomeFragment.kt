@@ -9,8 +9,10 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -120,6 +122,21 @@ class HomeFragment : Fragment() {
 
     private fun setTabsExpanded(expanded: Boolean) {
         isTabsExpandedState.value = expanded
+        if (expanded) topBarVisibleState.value = true // 展开分类面板时先呼出顶栏
+    }
+
+    // 顶栏(数据源/搜索)显隐: 内容区上滑收起、下滑/到顶呼出, 与底栏联动
+    private val topBarVisibleState = mutableStateOf(true)
+
+    /** 由内容列表的滚动增量驱动(MainActivity 转发, 仅主页 tab) */
+    fun onHomeContentScroll(dy: Int) {
+        if (dy > 8 && topBarVisibleState.value) topBarVisibleState.value = false
+        else if (dy < -8 && !topBarVisibleState.value) topBarVisibleState.value = true
+    }
+
+    /** 强制呼出顶栏(切回主页 tab/展开分类面板) */
+    fun showTopBar() {
+        topBarVisibleState.value = true
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -500,12 +517,17 @@ class HomeFragment : Fragment() {
         ) {
             Column(Modifier.fillMaxSize()) {
                 Spacer(Modifier.height(44.dp)) // 原 topLayout marginTop(状态栏区)
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = topBarVisibleState.value,
+                    enter = expandVertically(tween(200)) + fadeIn(tween(200)),
+                    exit = shrinkVertically(tween(200)) + fadeOut(tween(180))
                 ) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                     // 数据源名称: 点击切源, 长按刷新订阅
                     Row(
                         Modifier
@@ -571,6 +593,7 @@ class HomeFragment : Fragment() {
                                 modifier = Modifier.size(18.dp)
                             )
                         }
+                    }
                     }
                 }
 

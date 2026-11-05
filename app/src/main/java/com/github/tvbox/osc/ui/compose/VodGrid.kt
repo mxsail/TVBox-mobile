@@ -42,6 +42,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.util.DefaultConfig
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
 import com.squareup.picasso.Picasso
 
 /**
@@ -90,6 +94,8 @@ fun VodCardItem(
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    // 文字底衬背板: 对海报采样做真模糊提升可读性(Android 12+; 低版本降级纯渐变)
+    val cardBackdrop = rememberLayerBackdrop()
     Box(
         modifier = modifier
             .aspectRatio(0.75f)
@@ -99,7 +105,7 @@ fun VodCardItem(
             .background(colorScheme.surfaceContainer)
             .combinedClickable(onClick = onClick, onLongClick = { onLongClick?.invoke() })
     ) {
-        PosterImage(card.pic, Modifier.fillMaxSize())
+        PosterImage(card.pic, Modifier.fillMaxSize().layerBackdrop(cardBackdrop))
         if (card.badge.isNotEmpty()) {
             Text(
                 card.badge,
@@ -113,16 +119,33 @@ fun VodCardItem(
                     .padding(horizontal = 5.dp, vertical = 3.dp)
             )
         }
+        val bottomShape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
+        val infoModifier = if (isLiquidGlassSupported) {
+            Modifier.drawBackdrop(
+                backdrop = cardBackdrop,
+                shape = { bottomShape },
+                effects = { blur(12f) },
+                onDrawSurface = {
+                    drawRect(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            1f to Color(0x99000000)
+                        )
+                    )
+                }
+            )
+        } else {
+            Modifier.background(
+                Brush.verticalGradient(listOf(Color.Transparent, Color(0xB2000000))),
+                bottomShape
+            )
+        }
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color(0xB2000000))
-                    )
-                )
-                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .then(infoModifier)
+                .padding(horizontal = 10.dp, vertical = 4.dp)
         ) {
             if (!card.note.isNullOrEmpty()) {
                 Text(
@@ -139,7 +162,7 @@ fun VodCardItem(
                 fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 4.dp)
+                modifier = Modifier.padding(top = 2.dp)
             )
         }
     }

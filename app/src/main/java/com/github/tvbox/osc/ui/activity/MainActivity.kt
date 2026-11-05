@@ -264,7 +264,9 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
     /** 切换底部 tab(直播标题栏返回/我的页入口/通知点击等统一入口) */
     fun goToTab(index: Int) {
         if (index < 0 || index >= fragments.size) return
-        if (index != 0 && lastViewedTipState.value != null) {
+        if (index == 0) {
+            (fragments.getOrNull(0) as? HomeFragment)?.showTopBar() // 回主页呼出顶栏
+        } else if (lastViewedTipState.value != null) {
             lastViewedTipState.value = null // 离开主页 tab 时收起「上次观看」
         }
         currentTabState.intValue = index
@@ -387,6 +389,10 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         // 「上次观看」悬浮条: 内容区滚动即收起
         if (lastViewedTipState.value != null && (dy > 8 || dy < -8)) {
             lastViewedTipState.value = null
+        }
+        // 主页顶栏(数据源/搜索)随内容滚动收起/呼出(仅主页 tab)
+        if (currentTabState.intValue == 0) {
+            (fragments.getOrNull(0) as? HomeFragment)?.onHomeContentScroll(dy)
         }
         if (!Hawk.get(HawkConfig.BAR_AUTO_HIDE, false)) return
         if (dy > 8 && barShown) {

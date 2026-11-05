@@ -5,11 +5,14 @@ import android.text.Editable
 import android.text.TextUtils
 import android.text.TextWatcher
 import android.view.KeyEvent
+import android.content.Context
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +39,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
@@ -134,6 +138,12 @@ class FastSearchActivity : BaseActivity() {
     override fun getLayoutResID(): Int = -1
 
     override fun initVb() {
+        // 进页自动拉起输入法: STATE_VISIBLE + EditText requestFocus,
+        // (仅 post showSoftInput 会在窗口拿到焦点前被吞掉)
+        window.setSoftInputMode(
+            android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+                    or android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        )
         val composeView = androidx.compose.ui.platform.ComposeView(this)
         setContentView(composeView)
         composeView.setContent { TvBoxTheme { FastSearchScreen() } }
@@ -474,18 +484,19 @@ class FastSearchActivity : BaseActivity() {
                 .statusBarsPadding() // 顶栏避开状态栏(原 View 版由 ImmersionBar fitsSystemWindows 承担)
                 .background(colorScheme.background)
         ) {
-            // 顶栏: 返回 + 搜索框 + 过滤 + 搜索按钮
+            // 顶栏: 返回 + 搜索框(内含搜索钮) + 过滤。图标尺寸统一 22dp
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { finish() }) {
+                IconButton(onClick = { finish() }, modifier = Modifier.size(40.dp)) {
                     Icon(
                         painterResource(R.drawable.ic_arrow_back),
                         contentDescription = "返回",
-                        tint = colorScheme.onSurface
+                        tint = colorScheme.onSurface,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
                 Box(
@@ -495,41 +506,65 @@ class FastSearchActivity : BaseActivity() {
                         .background(colorScheme.surfaceContainerHigh, RoundedCornerShape(19.dp)),
                     contentAlignment = Alignment.CenterStart
                 ) {
-                    AndroidView(
-                        factory = { ctx ->
-                            EditText(ctx).apply {
-                                setBackgroundResource(android.R.color.transparent)
-                                setPadding(28, 12, 28, 12)
-                                textSize = 14f
-                                setSingleLine(true)
-                                hint = "搜索"
-                                setTextColor(resolveColorOnSurface())
-                                setHintTextColor(resolveColorOnSurfaceVariant())
-                                imeOptions = EditorInfo.IME_ACTION_SEARCH
-                                setOnEditorActionListener { _: TextView?, actionId: Int, _: KeyEvent? ->
-                                    if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                                        search(text.toString())
-                                        true
-                                    } else false
-                                }
-                                addTextChangedListener(textWatcher)
-                            }.also { searchEditText = it }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    EditText(ctx).apply {
+                                        setBackgroundResource(android.R.color.transparent)
+                                        setPadding(28, 12, 0, 12)
+                                        textSize = 14f
+                                        setSingleLine(true)
+                                        hint = "搜索"
+                                        setTextColor(resolveColorOnSurface())
+                                        setHintTextColor(resolveColorOnSurfaceVariant())
+                                        imeOptions = EditorInfo.IME_ACTION_SEARCH
+                                        setOnEditorActionListener { _: TextView?, actionId: Int, _: KeyEvent? ->
+                                            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                                                search(text.toString())
+                                                true
+                                            } else false
+                                        }
+                                        addTextChangedListener(textWatcher)
+                                        // 进页自动聚焦并拉起输入法
+                                        isFocusableInTouchMode = true
+                                        post {
+                                            requestFocus()
+                                            val imm =
+                                                ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                                            imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+                                        }
+                                    }.also { searchEditText = it }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        // 搜索钮移入搜索框内(与首页搜索框样式一致)
+                        Icon(
+                            painterResource(R.drawable.ic_search_18),
+                            contentDescription = "搜索",
+                            tint = colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) { search(searchEditText?.text?.toString()) }
+                                .padding(9.dp)
+                                .size(20.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
                 }
-                IconButton(onClick = { filterSearchSource() }) {
+                IconButton(onClick = { filterSearchSource() }, modifier = Modifier.size(40.dp)) {
                     Icon(
                         painterResource(R.drawable.ic_filter_list),
                         contentDescription = "搜索源过滤",
-                        tint = colorScheme.onSurface
-                    )
-                }
-                IconButton(onClick = { search(searchEditText?.text?.toString()) }) {
-                    Icon(
-                        painterResource(R.drawable.ic_search_18),
-                        contentDescription = "搜索",
-                        tint = colorScheme.onSurface
+                        tint = colorScheme.onSurface,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
