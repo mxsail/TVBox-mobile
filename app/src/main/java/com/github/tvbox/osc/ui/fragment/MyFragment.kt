@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import com.blankj.utilcode.util.AppUtils
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.cache.CacheManager
@@ -212,14 +211,6 @@ class MyFragment : Fragment() {
             HistoryCard()
             Spacer(Modifier.height(12.dp))
             FunctionsCard()
-            Text(
-                "v" + AppUtils.getAppVersionName(),
-                color = colorScheme.outline,
-                fontSize = 11.sp,
-                modifier = Modifier
-                    .padding(top = 10.dp, bottom = 6.dp)
-                    .fillMaxWidth()
-            )
         }
     }
 
@@ -358,7 +349,7 @@ class MyFragment : Fragment() {
     private fun FunctionsCard() {
         val funcs = listOf(
             FuncEntry(R.drawable.ic_collect_48, "我的收藏") { jumpActivity(CollectActivity::class.java) },
-            FuncEntry(R.drawable.ic_cache_48, "我的缓存") { goMainTab(2) },
+            FuncEntry(R.drawable.ic_download_nav, "我的缓存") { goMainTab(2) },
             FuncEntry(R.drawable.ic_live_tv_48, "直播") { goMainTab(1) },
             FuncEntry(R.drawable.ic_database_48, "订阅管理") { jumpActivity(SubscriptionActivity::class.java) },
             FuncEntry(R.drawable.ic_settings, "设置") { jumpActivity(SettingActivity::class.java) },
