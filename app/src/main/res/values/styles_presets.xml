@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 预设主题色覆盖层: 通过 theme.applyStyle 叠加到 Activity/Dialog 主题,
+     颜色值见 values(-night)/colors_presets.xml, 由 GenPresets 生成 -->
+<resources>
+
+    <style name="ThemeOverlay.Preset.Teal" parent="">
+        <item name="colorPrimary">@color/preset_teal_primary</item>
+        <item name="colorOnPrimary">@color/preset_teal_on_primary</item>
+        <item name="colorPrimaryContainer">@color/preset_teal_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/preset_teal_on_primary_container</item>
+        <item name="colorSecondary">@color/preset_teal_secondary</item>
+        <item name="colorOnSecondary">@color/preset_teal_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/preset_teal_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/preset_teal_on_secondary_container</item>
+        <item name="colorTertiary">@color/preset_teal_tertiary</item>
+        <item name="colorOnTertiary">@color/preset_teal_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/preset_teal_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/preset_teal_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/preset_teal_inverse_primary</item>
+    </style>
+
+    <style name="ThemeOverlay.Preset.Green" parent="">
+        <item name="colorPrimary">@color/preset_green_primary</item>
+        <item name="colorOnPrimary">@color/preset_green_on_primary</item>
+        <item name="colorPrimaryContainer">@color/preset_green_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/preset_green_on_primary_container</item>
+        <item name="colorSecondary">@color/preset_green_secondary</item>
+        <item name="colorOnSecondary">@color/preset_green_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/preset_green_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/preset_green_on_secondary_container</item>
+        <item name="colorTertiary">@color/preset_green_tertiary</item>
+        <item name="colorOnTertiary">@color/preset_green_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/preset_green_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/preset_green_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/preset_green_inverse_primary</item>
+    </style>
+
+    <style name="ThemeOverlay.Preset.Amber" parent="">
+        <item name="colorPrimary">@color/preset_amber_primary</item>
+        <item name="colorOnPrimary">@color/preset_amber_on_primary</item>
+        <item name="colorPrimaryContainer">@color/preset_amber_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/preset_amber_on_primary_container</item>
+        <item name="colorSecondary">@color/preset_amber_secondary</item>
+        <item name="colorOnSecondary">@color/preset_amber_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/preset_amber_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/preset_amber_on_secondary_container</item>
+        <item name="colorTertiary">@color/preset_amber_tertiary</item>
+        <item name="colorOnTertiary">@color/preset_amber_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/preset_amber_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/preset_amber_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/preset_amber_inverse_primary</item>
+    </style>
+
+    <style name="ThemeOverlay.Preset.Orange" parent="">
+        <item name="colorPrimary">@color/preset_orange_primary</item>
+        <item name="colorOnPrimary">@color/preset_orange_on_primary</item>
+        <item name="colorPrimaryContainer">@color/preset_orange_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/preset_orange_on_primary_container</item>
+        <item name="colorSecondary">@color/preset_orange_secondary</item>
+        <item name="colorOnSecondary">@color/preset_orange_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/preset_orange_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/preset_orange_on_secondary_container</item>
+        <item name="colorTertiary">@color/preset_orange_tertiary</item>
+        <item name="colorOnTertiary">@color/preset_orange_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/preset_orange_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/preset_orange_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/preset_orange_inverse_primary</item>
+    </style>
+
+    <style name="ThemeOverlay.Preset.Red" parent="">
+        <item name="colorPrimary">@color/preset_red_primary</item>
+        <item name="colorOnPrimary">@color/preset_red_on_primary</item>
+        <item name="colorPrimaryContainer">@color/preset_red_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/preset_red_on_primary_container</item>
+        <item name="colorSecondary">@color/preset_red_secondary</item>
+        <item name="colorOnSecondary">@color/preset_red_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/preset_red_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/preset_red_on_secondary_container</item>
+        <item name="colorTertiary">@color/preset_red_tertiary</item>
+        <item name="colorOnTertiary">@color/preset_red_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/preset_red_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/preset_red_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/preset_red_inverse_primary</item>
+    </style>
+
+    <style name="ThemeOverlay.Preset.Pink" parent="">
+        <item name="colorPrimary">@color/preset_pink_primary</item>
+        <item name="colorOnPrimary">@color/preset_pink_on_primary</item>
+        <item name="colorPrimaryContainer">@color/preset_pink_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/preset_pink_on_primary_container</item>
+        <item name="colorSecondary">@color/preset_pink_secondary</item>
+        <item name="colorOnSecondary">@color/preset_pink_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/preset_pink_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/preset_pink_on_secondary_container</item>
+        <item name="colorTertiary">@color/preset_pink_tertiary</item>
+        <item name="colorOnTertiary">@color/preset_pink_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/preset_pink_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/preset_pink_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/preset_pink_inverse_primary</item>
+    </style>
+
+    <style name="ThemeOverlay.Preset.Purple" parent="">
+        <item name="colorPrimary">@color/preset_purple_primary</item>
+        <item name="colorOnPrimary">@color/preset_purple_on_primary</item>
+        <item name="colorPrimaryContainer">@color/preset_purple_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/preset_purple_on_primary_container</item>
+        <item name="colorSecondary">@color/preset_purple_secondary</item>
+        <item name="colorOnSecondary">@color/preset_purple_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/preset_purple_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/preset_purple_on_secondary_container</item>
+        <item name="colorTertiary">@color/preset_purple_tertiary</item>
+        <item name="colorOnTertiary">@color/preset_purple_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/preset_purple_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/preset_purple_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/preset_purple_inverse_primary</item>
+    </style>
+
+    <style name="ThemeOverlay.Preset.Blue" parent="">
+        <item name="colorPrimary">@color/md_primary</item>
+        <item name="colorOnPrimary">@color/md_on_primary</item>
+        <item name="colorPrimaryContainer">@color/md_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/md_on_primary_container</item>
+        <item name="colorSecondary">@color/md_secondary</item>
+        <item name="colorOnSecondary">@color/md_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/md_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/md_on_secondary_container</item>
+        <item name="colorTertiary">@color/md_tertiary</item>
+        <item name="colorOnTertiary">@color/md_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/md_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/md_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/md_inverse_primary</item>
+    </style>
+</resources>

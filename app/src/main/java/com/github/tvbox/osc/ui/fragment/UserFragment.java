@@ -86,6 +86,11 @@ public class UserFragment extends BaseLazyFragment {
     @Override
     protected void init() {
         tvHotList1 = findViewById(R.id.tvHotList1);
+        // 滚动联动底栏隐藏 + 滚动回弹(主页 tab 的推荐列表)
+        com.github.tvbox.osc.view.BarAutoHide.attach(tvHotList1,
+                mActivity instanceof com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost
+                        ? (com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost) mActivity : null);
+        com.github.tvbox.osc.view.BounceOverScroll.attach(tvHotList1);
         homeHotVodAdapter = new GridAdapter();
         homeHotVodAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
             @Override

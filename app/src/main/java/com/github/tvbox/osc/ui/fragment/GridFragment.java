@@ -173,6 +173,12 @@ public class GridFragment extends BaseLazyFragment {
         this.page =1;
         this.maxPage =1;
         this.isLoad = false;
+        // 滚动联动底栏隐藏(每个层级的列表都要挂, 初次+多级栈动态创建都会走到这里)
+        com.github.tvbox.osc.view.BarAutoHide.attach(mGridView,
+                mActivity instanceof com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost
+                        ? (com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost) mActivity : null);
+        // 滚动回弹
+        com.github.tvbox.osc.view.BounceOverScroll.attach(mGridView);
     }
 
     private void initView() {

@@ -306,7 +306,8 @@ public class PlayFragment extends BaseLazyFragment {
 
             @Override
             public void exit() {
-                activity.onBackPressed();
+                // 走 dispatcher(等价旧 activity.onBackPressed(), 兼容预见性返回链路)
+                ((com.github.tvbox.osc.base.BaseActivity) activity).getOnBackPressedDispatcher().onBackPressed();
             }
 
             @Override
@@ -326,14 +327,14 @@ public class PlayFragment extends BaseLazyFragment {
             @Override
             public void showSetting() {
                 if (mFullWindows){
-                    mPlayingControlRightDialog = new XPopup.Builder(activity)
+                    mPlayingControlRightDialog = new XPopup.Builder(activity).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                             .isViewMode(true)//改为view模式无法自动响应返回键操作,onBackPress时手动dismiss
                             .popupHeight(ScreenUtils.getScreenHeight())
                             .popupPosition(PopupPosition.Right)
                             .asCustom(new PlayingControlRightDialog(activity,mController,mVideoView));
                     mPlayingControlRightDialog.show();
                 }else {
-                    mPlayingControlDialog = new XPopup.Builder(activity)
+                    mPlayingControlDialog = new XPopup.Builder(activity).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                             .isViewMode(true)
                             .asCustom(new PlayingControlDialog(activity,mController,mVideoView));
                     mPlayingControlDialog.show();

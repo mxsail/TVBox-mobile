@@ -2,184 +2,143 @@ package com.github.tvbox.osc.ui.activity
 
 import android.content.Intent
 import android.text.TextUtils
-import android.view.View
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.blankj.utilcode.util.ClipboardUtils
-import com.blankj.utilcode.util.LogUtils
 import com.blankj.utilcode.util.ToastUtils
-import com.chad.library.adapter.base.BaseQuickAdapter
 import com.github.tvbox.osc.R
-import com.github.tvbox.osc.base.BaseVbActivity
+import com.github.tvbox.osc.base.BaseActivity
+import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.bean.Source
 import com.github.tvbox.osc.bean.Subscription
-import com.github.tvbox.osc.databinding.ActivitySubscriptionBinding
-import com.github.tvbox.osc.ui.adapter.SubscriptionAdapter
+import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.dialog.ChooseSourceDialog
 import com.github.tvbox.osc.ui.dialog.SubsTipDialog
 import com.github.tvbox.osc.ui.dialog.SubsciptionDialog
 import com.github.tvbox.osc.ui.dialog.SubsciptionDialog.OnSubsciptionListener
 import com.github.tvbox.osc.util.HawkConfig
-import com.github.tvbox.osc.util.Utils
-import com.google.gson.JsonObject
+import com.github.tvbox.osc.view.MaterialBarHelper
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.gson.JsonParser
 import com.hjq.permissions.OnPermissionCallback
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
 import com.lxj.xpopup.XPopup
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.lzy.okgo.OkGo
 import com.lzy.okgo.callback.AbsCallback
 import com.lzy.okgo.model.Response
 import com.obsez.android.lib.filechooser.ChooserDialog
 import com.orhanobut.hawk.Hawk
-import java.util.function.Consumer
 
-class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
+/**
+ * 订阅管理(Compose): 订阅列表(选中/删除/置顶/重命名/复制) + 添加订阅(网络/本地导入/多线路/多仓解析)。
+ * 交互弹窗沿用 View 版(XPopup/Material/ChooserDialog), Compose 负责页面框架与列表渲染。
+ */
+class SubscriptionActivity : BaseActivity() {
 
     private var mBeforeUrl = Hawk.get(HawkConfig.API_URL, "")
     private var mSelectedUrl = ""
-    private var mSubscriptions: MutableList<Subscription> = Hawk.get(HawkConfig.SUBSCRIPTIONS, ArrayList())
-    private var mSubscriptionAdapter = SubscriptionAdapter()
+    private val mSubscriptions: MutableList<Subscription> = Hawk.get(HawkConfig.SUBSCRIPTIONS, ArrayList())
     private val mSources: MutableList<Source> = ArrayList()
 
+    /** 列表 UI 快照(Subscription 为可变 POJO, 每次操作后重建快照驱动重组) */
+    private data class SubRow(val name: String, val url: String, val checked: Boolean, val isTop: Boolean)
+    private val rows = mutableStateOf<List<SubRow>>(emptyList())
+    private val loading = mutableStateOf(false)
+
+    override fun getLayoutResID(): Int = -1
+
+    override fun initVb() {
+        val composeView = androidx.compose.ui.platform.ComposeView(this)
+        setContentView(composeView)
+        composeView.setContent { TvBoxTheme { SubscriptionScreen() } }
+    }
+
     override fun init() {
-
-        mBinding.rv.setAdapter(mSubscriptionAdapter)
-        mSubscriptions.forEach(Consumer { item: Subscription ->
-            if (item.isChecked) {
-                mSelectedUrl = item.url
-            }
-        })
-
-        mSubscriptionAdapter.setNewData(mSubscriptions)
-        mBinding.ivUseTip.setOnClickListener {
-            XPopup.Builder(this)
-                .asCustom(SubsTipDialog(this))
-                .show()
+        mSubscriptions.forEach { item: Subscription ->
+            if (item.isChecked) mSelectedUrl = item.url
         }
+        refresh()
+    }
 
-        mBinding.rightView.setOnClickListener {//添加订阅
-            XPopup.Builder(this)
-                .autoFocusEditText(false)
-                .asCustom(
-                    SubsciptionDialog(
-                        this,
-                        "订阅: " + (mSubscriptions.size + 1),
-                        object : OnSubsciptionListener {
-                            override fun onConfirm(
-                                name: String,
-                                url: String,
-                                checked: Boolean
-                            ) { //只有addSub2List用到,看注释,单线路才生效,其余方法仅作为参数继续传递
-                                for (item in mSubscriptions) {
-                                    if (item.url == url) {
-                                        ToastUtils.showLong("订阅地址与" + item.name + "相同")
-                                        return
-                                    }
-                                }
-                                addSubscription(name, url, checked)
-                            }
+    private fun refresh() {
+        // 置顶的排前面, 保持既有列表语义
+        val sorted = mSubscriptions.sortedByDescending { it.isTop }
+        rows.value = sorted.map { SubRow(it.name, it.url, it.isChecked, it.isTop) }
+    }
 
-                            override fun chooseLocal(checked: Boolean) { //本地导入
-                                if (!XXPermissions.isGranted(
-                                        mContext,
-                                        Permission.MANAGE_EXTERNAL_STORAGE
-                                    )
-                                ) {
-                                    showPermissionTipPopup(checked)
-                                } else {
-                                    pickFile(checked)
+    /** url → mSubscriptions 定位(置顶排序后 UI 顺序≠数据顺序, 一律按 url 定位) */
+    private fun indexOfUrl(url: String): Int = mSubscriptions.indexOfFirst { it.url == url }
+
+    // ---------------- 添加订阅 ----------------
+
+    private fun showAddDialog() {
+        XPopup.Builder(this).hasBlurBg(MaterialBarHelper.popupBlurEnabled())
+            .autoFocusEditText(false)
+            .asCustom(
+                SubsciptionDialog(
+                    this,
+                    "订阅: " + (mSubscriptions.size + 1),
+                    object : OnSubsciptionListener {
+                        override fun onConfirm(name: String, url: String, checked: Boolean) {
+                            for (item in mSubscriptions) {
+                                if (item.url == url) {
+                                    ToastUtils.showLong("订阅地址与" + item.name + "相同")
+                                    return
                                 }
                             }
-                        })
-                ).show()
-        }
+                            addSubscription(name, url, checked)
+                        }
 
-        mSubscriptionAdapter.setOnItemChildClickListener { _: BaseQuickAdapter<*, *>?, view: View, position: Int ->
-            LogUtils.d("删除订阅")
-            if (view.id == R.id.iv_del) {
-                if (mSubscriptions.get(position).isChecked) {
-                    ToastUtils.showShort("不能删除当前使用的订阅")
-                    return@setOnItemChildClickListener
-                }
-                MaterialAlertDialogBuilder(this@SubscriptionActivity)
-                    .setTitle("删除订阅")
-                    .setMessage("确定删除订阅吗？")
-                    .setNegativeButton("取消", null)
-                    .setPositiveButton("确定") { _, _ ->
-                        mSubscriptions.removeAt(position)
-                        //删除/选择只刷新,不触发重新排序
-                        mSubscriptionAdapter.notifyDataSetChanged()
-                    }
-.show()
-            }
-        }
-
-        mSubscriptionAdapter.setOnItemClickListener { _: BaseQuickAdapter<*, *>?, _: View?, position: Int ->  //选择订阅
-            for (i in mSubscriptions.indices) {
-                val subscription = mSubscriptions[i]
-                if (i == position) {
-                    subscription.setChecked(true)
-                    mSelectedUrl = subscription.url
-                } else {
-                    subscription.setChecked(false)
-                }
-            }
-            //删除/选择只刷新,不触发重新排序
-            mSubscriptionAdapter.notifyDataSetChanged()
-        }
-
-        mSubscriptionAdapter.onItemLongClickListener =
-            BaseQuickAdapter.OnItemLongClickListener { adapter: BaseQuickAdapter<*, *>?, view: View, position: Int ->
-                val item = mSubscriptions[position]
-                XPopup.Builder(this)
-                    .atView(view.findViewById(R.id.tv_name))
-                    .hasShadowBg(false)
-                    .asAttachList(
-                        arrayOf(
-                            if (item.isTop) "取消置顶" else "置顶",
-                            "重命名",
-                            "复制地址"
-                        ), null
-                    ) { index: Int, _: String? ->
-                        when (index) {
-                            0 -> {
-                                item.isTop = !item.isTop
-                                mSubscriptions[position] = item
-                                mSubscriptionAdapter.setNewData(mSubscriptions)
-                            }
-                            1 -> {
-                                XPopup.Builder(this)
-                                    .asInputConfirm(
-                                        "更改为",
-                                        "",
-                                        item.name,
-                                        "新的订阅名",
-                                        { text ->
-                                            if (!TextUtils.isEmpty(text)) {
-                                                if (text.trim { it <= ' ' }.length > 8) {
-                                                    ToastUtils.showShort("不要过长,不方便记忆")
-                                                } else {
-                                                    item.name = text.trim { it <= ' ' }
-                                                    mSubscriptionAdapter.notifyItemChanged(position)
-                                                }
-                                            }
-                                        },
-                                        null,
-                                        R.layout.dialog_input
-                                    ).show()
-                            }
-                            2 -> {
-                                ClipboardUtils.copyText(mSubscriptions.get(position).url)
-                                ToastUtils.showLong("已复制")
+                        override fun chooseLocal(checked: Boolean) {
+                            if (!XXPermissions.isGranted(this@SubscriptionActivity, Permission.MANAGE_EXTERNAL_STORAGE)) {
+                                showPermissionTipPopup(checked)
+                            } else {
+                                pickFile(checked)
                             }
                         }
-                    }.show()
-                true
-            }
+                    })
+            ).show()
+    }
+
+    private fun showUseTip() {
+        XPopup.Builder(this).hasBlurBg(MaterialBarHelper.popupBlurEnabled())
+            .asCustom(SubsTipDialog(this))
+            .show()
     }
 
     private fun showPermissionTipPopup(checked: Boolean) {
-        MaterialAlertDialogBuilder(this@SubscriptionActivity)
+        MaterialAlertDialogBuilder(this)
             .setTitle("提示")
             .setMessage("这将访问您设备文件的读取权限")
             .setNegativeButton("取消", null)
@@ -188,21 +147,14 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
                     .permission(Permission.MANAGE_EXTERNAL_STORAGE)
                     .request(object : OnPermissionCallback {
                         override fun onGranted(permissions: List<String>, all: Boolean) {
-                            if (all) {
-                                pickFile(checked)
-                            } else {
-                                ToastUtils.showLong("部分权限未正常授予,请授权")
-                            }
+                            if (all) pickFile(checked)
+                            else ToastUtils.showLong("部分权限未正常授予,请授权")
                         }
 
                         override fun onDenied(permissions: List<String>, never: Boolean) {
                             if (never) {
                                 ToastUtils.showLong("读写文件权限被永久拒绝，请手动授权")
-                                // 如果是被永久拒绝就跳转到应用权限系统设置页面
-                                XXPermissions.startPermissionActivity(
-                                    this@SubscriptionActivity,
-                                    permissions
-                                )
+                                XXPermissions.startPermissionActivity(this@SubscriptionActivity, permissions)
                             } else {
                                 ToastUtils.showShort("获取权限失败")
                                 showPermissionTipPopup(checked)
@@ -213,22 +165,16 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
             .show()
     }
 
-    /**
-     *
-     * @param checked 与showPermissionTipPopup一样,只记录并传递选中状态
-     */
     private fun pickFile(checked: Boolean) {
-        ChooserDialog(this@SubscriptionActivity, R.style.FileChooser)
+        ChooserDialog(this, R.style.FileChooser)
             .withFilter(false, false, "txt", "json")
             .withStartFile(
-                if (TextUtils.isEmpty(Hawk.get("before_selected_path"))) "/storage/emulated/0/Download" else Hawk.get(
-                    "before_selected_path"
-                )
+                if (TextUtils.isEmpty(Hawk.get<String>("before_selected_path"))) "/storage/emulated/0/Download"
+                else Hawk.get("before_selected_path")
             )
             .withChosenListener(ChooserDialog.Result { _, pathFile ->
                 Hawk.put("before_selected_path", pathFile.parent)
-                val clanPath =
-                    pathFile.absolutePath.replace("/storage/emulated/0", "clan://localhost")
+                val clanPath = pathFile.absolutePath.replace("/storage/emulated/0", "clan://localhost")
                 for (item in mSubscriptions) {
                     if (item.url == clanPath) {
                         ToastUtils.showLong("订阅地址与" + item.name + "相同")
@@ -244,58 +190,56 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
     private fun addSubscription(name: String, url: String, checked: Boolean) {
         if (url.startsWith("clan://")) {
             addSub2List(name, url, checked)
-            mSubscriptionAdapter.setNewData(mSubscriptions)
+            refresh()
         } else if (url.startsWith("http")) {
+            loading.value = true
             showLoadingDialog()
             OkGo.get<String>(url)
                 .tag("get_subscription")
                 .execute(object : AbsCallback<String?>() {
                     override fun onSuccess(response: Response<String?>) {
                         dismissLoadingDialog()
+                        loading.value = false
                         try {
                             val json = JsonParser.parseString(response.body()).asJsonObject
-                            // 多线路?
                             val urls = json["urls"]
-                            // 多仓?
                             val storeHouse = json["storeHouse"]
                             if (urls != null && urls.isJsonArray) { // 多线路
-                                if (checked) {
-                                    ToastUtils.showLong("多条线路请主动选择")
-                                }
+                                if (checked) ToastUtils.showLong("多条线路请主动选择")
                                 val urlList = urls.asJsonArray
-                                if (urlList != null && urlList.size() > 0 && urlList[0].isJsonObject
+                                if (urlList.size() > 0 && urlList[0].isJsonObject
                                     && urlList[0].asJsonObject.has("url")
                                     && urlList[0].asJsonObject.has("name")
-                                ) { //多线路格式
+                                ) {
                                     for (i in 0 until urlList.size()) {
-                                        val obj = urlList[i] as JsonObject
-                                        val name = obj["name"].asString.trim { it <= ' ' }
+                                        val obj = urlList[i] as com.google.gson.JsonObject
+                                        val n = obj["name"].asString.trim { it <= ' ' }
                                             .replace("<|>|《|》|-".toRegex(), "")
-                                        val url = obj["url"].asString.trim { it <= ' ' }
-                                        mSubscriptions.add(Subscription(name, url))
+                                        val u = obj["url"].asString.trim { it <= ' ' }
+                                        mSubscriptions.add(Subscription(n, u))
                                     }
                                 }
                             } else if (storeHouse != null && storeHouse.isJsonArray) { // 多仓
                                 val storeHouseList = storeHouse.asJsonArray
-                                if (storeHouseList != null && storeHouseList.size() > 0 && storeHouseList[0].isJsonObject
+                                if (storeHouseList.size() > 0 && storeHouseList[0].isJsonObject
                                     && storeHouseList[0].asJsonObject.has("sourceName")
                                     && storeHouseList[0].asJsonObject.has("sourceUrl")
-                                ) { //多仓格式
+                                ) {
                                     mSources.clear()
                                     for (i in 0 until storeHouseList.size()) {
-                                        val obj = storeHouseList[i] as JsonObject
-                                        val name = obj["sourceName"].asString.trim { it <= ' ' }
+                                        val obj = storeHouseList[i] as com.google.gson.JsonObject
+                                        val n = obj["sourceName"].asString.trim { it <= ' ' }
                                             .replace("<|>|《|》|-".toRegex(), "")
-                                        val url = obj["sourceUrl"].asString.trim { it <= ' ' }
-                                        mSources.add(Source(name, url))
+                                        val u = obj["sourceUrl"].asString.trim { it <= ' ' }
+                                        mSources.add(Source(n, u))
                                     }
                                     XPopup.Builder(this@SubscriptionActivity)
+                                        .hasBlurBg(MaterialBarHelper.popupBlurEnabled())
                                         .asCustom(
                                             ChooseSourceDialog(
                                                 this@SubscriptionActivity,
                                                 mSources
                                             ) { position: Int, _: String? ->
-                                                // 再根据多线路格式获取配置,如果仓内是正常多线路模式,name没用,直接使用线路的命名
                                                 addSubscription(
                                                     mSources[position].sourceName,
                                                     mSources[position].sourceUrl,
@@ -310,7 +254,7 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
                         } catch (th: Throwable) {
                             addSub2List(name, url, checked)
                         }
-                        mSubscriptionAdapter.setNewData(mSubscriptions)
+                        refresh()
                     }
 
                     @Throws(Throwable::class)
@@ -321,6 +265,7 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
                     override fun onError(response: Response<String?>) {
                         super.onError(response)
                         dismissLoadingDialog()
+                        loading.value = false
                         ToastUtils.showLong("订阅失败,请检查地址或网络状态")
                     }
                 })
@@ -329,18 +274,11 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
         }
     }
 
-    /**
-     * 仅当选中本地文件和添加的为单线路时,使用此订阅生效。多线路会直接解析全部并添加,多仓会展开并选择,最后也按多线路处理,直接添加
-     * @param name
-     * @param url
-     * @param checkNewest
-     */
+    /** 仅本地文件/单线路订阅用此生效; 多线路全量添加, 多仓展开选择 */
     private fun addSub2List(name: String, url: String, checkNewest: Boolean) {
-        if (checkNewest) { //选中最新的,清除以前的选中订阅
+        if (checkNewest) {
             for (subscription in mSubscriptions) {
-                if (subscription.isChecked) {
-                    subscription.setChecked(false)
-                }
+                if (subscription.isChecked) subscription.setChecked(false)
             }
             mSelectedUrl = url
             mSubscriptions.add(Subscription(name, url).setChecked(true))
@@ -349,9 +287,81 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
         }
     }
 
+    // ---------------- 列表操作 ----------------
+
+    private fun pickSubscription(positionInData: Int) {
+        for (i in mSubscriptions.indices) {
+            mSubscriptions[i].setChecked(i == positionInData)
+        }
+        mSelectedUrl = mSubscriptions[positionInData].url
+        refresh()
+    }
+
+    private fun deleteSubscription(url: String) {
+        val pos = indexOfUrl(url)
+        if (pos < 0) return
+        if (mSubscriptions[pos].isChecked) {
+            ToastUtils.showShort("不能删除当前使用的订阅")
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("删除订阅")
+            .setMessage("确定删除订阅吗？")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确定") { _, _ ->
+                mSubscriptions.removeAt(pos)
+                refresh()
+            }
+            .show()
+    }
+
+    private fun showItemMenu(url: String) {
+        val pos = indexOfUrl(url)
+        if (pos < 0) return
+        val item = mSubscriptions[pos]
+        XPopup.Builder(this).hasBlurBg(MaterialBarHelper.popupBlurEnabled())
+            .hasShadowBg(false)
+            .asAttachList(
+                arrayOf(if (item.isTop) "取消置顶" else "置顶", "重命名", "复制地址"), null
+            ) { index: Int, _: String? ->
+                when (index) {
+                    0 -> {
+                        item.isTop = !item.isTop
+                        refresh()
+                    }
+                    1 -> {
+                        XPopup.Builder(this).hasBlurBg(MaterialBarHelper.popupBlurEnabled())
+                            .asInputConfirm(
+                                "更改为",
+                                "",
+                                item.name,
+                                "新的订阅名",
+                                { text ->
+                                    if (!TextUtils.isEmpty(text)) {
+                                        if (text.trim { it <= ' ' }.length > 8) {
+                                            ToastUtils.showShort("不要过长,不方便记忆")
+                                        } else {
+                                            item.name = text.trim { it <= ' ' }
+                                            refresh()
+                                        }
+                                    }
+                                },
+                                null,
+                                R.layout.dialog_input
+                            ).show()
+                    }
+                    2 -> {
+                        ClipboardUtils.copyText(item.url)
+                        ToastUtils.showLong("已复制")
+                    }
+                }
+            }.show()
+    }
+
+    // ---------------- 生命周期语义(沿用旧版) ----------------
+
     override fun onPause() {
         super.onPause()
-        // 更新缓存
         Hawk.put(HawkConfig.API_URL, mSelectedUrl)
         Hawk.put<List<Subscription>?>(HawkConfig.SUBSCRIPTIONS, mSubscriptions)
         if (mBeforeUrl != mSelectedUrl) {
@@ -360,10 +370,9 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
     }
 
     override fun finish() {
-        //切换了订阅地址
         if (!TextUtils.isEmpty(mSelectedUrl) && mBeforeUrl != mSelectedUrl) {
             val intent = Intent(this, MainActivity::class.java)
-            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK
             startActivity(intent)
             overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
         }
@@ -373,5 +382,132 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
     override fun onDestroy() {
         super.onDestroy()
         OkGo.getInstance().cancelTag("get_subscription")
+    }
+
+    // ---------------- Compose 界面 ----------------
+
+    @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+    @Composable
+    private fun SubscriptionScreen() {
+        Scaffold(
+            containerColor = colorScheme.background,
+            topBar = {
+                TopAppBar(
+                    title = { Text("订阅管理", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = { finish() }) {
+                            Icon(
+                                painterResource(R.drawable.ic_arrow_back),
+                                contentDescription = "返回",
+                                tint = colorScheme.onSurface
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { showUseTip() }) {
+                            Icon(
+                                painterResource(R.drawable.ic_copyright_48),
+                                contentDescription = "使用说明",
+                                tint = colorScheme.onSurface
+                            )
+                        }
+                        IconButton(onClick = { showAddDialog() }) {
+                            Icon(
+                                painterResource(R.drawable.ic_add_24),
+                                contentDescription = "添加订阅",
+                                tint = colorScheme.onSurface
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
+                )
+            }
+        ) { padding ->
+            if (rows.value.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .padding(padding)
+                        .fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(Modifier.weight(1f))
+                    Text("暂无订阅, 点右上角添加", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    Spacer(Modifier.weight(1f))
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .padding(padding)
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    itemsIndexed(rows.value) { _, row ->
+                        val selected = row.checked
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 5.dp)
+                                .then(
+                                    if (selected) Modifier.border(
+                                        1.5.dp, colorScheme.primary, RoundedCornerShape(16.dp)
+                                    ) else Modifier
+                                ),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (selected) colorScheme.secondaryContainer
+                                else colorScheme.surfaceContainerLow
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .clickable { indexOfUrl(row.url).takeIf { it >= 0 }?.let { pickSubscription(it) } }
+                                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (row.isTop) {
+                                            Text(
+                                                "置顶",
+                                                color = colorScheme.primary,
+                                                fontSize = 11.sp,
+                                                modifier = Modifier.padding(end = 6.dp)
+                                            )
+                                        }
+                                        Text(
+                                            (if (selected) "✓ " else "") + row.name,
+                                            color = colorScheme.onSurface,
+                                            fontSize = 15.sp,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Text(
+                                        row.url,
+                                        color = colorScheme.onSurfaceVariant,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(top = 3.dp)
+                                    )
+                                }
+                                if (!selected) {
+                                    IconButton(onClick = { deleteSubscription(row.url) }) {
+                                        Icon(
+                                            painterResource(R.drawable.ic_close_24),
+                                            contentDescription = "删除",
+                                            tint = colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                } else {
+                                    Spacer(Modifier.size(48.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

@@ -69,23 +69,37 @@
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <com.angcyo.tablayout.DslTabLayout
-            android:id="@+id/tab_layout"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="40dp"
-            app:tab_indicator_drawable="@drawable/indicator_flash"
-            app:tab_indicator_enable_flash="true"
-            app:tab_indicator_enable_flash_clip="true"
-            app:tab_indicator_height="5dp"
-            app:tab_indicator_width="16dp"
-            app:tab_select_color="?attr/colorPrimary"
-            app:tab_text_min_size="14dp"
-            app:tab_text_max_size="16dp"
-            app:tab_enable_gradient_text_size="false"
-            android:layout_marginTop="6dp"
-            >
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp">
 
-        </com.angcyo.tablayout.DslTabLayout>
+            <com.angcyo.tablayout.DslTabLayout
+                android:id="@+id/tab_layout"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                app:tab_select_color="?attr/colorPrimary"
+                app:tab_text_min_size="14dp"
+                app:tab_text_max_size="16dp"
+                app:tab_enable_gradient_text_size="false"
+                android:paddingEnd="48dp"
+                >
+
+            </com.angcyo.tablayout.DslTabLayout>
+
+            <!-- 固定在右侧的「展开全部分类」按钮: tab 超长时快速切换, 无底色纯图标 -->
+            <ImageView
+                android:id="@+id/btn_expand_categories"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="4dp"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_expand_all_18"
+                android:importantForAccessibility="no" />
+
+        </FrameLayout>
 
         <androidx.viewpager.widget.ViewPager
             android:id="@+id/mViewPager"

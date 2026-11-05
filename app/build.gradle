@@ -1,5 +1,7 @@
 apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
+// Compose: 渐进式引入(现有 View 体系共存, 新页面优先用 Compose)
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 // Baseline Profile: 由 :baselineprofile 的启动 ULP 生成, 自动嵌入 release 构建
 apply plugin: 'androidx.baselineprofile'
 
@@ -101,6 +103,16 @@ android {
     }
     buildFeatures {
         viewBinding true
+        compose true
+    }
+
+    packaging {
+        resources {
+            excludes += 'META-INF/DEPENDENCIES'
+        }
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     packaging {
@@ -154,12 +166,22 @@ dependencies {
     implementation 'com.lzy.net:okgo:3.0.4'
     // implementation 'com.tencent.bugly:crashreport_upgrade:latest.release'
     implementation 'com.owen:tv-recyclerview:3.0.0'
+    // 界面材质(高斯模糊/液态玻璃): 实时采样根视图做背景模糊, API31+ 走 RenderEffect, 低版本 RenderScript
+    implementation 'com.github.Dimezis:BlurView:version-2.0.6'
 
     implementation 'com.github.getActivity:XXPermissions:13.6'
     implementation 'org.jsoup:jsoup:1.14.1'
     implementation 'com.github.hedzr:android-file-chooser:v1.2.0-final'
     implementation 'commons-io:commons-io:2.11.0'
     implementation 'com.googlecode.juniversalchardet:juniversalchardet:1.0.3'
+
+    // Compose(BOM 对齐; 与 View 体系互操作, 外观设置页为首个 Compose 页面)
+    def composeBom = platform('androidx.compose:compose-bom:2025.01.01')
+    implementation composeBom
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.activity:activity-compose:1.9.3'
 
     //沉浸式状态栏
     implementation 'com.geyifeng.immersionbar:immersionbar:3.2.2'

@@ -39,6 +39,7 @@ import com.github.tvbox.osc.util.DefaultConfig
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.HeavyTaskUtil
 import com.github.tvbox.osc.viewmodel.SourceViewModel
+import com.github.tvbox.osc.util.FastClickCheckUtil
 import com.lxj.xpopup.XPopup
 import com.orhanobut.hawk.Hawk
 import com.owen.tvrecyclerview.widget.TvRecyclerView
@@ -69,6 +70,12 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
      * 顶部tabs分类集合,用于渲染tab页,每个tab对应fragment内的数据
      */
     private var mSortDataList: List<SortData> = ArrayList()
+
+    /**
+     * 「展开全部」弹窗用的分类名列表(与 fragments 一一对应, 含/不含主页 tab 与 HOME_REC 设置一致)
+     */
+    private var allCategoryNames: List<String> = ArrayList()
+    private var categoryDropdown: com.github.tvbox.osc.view.CategoryDropdownPopup? = null
     private var dataInitOk = false
     private var jarInitOk = false
 
@@ -95,6 +102,22 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
         }
         mBinding.search.setOnClickListener {
             jumpActivity(FastSearchActivity::class.java)
+        }
+        // 右侧固定「展开全部分类」按钮 → 自分类栏向下展开的 M3 网格下拉
+        mBinding.btnExpandCategories.setOnClickListener { v ->
+            FastClickCheckUtil.check(v)
+            if (allCategoryNames.isEmpty()) {
+                ToastUtils.showShort("分类未加载")
+                return@setOnClickListener
+            }
+            if (categoryDropdown == null) {
+                categoryDropdown = com.github.tvbox.osc.view.CategoryDropdownPopup(
+                    requireActivity(), allCategoryNames, mBinding.mViewPager.currentItem
+                ) { position ->
+                    mBinding.mViewPager.setCurrentItem(position, false)
+                }
+            }
+            categoryDropdown?.show(v)
         }
         setLoadSir(mBinding.contentLayout)
         initViewModel()
@@ -284,6 +307,13 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
                 fragments.removeAt(0)
             }
 
+            // 供「展开全部」弹窗使用的分类名(与 fragments 一一对应, HOME_REC=2 时同样去掉主页)
+            val names = ArrayList<String>()
+            for (data in mSortDataList) names.add(data.name)
+            if (Hawk.get(HawkConfig.HOME_REC, 0) == 2 && names.isNotEmpty()) names.removeAt(0)
+            allCategoryNames = names
+            categoryDropdown = null // 换源/刷新后重建, 弹窗数据与 fragments 同步
+
             //重新渲染vp
             mBinding.mViewPager.adapter =
                 object : FragmentStatePagerAdapter(getChildFragmentManager()) {
@@ -377,7 +407,7 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
 
             // 查询完成后更新UI
             if (vodInfoList.isNotEmpty() && vodInfoList[0] != null) {
-                XPopup.Builder(context)
+                XPopup.Builder(context).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                     .hasShadowBg(false)
                     .isDestroyOnDismiss(true)
                     .isCenterHorizontal(true)

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material 3 预设主题色深色色板, 由 GenPresets 生成, 勿手改 -->
+<resources>
+
+    <!-- 青绿 -->
+    <color name="preset_teal_primary">#FF70D8C8</color>
+    <color name="preset_teal_on_primary">#FF003731</color>
+    <color name="preset_teal_primary_container">#FF005048</color>
+    <color name="preset_teal_on_primary_container">#FF8DF5E4</color>
+    <color name="preset_teal_secondary">#FFB1CCC6</color>
+    <color name="preset_teal_on_secondary">#FF1C3531</color>
+    <color name="preset_teal_secondary_container">#FF334B47</color>
+    <color name="preset_teal_on_secondary_container">#FFCCE8E2</color>
+    <color name="preset_teal_tertiary">#FFADCAE5</color>
+    <color name="preset_teal_on_tertiary">#FF143349</color>
+    <color name="preset_teal_tertiary_container">#FF2D4A60</color>
+    <color name="preset_teal_on_tertiary_container">#FFCBE6FF</color>
+    <color name="preset_teal_inverse_primary">#FF006B5F</color>
+
+    <!-- 翠绿 -->
+    <color name="preset_green_primary">#FF82DB7E</color>
+    <color name="preset_green_on_primary">#FF00390A</color>
+    <color name="preset_green_primary_container">#FF005312</color>
+    <color name="preset_green_on_primary_container">#FF9DF898</color>
+    <color name="preset_green_secondary">#FFBACCB3</color>
+    <color name="preset_green_on_secondary">#FF253423</color>
+    <color name="preset_green_secondary_container">#FF3B4B38</color>
+    <color name="preset_green_on_secondary_container">#FFD5E8CE</color>
+    <color name="preset_green_tertiary">#FFA0CFD4</color>
+    <color name="preset_green_on_tertiary">#FF00363B</color>
+    <color name="preset_green_tertiary_container">#FF1F4D52</color>
+    <color name="preset_green_on_tertiary_container">#FFBCEBF0</color>
+    <color name="preset_green_inverse_primary">#FF106D20</color>
+
+    <!-- 琥珀 -->
+    <color name="preset_amber_primary">#FFFFB77A</color>
+    <color name="preset_amber_on_primary">#FF4C2700</color>
+    <color name="preset_amber_primary_container">#FF6D3A00</color>
+    <color name="preset_amber_on_primary_container">#FFFFDCC2</color>
+    <color name="preset_amber_secondary">#FFE3C0A5</color>
+    <color name="preset_amber_on_secondary">#FF412C19</color>
+    <color name="preset_amber_secondary_container">#FF5A422E</color>
+    <color name="preset_amber_on_secondary_container">#FFFFDCC2</color>
+    <color name="preset_amber_tertiary">#FFC4CB97</color>
+    <color name="preset_amber_on_tertiary">#FF2D330D</color>
+    <color name="preset_amber_tertiary_container">#FF444A22</color>
+    <color name="preset_amber_on_tertiary_container">#FFE0E7B1</color>
+    <color name="preset_amber_inverse_primary">#FF8F4E00</color>
+
+    <!-- 暖橙 -->
+    <color name="preset_orange_primary">#FFFFB5A0</color>
+    <color name="preset_orange_on_primary">#FF5F1500</color>
+    <color name="preset_orange_primary_container">#FF872100</color>
+    <color name="preset_orange_on_primary_container">#FFFFDBD1</color>
+    <color name="preset_orange_secondary">#FFE7BDB2</color>
+    <color name="preset_orange_on_secondary">#FF442A22</color>
+    <color name="preset_orange_secondary_container">#FF5D4037</color>
+    <color name="preset_orange_on_secondary_container">#FFFFDBD1</color>
+    <color name="preset_orange_tertiary">#FFD9C58D</color>
+    <color name="preset_orange_on_tertiary">#FF3B2F05</color>
+    <color name="preset_orange_tertiary_container">#FF534619</color>
+    <color name="preset_orange_on_tertiary_container">#FFF6E1A7</color>
+    <color name="preset_orange_inverse_primary">#FFB02E00</color>
+
+    <!-- 绯红 -->
+    <color name="preset_red_primary">#FFFFB4AC</color>
+    <color name="preset_red_on_primary">#FF690006</color>
+    <color name="preset_red_primary_container">#FF93000D</color>
+    <color name="preset_red_on_primary_container">#FFFFDAD6</color>
+    <color name="preset_red_secondary">#FFE7BDB8</color>
+    <color name="preset_red_on_secondary">#FF442927</color>
+    <color name="preset_red_secondary_container">#FF5D3F3C</color>
+    <color name="preset_red_on_secondary_container">#FFFFDAD6</color>
+    <color name="preset_red_tertiary">#FFE0C38C</color>
+    <color name="preset_red_on_tertiary">#FF3F2E04</color>
+    <color name="preset_red_tertiary_container">#FF584419</color>
+    <color name="preset_red_on_tertiary_container">#FFFEDFA6</color>
+    <color name="preset_red_inverse_primary">#FFBB171C</color>
+
+    <!-- 粉紫 -->
+    <color name="preset_pink_primary">#FFFFB2BF</color>
+    <color name="preset_pink_on_primary">#FF660028</color>
+    <color name="preset_pink_primary_container">#FF90003B</color>
+    <color name="preset_pink_on_primary_container">#FFFFD9DE</color>
+    <color name="preset_pink_secondary">#FFE4BDC2</color>
+    <color name="preset_pink_on_secondary">#FF43292E</color>
+    <color name="preset_pink_secondary_container">#FF5C3F44</color>
+    <color name="preset_pink_on_secondary_container">#FFFFD9DE</color>
+    <color name="preset_pink_tertiary">#FFEBBE90</color>
+    <color name="preset_pink_on_tertiary">#FF462A08</color>
+    <color name="preset_pink_tertiary_container">#FF5F401D</color>
+    <color name="preset_pink_on_tertiary_container">#FFFFDCBB</color>
+    <color name="preset_pink_inverse_primary">#FFBC004F</color>
+
+    <!-- 雅紫 -->
+    <color name="preset_purple_primary">#FFEBB2FF</color>
+    <color name="preset_purple_on_primary">#FF520071</color>
+    <color name="preset_purple_primary_container">#FF721199</color>
+    <color name="preset_purple_on_primary_container">#FFF8D8FF</color>
+    <color name="preset_purple_secondary">#FFD4C0D7</color>
+    <color name="preset_purple_on_secondary">#FF392C3D</color>
+    <color name="preset_purple_secondary_container">#FF504255</color>
+    <color name="preset_purple_on_secondary_container">#FFF1DCF4</color>
+    <color name="preset_purple_tertiary">#FFF5B7B5</color>
+    <color name="preset_purple_on_tertiary">#FF4C2524</color>
+    <color name="preset_purple_tertiary_container">#FF663B39</color>
+    <color name="preset_purple_on_tertiary_container">#FFFFDAD8</color>
+    <color name="preset_purple_inverse_primary">#FF8C33B3</color>
+
+</resources>

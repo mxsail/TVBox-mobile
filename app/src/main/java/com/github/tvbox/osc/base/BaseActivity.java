@@ -6,6 +6,7 @@ import android.content.res.AssetManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -25,6 +26,8 @@ import com.github.tvbox.osc.callback.LoadingCallback;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.ui.activity.DetailActivity;
 import com.github.tvbox.osc.util.AppManager;
+import com.github.tvbox.osc.util.FontApplier;
+import com.github.tvbox.osc.util.FontFactory2;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.Utils;
 import com.gyf.immersionbar.ImmersionBar;
@@ -55,7 +58,15 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        // 预设主题色覆盖层必须在 setContentView 之前叠上主题(动态取色由 App 的 precondition 处理)
+        ThemeManager.applyPresetOverlay(this);
+        // 自定义字体工厂也要赶在 super.onCreate 之前挂上:
+        // appcompat 检测到已有 Factory2 会跳过自身安装, 由 FontFactory2 转发给 delegate 完成视图创建
+        if (FontApplier.hasCustomFont()) {
+            getLayoutInflater().setFactory2(new FontFactory2((LayoutInflater.Factory2) getDelegate()));
+        }
         super.onCreate(savedInstanceState);
+        setupBackCallback();
         EventBus.getDefault().register(this);
 
         if (getLayoutResID()==-1){
@@ -67,6 +78,8 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
         AppManager.getInstance().addActivity(this);
         initStatusBar();
         init();
+        // BottomNavigationView 菜单等非 inflater 创建的文本兜底补一遍字体
+        FontApplier.applyToViewTree(getWindow().getDecorView());
         if (!App.getInstance().isNormalStart){
             AppUtils.relaunchApp(true);
         }
@@ -75,6 +88,44 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void refresh(RefreshEvent event) {
 
+    }
+
+    // ---------------- 返回键统一处理(预见性返回) ----------------
+
+    private androidx.activity.OnBackPressedCallback mBackCallback;
+
+    /**
+     * 返回键统一走 OnBackPressedDispatcher(manifest 已开 enableOnBackInvokedCallback):
+     *  - 预见性返回关闭(默认): 回调常开, 行为与旧版重写 onBackPressed 完全一致;
+     *  - 预见性返回开启: 默认放行系统(API33+ 出预见性预览动画, 到根由系统收尾),
+     *    需要自行消化返回的页面覆写 keepBackIntercept()=true, 或运行时 setBackIntercept()。
+     */
+    private void setupBackCallback() {
+        boolean predictive = Hawk.get(HawkConfig.PREDICTIVE_BACK, false);
+        mBackCallback = new androidx.activity.OnBackPressedCallback(!predictive || keepBackIntercept()) {
+            @Override
+            public void handleOnBackPressed() {
+                onBackHandled();
+            }
+        };
+        getOnBackPressedDispatcher().addCallback(this, mBackCallback);
+    }
+
+    /** 预见性返回模式下本页是否仍拦截返回(复杂页面/播放页覆写 true) */
+    protected boolean keepBackIntercept() {
+        return false;
+    }
+
+    /** 运行时切换本页拦截态(内层弹窗/播放控制层出现时开, 关闭后关) */
+    protected void setBackIntercept(boolean enable) {
+        if (mBackCallback != null) {
+            mBackCallback.setEnabled(enable);
+        }
+    }
+
+    /** 返回键处理入口(替代旧版重写 onBackPressed), 默认退出本页 */
+    protected void onBackHandled() {
+        finish();
     }
 
 

@@ -42,6 +42,7 @@ public class AllVodSeriesBottomDialog extends BottomPopupView {
     protected void onCreate() {
         super.onCreate();
         RecyclerView rv = findViewById(R.id.rv);
+        com.github.tvbox.osc.view.BounceOverScroll.attach(rv);
 
         rv.setLayoutManager(new GridLayoutManager(getContext(), Utils.getSeriesSpanCount(mList)));
         rv.addItemDecoration(new GridSpacingItemDecoration(Utils.getSeriesSpanCount(mList), 20, true));

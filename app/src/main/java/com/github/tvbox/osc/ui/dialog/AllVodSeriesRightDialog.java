@@ -58,6 +58,7 @@ public class AllVodSeriesRightDialog extends DrawerPopupView {
 
         if (mDetailActivity.seriesAdapter!=null){//复用activity的adapter
             RecyclerView rv = findViewById(R.id.rv);
+            com.github.tvbox.osc.view.BounceOverScroll.attach(rv);
             rv.setLayoutManager(new GridLayoutManager(getContext(),Utils.getSeriesSpanCount(mDetailActivity.seriesAdapter.getData())));
             rv.addItemDecoration(new GridSpacingItemDecoration(Utils.getSeriesSpanCount(mDetailActivity.seriesAdapter.getData()), 20, true));
             mDetailActivity.seriesAdapter.setGird(true);

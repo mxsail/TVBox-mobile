@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 弹出菜单卡片: containerHigh 底 + 细描边(深浅模式都与页面背景拉开层次) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+	android:shape="rectangle">
+	<solid android:color="?attr/colorSurfaceContainerHigh" />
+	<corners android:radius="@dimen/m3_corner_card" />
+	<stroke android:width="1dp" android:color="@color/md_outline_variant" />
+</shape>
