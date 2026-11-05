@@ -601,7 +601,8 @@ class FastSearchActivity : BaseActivity() {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             words.forEach { word ->
                 Text(

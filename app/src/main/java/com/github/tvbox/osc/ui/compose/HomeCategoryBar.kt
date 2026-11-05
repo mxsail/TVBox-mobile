@@ -111,13 +111,15 @@ fun HomeCategoryBar(
             .then(
                 if (isExpanded) {
                     // 底部阴影留位 + clipToBounds: 面板与顶栏齐平, shadow 四周扩散会把
-                    // 顶边阴影画进顶部内容区形成"上边框"——裁掉上/侧, 只留底部柔和阴影
+                    // 顶边阴影画进顶部内容区形成"上边框"——裁掉上/侧, 只留底部柔和阴影。
+                    // 背景必须用 background 与页面同色: surface 与页面背景有色差,
+                    // 面板顶边与搜索框之间会出现一条全宽分割线
                     Modifier
                         .clipToBounds()
                         .padding(bottom = 12.dp)
                         .shadow(elevation = shadowElevation, shape = drawerShape)
                         .background(
-                            color = MaterialTheme.colorScheme.surface,
+                            color = MaterialTheme.colorScheme.background,
                             shape = drawerShape
                         )
                 } else {
