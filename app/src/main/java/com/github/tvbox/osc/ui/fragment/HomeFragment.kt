@@ -3,24 +3,60 @@ package com.github.tvbox.osc.ui.fragment
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
-import android.view.Gravity
-import android.widget.TextView
+import android.os.Looper
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentStatePagerAdapter
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
-import com.blankj.utilcode.util.ConvertUtils
+import androidx.viewpager.widget.ViewPager
 import com.blankj.utilcode.util.ScreenUtils
 import com.blankj.utilcode.util.ToastUtils
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.api.ApiConfig
 import com.github.tvbox.osc.api.ApiConfig.LoadConfigCallback
-import com.github.tvbox.osc.base.App
 import com.github.tvbox.osc.base.BaseLazyFragment
-import com.github.tvbox.osc.base.BaseVbFragment
 import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.bean.AbsSortXml
 import com.github.tvbox.osc.bean.MovieSort.SortData
@@ -28,7 +64,6 @@ import com.github.tvbox.osc.bean.SourceBean
 import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.cache.RoomDataManger
 import com.github.tvbox.osc.constant.IntentKey
-import com.github.tvbox.osc.databinding.FragmentHomeBinding
 import com.github.tvbox.osc.event.AppearanceChangedEvent
 import com.github.tvbox.osc.server.ControlManager
 import com.github.tvbox.osc.ui.activity.FastSearchActivity
@@ -36,6 +71,8 @@ import com.github.tvbox.osc.ui.activity.MainActivity
 import com.github.tvbox.osc.ui.activity.SubscriptionActivity
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
 import com.github.tvbox.osc.ui.compose.HomeCategoryBar
+import com.github.tvbox.osc.ui.compose.LoadState
+import com.github.tvbox.osc.ui.compose.LoadStateBox
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.dialog.LastViewedDialog
 import com.github.tvbox.osc.ui.dialog.SelectDialog
@@ -44,7 +81,6 @@ import com.github.tvbox.osc.util.DefaultConfig
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.HeavyTaskUtil
 import com.github.tvbox.osc.viewmodel.SourceViewModel
-import com.github.tvbox.osc.util.FastClickCheckUtil
 import com.lxj.xpopup.XPopup
 import com.orhanobut.hawk.Hawk
 import com.owen.tvrecyclerview.widget.TvRecyclerView
@@ -52,13 +88,30 @@ import com.owen.tvrecyclerview.widget.V7GridLayoutManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.greenrobot.eventbus.EventBus
+import org.greenrobot.eventbus.Subscribe
+import org.greenrobot.eventbus.ThreadMode
+import me.jessyan.autosize.AutoSize
 
-class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
+/**
+ * 首页(Compose 渲染层): 顶栏(数据源名/搜索) + 分类栏(HomeCategoryBar) + 内容区
+ * (ViewPager1 经 AndroidView 承载 UserFragment/GridFragment 分类子页)。
+ * 源加载链路(loadConfig/loadJar/getSort/重试)与子页装配逻辑原样保留, 仅渲染层替换。
+ */
+class HomeFragment : Fragment() {
 
+    // ---------------- Compose 响应状态 ----------------
     private val selectedTabState = mutableIntStateOf(0)
     private val categoriesState = mutableStateOf<List<String>>(listOf("主页"))
     private val materialState = mutableStateOf(Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID))
     private val isTabsExpandedState = mutableStateOf(false)
+    private val sourceNameState = mutableStateOf("")
+    private val pageLoadState = mutableStateOf(LoadState.None)
+
+    /** 分类适配器版本(装载完成后递增, 触发 ViewPager 挂载) */
+    private val pagerVersion = mutableIntStateOf(0)
+    private var viewPager: ViewPager? = null
+    private var pendingPagerAdapter: FragmentStatePagerAdapter? = null
 
     fun collapseTabsIfExpanded(): Boolean {
         if (isTabsExpandedState.value) {
@@ -69,19 +122,10 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
     }
 
     private fun setTabsExpanded(expanded: Boolean) {
-        if (isTabsExpandedState.value == expanded) return
         isTabsExpandedState.value = expanded
-        if (expanded) {
-            mBinding.tabMaskView.visibility = android.view.View.VISIBLE
-            mBinding.tabMaskView.animate().alpha(1f).setDuration(240).start()
-        } else {
-            mBinding.tabMaskView.animate().alpha(0f).setDuration(200).withEndAction {
-                mBinding.tabMaskView.visibility = android.view.View.GONE
-            }.start()
-        }
     }
 
-    @org.greenrobot.eventbus.Subscribe(threadMode = org.greenrobot.eventbus.ThreadMode.MAIN)
+    @Subscribe(threadMode = ThreadMode.MAIN)
     fun onAppearanceChanged(event: AppearanceChangedEvent) {
         if (event.type == AppearanceChangedEvent.TYPE_STYLE) {
             materialState.value = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID)
@@ -102,18 +146,13 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
 
     private var sourceViewModel: SourceViewModel? = null
     private val fragments: MutableList<BaseLazyFragment> = ArrayList()
-    private val mHandler = Handler()
+    private val mHandler = Handler(Looper.getMainLooper())
 
     /**
      * 顶部tabs分类集合,用于渲染tab页,每个tab对应fragment内的数据
      */
     private var mSortDataList: List<SortData> = ArrayList()
 
-    /**
-     * 「展开全部」弹窗用的分类名列表(与 fragments 一一对应, 含/不含主页 tab 与 HOME_REC 设置一致)
-     */
-    private var allCategoryNames: List<String> = ArrayList()
-    private var categoryDropdown: com.github.tvbox.osc.view.CategoryDropdownPopup? = null
     private var dataInitOk = false
     private var jarInitOk = false
 
@@ -125,67 +164,32 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
      */
     var onlyConfigChanged = false
 
-    override fun init() {
+    private var eventBusRegistered = false
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        AutoSize.autoConvertDensity(activity, 360f, true)
+        sourceNameState.value = getString(R.string.app_name)
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent { TvBoxTheme { HomeScreen() } }
+        }
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        if (!eventBusRegistered) {
+            eventBusRegistered = true
+            EventBus.getDefault().register(this)
+        }
+        init()
+    }
+
+    private fun init() {
         ControlManager.get().startServer()
-        mBinding.nameContainer.setOnClickListener {
-            if (dataInitOk && jarInitOk) {
-                showSiteSwitch()
-            } else {
-                ToastUtils.showShort("数据源未加载，长按刷新或切换订阅")
-            }
-        }
-        mBinding.nameContainer.setOnLongClickListener {
-            refreshHomeSources()
-            true
-        }
-        mBinding.search.setOnClickListener {
-            jumpActivity(FastSearchActivity::class.java)
-        }
-        // 右侧固定「展开全部分类」按钮 → 自分类栏向下展开的 M3 网格下拉
-        mBinding.btnExpandCategories.setOnClickListener { v ->
-            FastClickCheckUtil.check(v)
-            if (allCategoryNames.isEmpty()) {
-                ToastUtils.showShort("分类未加载")
-                return@setOnClickListener
-            }
-            if (categoryDropdown == null) {
-                categoryDropdown = com.github.tvbox.osc.view.CategoryDropdownPopup(
-                    requireActivity(), allCategoryNames, mBinding.mViewPager.currentItem
-                ) { position ->
-                    mBinding.mViewPager.setCurrentItem(position, false)
-                }
-            }
-            categoryDropdown?.show(v)
-        }
-        mBinding.tabMaskView.setOnClickListener {
-            setTabsExpanded(false)
-        }
-        mBinding.mViewPager.addOnPageChangeListener(object : androidx.viewpager.widget.ViewPager.SimpleOnPageChangeListener() {
-            override fun onPageSelected(position: Int) {
-                selectedTabState.intValue = position
-            }
-        })
-        mBinding.composeTabs.setViewCompositionStrategy(
-            androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
-        )
-        mBinding.composeTabs.setContent {
-            TvBoxTheme {
-                HomeCategoryBar(
-                    categories = categoriesState.value,
-                    selectedIndex = selectedTabState.intValue,
-                    onTabSelected = { pos ->
-                        selectedTabState.intValue = pos
-                        mBinding.mViewPager.setCurrentItem(pos, false)
-                    },
-                    material = materialState.value,
-                    isExpanded = isTabsExpandedState.value,
-                    onExpandChanged = { expanded ->
-                        setTabsExpanded(expanded)
-                    }
-                )
-            }
-        }
-        setLoadSir(mBinding.contentLayout)
         initViewModel()
         initData()
     }
@@ -210,13 +214,12 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
     }
 
     private fun initData() {
-        val mainActivity = mActivity as MainActivity
+        val mainActivity = requireActivity() as MainActivity
         onlyConfigChanged = mainActivity.useCacheConfig
 
         val home = ApiConfig.get().homeSourceBean
         if (home != null && !home.name.isNullOrEmpty()) {
-            mBinding.tvName.text = home.name
-            mBinding.tvName.postDelayed({ mBinding.tvName.isSelected = true }, 2000)
+            sourceNameState.value = home.name
         }
 
         showLoading()
@@ -225,7 +228,7 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
         // 也在此链路上——全部挪到后台线程执行。回调统一经 mHandler(主线程)回到本类,
         // 缓存命中/空订阅的同步回调也只做 mHandler.post, 线程安全。
         HeavyTaskUtil.executeNewTask {
-            when{
+            when {
                 dataInitOk && jarInitOk -> {
                     //正常初始化会先加载,最终到这,此时数据有以下几种情况
                     // 1. api/jar/spider等均加载完,正常显示数据。2. 缺失spider(存疑?)/api配置有问题同样加载(最后空布局 或 只有豆瓣首页)
@@ -241,7 +244,7 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
         }
     }
 
-    private fun loadConfig(){
+    private fun loadConfig() {
         ApiConfig.get().loadConfig(onlyConfigChanged, object : LoadConfigCallback {
 
             override fun retry() {
@@ -267,10 +270,10 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
                     showTipDialog(msg)
                 }
             }
-        }, activity)
+        }, requireActivity())
     }
 
-    private fun loadJar(){
+    private fun loadJar() {
         if (!ApiConfig.get().spider.isNullOrEmpty()) {
             ApiConfig.get().loadJar(
                 onlyConfigChanged,
@@ -363,27 +366,22 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
                 fragments.removeAt(0)
             }
 
-            // 供「展开全部」使用的分类名(与 fragments 一一对应, HOME_REC=2 时同样去掉主页)
-            val names = ArrayList<String>()
-            for (data in mSortDataList) names.add(data.name)
-            if (Hawk.get(HawkConfig.HOME_REC, 0) == 2 && names.isNotEmpty()) names.removeAt(0)
-            allCategoryNames = names
-            categoryDropdown = null
-
             // 驱动 Compose 响应式刷新分类栏 (彻底解决异步加载分类不展示的问题)
-            categoriesState.value = names.toList()
+            categoriesState.value = mSortDataList.map { it.name }.let { names ->
+                if (Hawk.get(HawkConfig.HOME_REC, 0) == 2 && names.isNotEmpty()) names.drop(1) else names
+            }
 
             //重新渲染vp
-            mBinding.mViewPager.adapter =
-                object : FragmentStatePagerAdapter(getChildFragmentManager()) {
-                    override fun getItem(position: Int): Fragment {
-                        return fragments[position]
-                    }
-
-                    override fun getCount(): Int {
-                        return fragments.size
-                    }
+            pendingPagerAdapter = object : FragmentStatePagerAdapter(childFragmentManager) {
+                override fun getItem(position: Int): Fragment {
+                    return fragments[position]
                 }
+
+                override fun getCount(): Int {
+                    return fragments.size
+                }
+            }
+            pagerVersion.intValue++
         }
     }
 
@@ -393,7 +391,7 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
     fun scrollToFirstTab(): Boolean {
         return if (selectedTabState.intValue != 0) {
             selectedTabState.intValue = 0
-            mBinding.mViewPager.setCurrentItem(0, false)
+            viewPager?.setCurrentItem(0, false)
             true
         } else {
             false
@@ -403,6 +401,19 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
     override fun onPause() {
         super.onPause()
         mHandler.removeCallbacksAndMessages(null)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (eventBusRegistered) {
+            EventBus.getDefault().unregister(this)
+            eventBusRegistered = false
+        }
+        ControlManager.get().stopServer()
+    }
+
+    private fun jumpActivity(clazz: Class<*>) {
+        startActivity(Intent(requireActivity(), clazz))
     }
 
     private fun showSiteSwitch() {
@@ -445,11 +456,6 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
         startActivity(intent)
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        ControlManager.get().stopServer()
-    }
-
     private fun queryHistory() {
         lifecycleScope.launch {
             val vodInfoList = withContext(Dispatchers.IO) {
@@ -474,6 +480,166 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
                     .asCustom(LastViewedDialog(requireContext(), vodInfoList[0]))
                     .show()
                     .delayDismiss(4000)
+            }
+        }
+    }
+
+    private fun showLoading() {
+        pageLoadState.value = LoadState.Loading
+    }
+
+    private fun showSuccess() {
+        pageLoadState.value = LoadState.Success
+    }
+
+    // ---------------- Compose 渲染层 ----------------
+
+    @OptIn(ExperimentalFoundationApi::class)
+    @Composable
+    private fun HomeScreen() {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(colorScheme.background)
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                Spacer(Modifier.height(44.dp)) // 原 topLayout marginTop(状态栏区)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 数据源名称: 点击切源, 长按刷新订阅
+                    Row(
+                        Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .combinedClickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {
+                                    if (dataInitOk && jarInitOk) {
+                                        showSiteSwitch()
+                                    } else {
+                                        ToastUtils.showShort("数据源未加载，长按刷新或切换订阅")
+                                    }
+                                },
+                                onLongClick = { refreshHomeSources() }
+                            )
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            sourceNameState.value,
+                            color = colorScheme.onSurface,
+                            fontSize = 16.sp,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .widthIn(max = 110.dp)
+                                .basicMarquee(iterations = Int.MAX_VALUE)
+                        )
+                        Icon(
+                            painterResource(R.drawable.ic_arrow_down),
+                            contentDescription = "切换数据源",
+                            tint = colorScheme.onSurface,
+                            modifier = Modifier
+                                .padding(start = 6.dp)
+                                .size(14.dp)
+                        )
+                    }
+                    // 搜索入口
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .padding(start = 10.dp, end = 10.dp)
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(colorScheme.surfaceContainerHigh)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { jumpActivity(FastSearchActivity::class.java) }
+                    ) {
+                        Row(
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("搜索", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                            Spacer(Modifier.weight(1f))
+                            Icon(
+                                painterResource(R.drawable.ic_search_18),
+                                contentDescription = "搜索",
+                                tint = colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                Box(Modifier.weight(1f)) {
+                    Column(Modifier.fillMaxSize()) {
+                        Spacer(Modifier.height(46.dp)) // 原 contentLayout marginTop(分类栏让位)
+                        LoadStateBox(pageLoadState.value, Modifier.fillMaxSize()) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    ViewPager(ctx).apply {
+                                        // 固定原 XML 的 view id: FragmentStatePagerAdapter 以
+                                        // "android:switcher:id:position" 复用子 fragment, 重建后仍能命中
+                                        id = R.id.mViewPager
+                                        viewPager = this
+                                        addOnPageChangeListener(object :
+                                            ViewPager.SimpleOnPageChangeListener() {
+                                            override fun onPageSelected(position: Int) {
+                                                selectedTabState.intValue = position
+                                            }
+                                        })
+                                    }
+                                },
+                                update = { vp ->
+                                    pagerVersion.intValue // 订阅适配器版本(分类装载完成后挂载/重建)
+                                    val adapter = pendingPagerAdapter
+                                    if (adapter != null && vp.adapter !== adapter) {
+                                        vp.adapter = adapter
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                    // 分类展开时的内容区压暗遮罩(淡入, 点击收起)
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isTabsExpandedState.value,
+                        enter = fadeIn(tween(240)),
+                        exit = fadeOut(tween(200))
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color(0x73000000))
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) { setTabsExpanded(false) }
+                        )
+                    }
+                    // 顶部分类栏(常态单行滚动 / 展开全量 chips)
+                    HomeCategoryBar(
+                        categories = categoriesState.value,
+                        selectedIndex = selectedTabState.intValue,
+                        onTabSelected = { pos ->
+                            selectedTabState.intValue = pos
+                            viewPager?.setCurrentItem(pos, false)
+                        },
+                        material = materialState.value,
+                        isExpanded = isTabsExpandedState.value,
+                        onExpandChanged = { expanded ->
+                            setTabsExpanded(expanded)
+                        },
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
             }
         }
     }
