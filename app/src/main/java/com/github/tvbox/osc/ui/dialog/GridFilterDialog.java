@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.github.tvbox.osc.R;
+import com.github.tvbox.osc.base.ThemeManager;
 import com.github.tvbox.osc.bean.MovieSort;
 import com.github.tvbox.osc.ui.adapter.GridFilterKVAdapter;
 import android.widget.TextView;
@@ -36,6 +37,15 @@ public class GridFilterDialog extends BaseDialog {
         setCancelable(true);
         setContentView(R.layout.dialog_grid_filter);
         filterRoot = findViewById(R.id.filterRoot);
+        // 材质适配: 液态玻璃/轻透磨砂时 BaseDialog 已开启跨窗 blur-behind,
+        // 这里把表面降为半透明让毛玻璃透出(Material You 保持不透明)
+        if (com.github.tvbox.osc.view.MaterialBarHelper.blurSupported()
+                && ThemeManager.material() != ThemeManager.MATERIAL_YOU) {
+            android.graphics.drawable.Drawable bg = filterRoot.getBackground();
+            if (bg != null) {
+                bg.mutate().setAlpha(216);
+            }
+        }
         findViewById(R.id.btn_reset).setOnClickListener(view -> {
             mSortData.filterSelect = new HashMap<>();
             selectChange = true;

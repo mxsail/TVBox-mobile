@@ -85,7 +85,7 @@ fun LastViewedTip(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .liquidGlass(
+                    .materialGlass(
                         material = material,
                         backdrop = backdrop,
                         shape = CircleShape

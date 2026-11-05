@@ -1,11 +1,12 @@
 package com.github.tvbox.osc.ui.compose
 
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -26,66 +27,69 @@ import com.kyant.backdrop.isRuntimeShaderSupported
 import com.orhanobut.hawk.Hawk
 
 /**
- * 液态玻璃 (Liquid Glass) Compose 工具层:
- * - 基于 Kyant0/AndroidLiquidGlass
- * - 结合项目设置 UI_MATERIAL:
- *    MATERIAL_LIQUID: 开启物理折射与色散 (API 33+) + 模糊 (API 31+) + 高光
- *    MATERIAL_BLUR: 仅高斯模糊
- *    MATERIAL_TRANSLUCENT / 低版本降级: 半透明 surface + 细描边
- *    MATERIAL_SOLID: 正常实底
+ * 界面材质 (三类): 按 UI_MATERIAL 设置给玻璃容器套配方
+ * - MATERIAL_YOU      Material You: 实底跟随 M3 动态色, 无玻璃效果
+ * - MATERIAL_LIQUID   液态玻璃: 折射(Android 14+)+色散+高光+模糊, 背景透出后方内容
+ * - MATERIAL_FROSTED  轻透磨砂: 类 iOS 26 毛玻璃, 重模糊高透无折射
  */
+
+/** 跨组合共享的全屏背板: 底栏组合创建, 各 Compose 页面根节点 layerBackdrop 注册,
+ *  底栏玻璃即可采样真实页面内容(背景透出后方内容)。Live 等 View 页不注册, 玻璃自动退化为表面色。 */
+object AppUiBackdrop {
+    val layer = mutableStateOf<LayerBackdrop?>(null)
+}
 
 /** 当前设备是否支持真 RenderEffect 模糊 */
 val isLiquidGlassSupported: Boolean get() = isRenderEffectSupported()
 
-/** 当前配置是否选中了液态玻璃材质 */
-fun isLiquidMaterialActive(): Boolean {
-    val material = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID)
-    return material == ThemeManager.MATERIAL_LIQUID && isLiquidGlassSupported
-}
-
-/** 当前配置是否选中了模糊或液态玻璃材质 */
-fun isBlurOrLiquidActive(): Boolean {
-    val material = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID)
-    return (material == ThemeManager.MATERIAL_LIQUID || material == ThemeManager.MATERIAL_BLUR) && isLiquidGlassSupported
+/** 当前配置是否需要玻璃背板(液态玻璃/轻透磨砂) */
+fun isGlassMaterialActive(): Boolean {
+    val material = ThemeManager.material()
+    return material != ThemeManager.MATERIAL_YOU && isLiquidGlassSupported
 }
 
 /**
- * 给 Compose 容器应用液态玻璃 / 半透明降级修饰符
+ * 给 Compose 容器按材质套表面配方
  */
 @Composable
-fun Modifier.liquidGlass(
-    material: String = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID),
+fun Modifier.materialGlass(
+    material: String = ThemeManager.material(),
     backdrop: Backdrop = emptyBackdrop(),
-    cornerRadius: Dp = 28.dp,
-    shape: Shape = RoundedCornerShape(cornerRadius),
+    shape: Shape = RoundedCornerShape(28.dp),
     blurRadius: Dp = Hawk.get(HawkConfig.LIQUID_BLUR_RADIUS, 16f).dp,
     refractionHeight: Dp = Hawk.get(HawkConfig.LIQUID_REFRACTION_HEIGHT, 20f).dp,
     refractionAmount: Dp = Hawk.get(HawkConfig.LIQUID_REFRACTION_AMOUNT, 14f).dp,
     chromaticAberration: Boolean = Hawk.get(HawkConfig.LIQUID_DISPERSION, true),
     containerColor: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)
 ): Modifier {
-    // 实底材质
-    if (material == ThemeManager.MATERIAL_SOLID) {
+    // Material You: 实底 M3 表面, 无玻璃
+    if (material == ThemeManager.MATERIAL_YOU || !isLiquidGlassSupported) {
         return this.background(MaterialTheme.colorScheme.surface, shape)
     }
 
-    // 不支持 RenderEffect 或普通半透明材质时：走优雅降级
-    if (!isLiquidGlassSupported || material == ThemeManager.MATERIAL_TRANSLUCENT) {
+    // 轻透磨砂: 仅重模糊 + 高透表面(iOS 26 毛玻璃观感), 无折射无高光
+    if (material == ThemeManager.MATERIAL_FROSTED) {
+        val frostedTint = MaterialTheme.colorScheme.surface.copy(alpha = 0.26f)
+        val frostedBorder = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
         return this
-            .background(containerColor, shape)
-            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), shape)
+            .drawBackdrop(
+                backdrop = backdrop,
+                shape = { shape },
+                effects = { blur(20f) },
+                onDrawSurface = { drawRect(frostedTint) }
+            )
+            .border(0.5.dp, frostedBorder, shape)
     }
 
-    // Android 12+ 真模糊与液态玻璃材质
-    val isLiquid = material == ThemeManager.MATERIAL_LIQUID
+    // 液态玻璃: 物理折射(Android 14+)+色散+高光+模糊
+    val isRuntimeShaderOk = isRuntimeShaderSupported()
     return this.drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
             vibrancy()
             blur(blurRadius.value)
-            if (isLiquid && isRuntimeShaderSupported()) {
+            if (isRuntimeShaderOk) {
                 lens(
                     refractionHeight = refractionHeight.value,
                     refractionAmount = refractionAmount.value,
@@ -94,11 +98,42 @@ fun Modifier.liquidGlass(
                 )
             }
         },
-        highlight = if (isLiquid) {
-            { Highlight.Default.copy(alpha = 0.7f) }
-        } else null,
-        onDrawSurface = {
-            drawRect(containerColor)
-        }
+        highlight = { Highlight.Default.copy(alpha = 0.7f) },
+        onDrawSurface = { drawRect(containerColor) }
     )
 }
+
+/** 底栏玻璃配方(三类): 供 LiquidBottomTabs/筛选圆钮等深色玻璃件使用 */
+@Composable
+fun Modifier.barGlass(
+    material: String,
+    backdrop: Backdrop,
+    shape: Shape,
+    isLightTheme: Boolean
+): Modifier {
+    // Material You / 低版本: 实底胶囊(轻微透出以保留层次)
+    if (material == ThemeManager.MATERIAL_YOU || !isLiquidGlassSupported) {
+        val solid = if (isLightTheme) Color(0xFFF7F7F9) else Color(0xFF202024)
+        return this.background(solid.copy(alpha = 0.92f), shape)
+    }
+    val containerColor = if (isLightTheme) Color(0xFFFAFAFA).copy(0.4f) else Color(0xFF121212).copy(0.4f)
+    return this.drawBackdrop(
+        backdrop = backdrop,
+        shape = { shape },
+        effects = {
+            vibrancy()
+            blur(8f.dp.toPx())
+            if (material == ThemeManager.MATERIAL_LIQUID && isRuntimeShaderSupported()) {
+                lens(24f.dp.toPx(), 24f.dp.toPx())
+            }
+            if (material == ThemeManager.MATERIAL_FROSTED) {
+                blur(14f)
+            }
+        },
+        onDrawSurface = { drawRect(containerColor) }
+    )
+}
+
+/** 悬浮底栏浅色判断(玻璃内容色) */
+@Composable
+fun isBarLightTheme(): Boolean = !isSystemInDarkTheme()

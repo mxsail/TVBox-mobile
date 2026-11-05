@@ -39,10 +39,12 @@ import com.github.tvbox.osc.download.DownloadTaskManager
 import com.github.tvbox.osc.event.DownloadEvent
 import com.github.tvbox.osc.ui.activity.DownloadActivity
 import com.github.tvbox.osc.ui.adapter.DownloadAdapter
+import com.github.tvbox.osc.ui.compose.AppUiBackdrop
 import com.github.tvbox.osc.ui.compose.ObserveBarHideDeltas
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.compose.VodCardItem
 import com.github.tvbox.osc.ui.compose.VodGridScreen
+import com.kyant.backdrop.backdrops.layerBackdrop
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.orhanobut.hawk.Hawk
 import org.greenrobot.eventbus.EventBus
@@ -116,7 +118,13 @@ class CacheFragment : Fragment() {
         gridState.ObserveBarHideDeltas { dy ->
             (activity as? com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost)?.onMainScrollDelta(dy)
         }
-        Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .then(
+                    AppUiBackdrop.layer.value?.let { Modifier.layerBackdrop(it) } ?: Modifier
+                )
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

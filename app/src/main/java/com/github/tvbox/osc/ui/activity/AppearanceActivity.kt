@@ -52,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -91,10 +92,9 @@ class AppearanceActivity : BaseActivity() {
 
     private val THEME_MODES = listOf("跟随系统", "浅色", "深色")
     private val MATERIAL_OPTIONS = listOf(
-        ThemeManager.MATERIAL_SOLID to "实底",
-        ThemeManager.MATERIAL_TRANSLUCENT to "半透明",
-        ThemeManager.MATERIAL_BLUR to "高斯模糊",
-        ThemeManager.MATERIAL_LIQUID to "液态玻璃",
+        Triple(ThemeManager.MATERIAL_YOU, "Material You", "实底 · 跟随动态色"),
+        Triple(ThemeManager.MATERIAL_LIQUID, "液态玻璃", "折射 · 色散 · 高光"),
+        Triple(ThemeManager.MATERIAL_FROSTED, "轻透磨砂", "毛玻璃 · 高透"),
     )
 
     private val fontPicker = registerForActivityResult(
@@ -126,22 +126,6 @@ class AppearanceActivity : BaseActivity() {
 
     private fun materialLabel(code: String): String =
         MATERIAL_OPTIONS.firstOrNull { it.first == code }?.second ?: MATERIAL_OPTIONS[0].second
-
-    private fun showMaterialDialog(current: String, onPicked: (Int) -> Unit) {
-        val defaultPos = MATERIAL_OPTIONS.indexOfFirst { it.first == current }
-        val dialog = SelectDialog<String>(this)
-        dialog.setTip("界面材质")
-        dialog.setAdapter(object : SelectDialogInterface<String?> {
-            override fun click(value: String?, pos: Int) {
-                Hawk.put(HawkConfig.UI_MATERIAL, MATERIAL_OPTIONS[pos].first)
-                EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
-                onPicked(pos)
-            }
-
-            override fun getDisplay(name: String?): String = name ?: ""
-        }, SelectDialogAdapter.stringDiff, ArrayList(MATERIAL_OPTIONS.map { it.second }), defaultPos)
-        dialog.show()
-    }
 
     private fun launchFontPicker() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -276,7 +260,7 @@ class AppearanceActivity : BaseActivity() {
     private fun AppearanceScreenContent() {
         var themeMode by remember { mutableStateOf(Hawk.get(HawkConfig.THEME_TAG, 0)) }
         var themeColor by remember { mutableStateOf(ThemeManager.colorScheme()) }
-        var material by remember { mutableStateOf(Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID)) }
+        var material by remember { mutableStateOf(ThemeManager.material()) }
         var liquidBlurRadius by remember { mutableFloatStateOf(Hawk.get(HawkConfig.LIQUID_BLUR_RADIUS, 16f)) }
         var liquidRefractionHeight by remember { mutableFloatStateOf(Hawk.get(HawkConfig.LIQUID_REFRACTION_HEIGHT, 20f)) }
         var liquidRefractionAmount by remember { mutableFloatStateOf(Hawk.get(HawkConfig.LIQUID_REFRACTION_AMOUNT, 14f)) }
@@ -400,16 +384,29 @@ class AppearanceActivity : BaseActivity() {
 
                 SectionTitle("界面材质")
                 GroupCard {
-                    MenuRow(
-                        icon = R.drawable.ic_material_48,
-                        title = "材质效果",
-                        value = materialLabel(material),
-                        onClick = {
-                            showMaterialDialog(material) { pos ->
-                                material = MATERIAL_OPTIONS[pos].first
-                            }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        MATERIAL_OPTIONS.forEach { (code, label, desc) ->
+                            MaterialCard(
+                                selected = material == code,
+                                label = label,
+                                desc = desc,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    if (material != code) {
+                                        Hawk.put(HawkConfig.UI_MATERIAL, code)
+                                        material = code
+                                        EventBus.getDefault()
+                                            .post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
+                                    }
+                                }
+                            )
                         }
-                    )
+                    }
                 }
 
                 if (material == ThemeManager.MATERIAL_LIQUID) {
@@ -544,6 +541,50 @@ class AppearanceActivity : BaseActivity() {
         // 预设覆盖层在 Activity 创建时叠加, applyStyle 不可撤销, 必须 recreate
         EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_RECREATE))
         recreate()
+    }
+
+    @Composable
+    private fun MaterialCard(
+        selected: Boolean,
+        label: String,
+        desc: String,
+        modifier: Modifier = Modifier,
+        onClick: () -> Unit
+    ) {
+        Column(
+            modifier = modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(
+                    if (selected) colorScheme.secondaryContainer
+                    else colorScheme.surfaceContainerHigh,
+                    RoundedCornerShape(14.dp)
+                )
+                .border(
+                    width = if (selected) 2.dp else 1.dp,
+                    color = if (selected) colorScheme.primary
+                    else colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .clickable { onClick() }
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                label,
+                color = if (selected) colorScheme.onSecondaryContainer else colorScheme.onSurface,
+                fontSize = 13.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1
+            )
+            Text(
+                desc,
+                color = if (selected) colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                else colorScheme.onSurfaceVariant,
+                fontSize = 10.sp,
+                maxLines = 2,
+                modifier = Modifier.padding(top = 3.dp)
+            )
+        }
     }
 
     @Composable

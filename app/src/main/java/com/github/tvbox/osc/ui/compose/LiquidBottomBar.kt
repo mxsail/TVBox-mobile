@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.MutatorMutex
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -467,11 +468,15 @@ fun LiquidBottomTabs(
     tabsCount: Int,
     modifier: Modifier = Modifier,
     pageScrollFraction: Float? = null,
+    material: String = ThemeManager.MATERIAL_LIQUID,
     content: @Composable RowScope.() -> Unit
 ) {
     val isLightTheme = !isSystemInDarkTheme()
     val accentColor = if (isLightTheme) Color(0xFF0088FF) else Color(0xFF0091FF)
     val containerColor = if (isLightTheme) Color(0xFFFAFAFA).copy(0.4f) else Color(0xFF121212).copy(0.4f)
+    val isLiquid = material == ThemeManager.MATERIAL_LIQUID
+    val isFrosted = material == ThemeManager.MATERIAL_FROSTED
+    val solidBarColor = if (isLightTheme) Color(0xFFF7F7F9) else Color(0xFF202024)
 
     val tabsBackdrop = rememberLayerBackdrop()
 
@@ -563,7 +568,8 @@ fun LiquidBottomTabs(
             )
         }
 
-        // Layer 1: 外层液态玻璃底板 Row (64dp 高度，内边距 4dp，展示常态图文)
+        // Layer 1: 外层玻璃底板 Row (64dp 高度，内边距 4dp，展示常态图文)
+        // 液态玻璃=折射+色散+高光; 轻透磨砂=重模糊; Material You=实底胶囊
         CompositionLocalProvider(
             androidx.compose.material3.LocalContentColor provides (if (isLightTheme) Color.Black else Color.White)
         ) {
@@ -576,9 +582,15 @@ fun LiquidBottomTabs(
                         backdrop = backdrop,
                         shape = { Capsule },
                         effects = {
-                            vibrancy()
-                            blur(8f.dp.toPx())
-                            lens(24f.dp.toPx(), 24f.dp.toPx())
+                            when {
+                                isLiquid -> {
+                                    vibrancy()
+                                    blur(8f.dp.toPx())
+                                    lens(24f.dp.toPx(), 24f.dp.toPx())
+                                }
+                                isFrosted -> blur(20f)
+                                // Material You: 无玻璃效果, 实底表面
+                            }
                         },
                         layerBlock = {
                             val progress = dampedDragAnimation.pressProgress
@@ -586,7 +598,17 @@ fun LiquidBottomTabs(
                             scaleX = scale
                             scaleY = scale
                         },
-                        onDrawSurface = { drawRect(containerColor) }
+                        onDrawSurface = {
+                            when {
+                                isLiquid -> drawRect(containerColor)
+                                isFrosted ->
+                                    drawRect(
+                                        if (isLightTheme) Color.White.copy(0.30f)
+                                        else Color.Black.copy(0.30f)
+                                    )
+                                else -> drawRect(solidBarColor)
+                            }
+                        }
                     )
                     .then(interactiveHighlight.modifier)
                     .height(LiquidBarSpec.HeightDp.dp)
@@ -597,55 +619,58 @@ fun LiquidBottomTabs(
             )
         }
 
-        // Layer 2: 官方原版采样层。alpha(0f) 使其完全不可见, 只把「玻璃背景 + 高光 +
+        // Layer 2: 官方原版采样层(仅液态玻璃需要)。alpha(0f) 使其完全不可见, 只把「玻璃背景 + 高光 +
         // 放大 1.2x 的染色图文」记录进 tabsBackdrop, 供 Layer 3 的色散透镜折射。
-        CompositionLocalProvider(
-            LocalLiquidBottomTabScale provides {
-                lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
-            },
-            androidx.compose.material3.LocalContentColor provides accentColor
-        ) {
-            Row(
-                Modifier
-                    .clearAndSetSemantics {}
-                    .alpha(0f)
-                    .layerBackdrop(tabsBackdrop)
-                    .graphicsLayer {
-                        translationX = panelOffset
-                    }
-                    .drawBackdrop(
-                        backdrop = backdrop,
-                        shape = { Capsule },
-                        effects = {
-                            val progress = dampedDragAnimation.pressProgress
-                            vibrancy()
-                            blur(8f.dp.toPx())
-                            lens(
-                                24f.dp.toPx() * progress,
-                                24f.dp.toPx() * progress
-                            )
+        if (isLiquid) {
+            CompositionLocalProvider(
+                LocalLiquidBottomTabScale provides {
+                    lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
+                },
+                androidx.compose.material3.LocalContentColor provides accentColor
+            ) {
+                Row(
+                    Modifier
+                        .clearAndSetSemantics {}
+                        .alpha(0f)
+                        .layerBackdrop(tabsBackdrop)
+                        .graphicsLayer {
+                            translationX = panelOffset
+                        }
+                        .drawBackdrop(
+                            backdrop = backdrop,
+                            shape = { Capsule },
+                            effects = {
+                                val progress = dampedDragAnimation.pressProgress
+                                vibrancy()
+                                blur(8f.dp.toPx())
+                                lens(
+                                    24f.dp.toPx() * progress,
+                                    24f.dp.toPx() * progress
+                                )
+                            },
+                            highlight = {
+                                val progress = dampedDragAnimation.pressProgress
+                                Highlight.Default.copy(alpha = progress)
+                            },
+                            onDrawSurface = { drawRect(containerColor) }
+                        )
+                        .then(interactiveHighlight.modifier)
+                        .height(LiquidBarSpec.ContentHeightDp.dp)
+                        .fillMaxWidth()
+                        .padding(horizontal = LiquidBarSpec.InsetDp.dp)
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(color = accentColor, blendMode = BlendMode.SrcIn)
                         },
-                        highlight = {
-                            val progress = dampedDragAnimation.pressProgress
-                            Highlight.Default.copy(alpha = progress)
-                        },
-                        onDrawSurface = { drawRect(containerColor) }
-                    )
-                    .then(interactiveHighlight.modifier)
-                    .height(LiquidBarSpec.ContentHeightDp.dp)
-                    .fillMaxWidth()
-                    .padding(horizontal = LiquidBarSpec.InsetDp.dp)
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(color = accentColor, blendMode = BlendMode.SrcIn)
-                    },
-                verticalAlignment = Alignment.CenterVertically,
-                content = content
-            )
+                    verticalAlignment = Alignment.CenterVertically,
+                    content = content
+                )
+            }
         }
 
-        // Layer 3: 官方透镜滑块 Box。drawBackdrop 内部已按 Capsule 做 clip + Offscreen,
+        // Layer 3: 官方透镜滑块 Box(液态玻璃=色散透镜; 磨砂=模糊滑块; Material You=实底滑块)。
+        // drawBackdrop 内部已按 Capsule 做 clip + Offscreen,
         // 外层不能再 clip, 否则会裁掉外阴影、折射采样外扩与约 1.4x 液滴膨胀。
         Box(
             Modifier
@@ -658,31 +683,41 @@ fun LiquidBottomTabs(
                 .then(interactiveHighlight.gestureModifier)
                 .then(dampedDragAnimation.modifier)
                 .drawBackdrop(
-                    backdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop),
+                    backdrop = if (isLiquid) rememberCombinedBackdrop(backdrop, tabsBackdrop) else backdrop,
                     shape = { Capsule },
                     effects = {
                         val progress = dampedDragAnimation.pressProgress
-                        lens(
-                            10f.dp.toPx() * progress,
-                            14f.dp.toPx() * progress,
-                            chromaticAberration = true
-                        )
+                        when {
+                            isLiquid -> lens(
+                                10f.dp.toPx() * progress,
+                                14f.dp.toPx() * progress,
+                                chromaticAberration = true
+                            )
+                            isFrosted -> blur(14f)
+                            // Material You: 实底滑块, 无玻璃效果
+                        }
                     },
-                    highlight = {
-                        val progress = dampedDragAnimation.pressProgress
-                        Highlight.Default.copy(alpha = progress)
-                    },
-                    shadow = {
-                        val progress = dampedDragAnimation.pressProgress
-                        Shadow(alpha = progress)
-                    },
-                    innerShadow = {
-                        val progress = dampedDragAnimation.pressProgress
-                        InnerShadow(
-                            radius = 8f.dp * progress,
-                            alpha = progress
-                        )
-                    },
+                    highlight = if (isLiquid) {
+                        {
+                            val progress = dampedDragAnimation.pressProgress
+                            Highlight.Default.copy(alpha = progress)
+                        }
+                    } else null,
+                    shadow = if (isLiquid) {
+                        {
+                            val progress = dampedDragAnimation.pressProgress
+                            Shadow(alpha = progress)
+                        }
+                    } else null,
+                    innerShadow = if (isLiquid) {
+                        {
+                            val progress = dampedDragAnimation.pressProgress
+                            InnerShadow(
+                                radius = 8f.dp * progress,
+                                alpha = progress
+                            )
+                        }
+                    } else null,
                     layerBlock = {
                         scaleX = dampedDragAnimation.scaleX
                         scaleY = dampedDragAnimation.scaleY
@@ -691,13 +726,22 @@ fun LiquidBottomTabs(
                         scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
                     },
                     onDrawSurface = {
-                        val progress = dampedDragAnimation.pressProgress
-                        drawRect(
-                            if (isLightTheme) Color.Black.copy(0.1f)
-                            else Color.White.copy(0.1f),
-                            alpha = 1f - progress
-                        )
-                        drawRect(Color.Black.copy(alpha = 0.03f * progress))
+                        when {
+                            isLiquid -> {
+                                val progress = dampedDragAnimation.pressProgress
+                                drawRect(
+                                    if (isLightTheme) Color.Black.copy(0.1f)
+                                    else Color.White.copy(0.1f),
+                                    alpha = 1f - progress
+                                )
+                                drawRect(Color.Black.copy(alpha = 0.03f * progress))
+                            }
+                            isFrosted -> drawRect(
+                                if (isLightTheme) Color.White.copy(0.34f)
+                                else Color.Black.copy(0.34f)
+                            )
+                            else -> drawRect(accentColor.copy(alpha = 0.9f))
+                        }
                     }
                 )
                 .height(LiquidBarSpec.ContentHeightDp.dp)
@@ -743,7 +787,8 @@ fun LiquidBottomBar(
             backdrop = backdrop,
             tabsCount = tabs.size,
             modifier = Modifier.weight(1f), // 筛选钮可见时底栏收窄让位
-            pageScrollFraction = pageScrollFraction
+            pageScrollFraction = pageScrollFraction,
+            material = material
         ) {
             tabs.forEachIndexed { index, item ->
                 LiquidBottomTab(onClick = { onTabSelected(index) }) {
@@ -776,20 +821,34 @@ fun LiquidBottomBar(
                 fadeOut(tween(140))
         ) {
             val isLightTheme = !isSystemInDarkTheme()
+            val isLiquid = material == ThemeManager.MATERIAL_LIQUID
+            val isFrosted = material == ThemeManager.MATERIAL_FROSTED
             val containerColor = if (isLightTheme) Color(0xFFFAFAFA).copy(0.4f) else Color(0xFF121212).copy(0.4f)
+            val solidCircle = if (isLightTheme) Color(0xFFF7F7F9) else Color(0xFF202024)
             Box(
                 modifier = Modifier
                     .padding(start = 10.dp)
                     .size(LiquidBarSpec.HeightDp.dp)
-                    .drawBackdrop(
-                        backdrop = backdrop,
-                        shape = { CircleShape },
-                        effects = {
-                            vibrancy()
-                            blur(8f.dp.toPx())
-                            lens(24f.dp.toPx(), 24f.dp.toPx())
-                        },
-                        onDrawSurface = { drawRect(containerColor) }
+                    .then(
+                        if (material == ThemeManager.MATERIAL_YOU || !isLiquidGlassSupported) {
+                            Modifier.background(solidCircle.copy(alpha = 0.92f), CircleShape)
+                        } else {
+                            Modifier.drawBackdrop(
+                                backdrop = backdrop,
+                                shape = { CircleShape },
+                                effects = {
+                                    when {
+                                        isLiquid -> {
+                                            vibrancy()
+                                            blur(8f.dp.toPx())
+                                            lens(24f.dp.toPx(), 24f.dp.toPx())
+                                        }
+                                        isFrosted -> blur(18f)
+                                    }
+                                },
+                                onDrawSurface = { drawRect(containerColor) }
+                            )
+                        }
                     )
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },

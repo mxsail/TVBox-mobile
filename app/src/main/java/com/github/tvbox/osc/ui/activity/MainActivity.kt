@@ -19,14 +19,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
@@ -45,6 +43,7 @@ import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.databinding.ActivityMainBinding
 import com.github.tvbox.osc.event.AppearanceChangedEvent
+import com.github.tvbox.osc.ui.compose.AppUiBackdrop
 import com.github.tvbox.osc.ui.compose.LastViewedTip
 import com.github.tvbox.osc.ui.compose.LiquidBarSpec
 import com.github.tvbox.osc.ui.compose.LiquidBottomBar
@@ -57,7 +56,6 @@ import com.github.tvbox.osc.ui.fragment.MyFragment
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.view.BarAutoHide
 import com.github.tvbox.osc.view.MaterialBarHelper
-import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.orhanobut.hawk.Hawk
 import kotlin.system.exitProcess
@@ -137,39 +135,15 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         mBinding.vp.offscreenPageLimit = 1
         mBinding.vp.postDelayed({ mBinding.vp.offscreenPageLimit = fragments.size - 1 }, 600)
 
-        // 液态玻璃背板: 屏幕已不显示壁纸, 但 blur/lens 仍需采样源。
-        // 采样层改为与主题背景同色系的柔和渐变(不再引用壁纸), alpha 0f 不参与屏幕显示,
-        // 由 layerBackdrop 写进 LayerBackdrop 供底栏折射。
+        // 玻璃背板: 共享 LayerBackdrop 供底栏折射真实页面内容——
+        // 底栏组合创建, 各 Compose 页面根节点经 AppUiBackdrop 注册 layerBackdrop,
+        // 悬浮底栏/筛选钮/上次观看条的玻璃即可「透出后方内容」(官方 LiquidBottomTabs 行为)。
         mBinding.composeBottomBar.setContent {
             TvBoxTheme {
-                val screenHeight = with(LocalDensity.current) {
-                    resources.displayMetrics.heightPixels.toDp()
-                }
-                val baseColor = MaterialTheme.colorScheme.background
-                val surfaceColor = MaterialTheme.colorScheme.surface
                 val backdrop = rememberLayerBackdrop()
+                AppUiBackdrop.layer.value = backdrop
 
                 Box(Modifier.fillMaxSize()) {
-                    // 仅作采样源: 与屏幕主题背景一致, 底栏后方不会再出现壁纸花纹。
-                    // 全屏高度底对齐使记录层截到的是底栏对应区域。
-                    Box(
-                        Modifier
-                            .matchParentSize()
-                            .alpha(0f)
-                            .layerBackdrop(backdrop)
-                    ) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(screenHeight)
-                                .align(Alignment.BottomCenter)
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(surfaceColor, baseColor, surfaceColor)
-                                    )
-                                )
-                        )
-                    }
 
                     // 底栏右侧筛选玻璃钮: 主页 tab 且当前分类页(GridFragment)有筛选条件时显示
                     val homeFragment = fragments.getOrNull(0) as? HomeFragment

@@ -19,52 +19,49 @@ import com.google.android.material.color.MaterialColors
 import com.orhanobut.hawk.Hawk
 
 /**
- * 界面材质系统: 按 UI_MATERIAL 设置给底栏/顶栏等悬浮容器套材质, 并给弹窗加背景模糊。
+ * 界面材质系统(View 体系余量): 现仅服务于 BaseDialog 的跨窗背景模糊;
+ * 底栏/悬浮件的玻璃已由 Compose 侧(ui.compose.LiquidGlass/LiquidBottomBar)接管。
  *
- * 材质取值(ThemeManager.MATERIAL_*):
- *  - solid       实底(默认, 组件自带背景, 本类不做任何事)
- *  - translucent 半透明 surface + 细描边
- *  - blur        高斯模糊背板(Android 12+ RenderEffect, 低版本自动降级半透明)
- *  - liquid      液态玻璃 = 模糊 + 更亮着色 + 高光描边(低版本同样降级)
- *
- * 性能: 模糊层每帧采样根视图, 仅在材质≠实底时创建; 采样源为 android.R.id.content。
+ * 材质三选(ThemeManager.MATERIAL_*):
+ *  - you      Material You 实底(跟随 M3 动态色, 本类不做任何事)
+ *  - liquid   液态玻璃 = 折射+色散+高光(Compose), 弹窗走背景模糊
+ *  - frosted  轻透磨砂 = 重模糊高透(Compose), 弹窗走更重背景模糊
  */
 object MaterialBarHelper {
 
     private const val TAG_BLUR_LAYER = "material_blur_layer"
 
     @JvmStatic
-    fun material(): String = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID)
+    fun material(): String = ThemeManager.material()
 
     /** 原生跨窗口/视图层级真模糊需要 Android 12+ */
     @JvmStatic
     fun blurSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-    /** 实际生效的材质: 低版本把 blur/liquid 降级为 translucent */
+    /** 实际生效的材质: 低版本把 liquid/frosted 降级为 you(实底) */
     @JvmStatic
     fun effectiveMaterial(): String = normalizeMaterial(material(), Build.VERSION.SDK_INT)
 
     /** 纯逻辑(供单测): 材质降级规则 */
     @JvmStatic
     fun normalizeMaterial(m: String, sdkInt: Int): String {
-        return if ((m == ThemeManager.MATERIAL_BLUR || m == ThemeManager.MATERIAL_LIQUID)
+        return if ((m == ThemeManager.MATERIAL_LIQUID || m == ThemeManager.MATERIAL_FROSTED)
             && sdkInt < Build.VERSION_CODES.S
         ) {
-            ThemeManager.MATERIAL_TRANSLUCENT
+            ThemeManager.MATERIAL_YOU
         } else {
             m
         }
     }
 
-    /** XPopup 弹窗背景模糊开关: XPopup 自带 RenderScript 模糊全版本可用, blur/liquid 时开启 */
+    /** XPopup 弹窗背景模糊开关: XPopup 自带 RenderScript 模糊全版本可用, 非 Material You 时开启 */
     @JvmStatic
-    fun popupBlurEnabled(): Boolean =
-        material() == ThemeManager.MATERIAL_BLUR || material() == ThemeManager.MATERIAL_LIQUID
+    fun popupBlurEnabled(): Boolean = material() != ThemeManager.MATERIAL_YOU
 
     /**
      * 给悬浮容器(底栏/首页顶栏)套材质。
-     * solid: 清空自定义背景交给组件默认; translucent: 半透明着色+描边;
-     * blur/liquid: 插入一层 BlurView 背板(index 0, 带 tag 防重复), 容器按 cornerRadiusPx 裁圆角。
+     * you: 清空自定义背景交给组件默认; frosted: BlurView 重模糊;
+     * liquid: BlurView 轻模糊 + 高光描边。
      *
      * @return 插入的模糊背板 View, 无模糊时为 null
      */
@@ -73,20 +70,13 @@ object MaterialBarHelper {
         container.findViewWithTag<View>(TAG_BLUR_LAYER)?.let { container.removeView(it) }
         val ctx = container.context
         when (effectiveMaterial()) {
-            ThemeManager.MATERIAL_SOLID -> {
+            ThemeManager.MATERIAL_YOU -> {
                 container.background = null
                 container.foreground = null
                 container.clipToOutline = false
                 return null
             }
-            ThemeManager.MATERIAL_TRANSLUCENT -> {
-                container.background = surfaceDrawable(ctx, 0.65f, cornerRadiusPx, highlight = false)
-                container.foreground = null
-                container.clipToOutline = cornerRadiusPx > 0
-                container.outlineProvider = roundedOutline(cornerRadiusPx)
-                return null
-            }
-            else -> { // blur / liquid
+            else -> { // liquid / frosted
                 val liquid = effectiveMaterial() == ThemeManager.MATERIAL_LIQUID
                 container.background = null
                 container.clipToOutline = cornerRadiusPx > 0
@@ -111,7 +101,7 @@ object MaterialBarHelper {
                     val lightSurface = ColorUtils.calculateLuminance(surface) > 0.5
                     blurView.setOverlayColor(if (lightSurface) 0x24FFFFFF else 0x1AFFFFFF)
                 } else {
-                    // 普通高斯模糊: surface 着色保证内容可读性
+                    // 轻透磨砂: surface 着色保证内容可读性
                     blurView.setOverlayColor(ColorUtils.setAlphaComponent(surface, 0x59))
                 }
                 container.addView(
@@ -150,11 +140,12 @@ object MaterialBarHelper {
     /** 普通弹窗(BaseDialog 系)跨窗背景模糊: API31+, 省电模式关闭跨窗模糊时系统自动跳过 */
     @JvmStatic
     fun applyDialogBlur(window: Window?) {
-        if (window == null || material() == ThemeManager.MATERIAL_SOLID) return
+        if (window == null || effectiveMaterial() == ThemeManager.MATERIAL_YOU) return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
         val lp = window.attributes
-        lp.blurBehindRadius = dp(window.context, 28)
+        // 轻透磨砂比液态玻璃模糊更重
+        lp.blurBehindRadius = dp(window.context, if (effectiveMaterial() == ThemeManager.MATERIAL_FROSTED) 36 else 28)
         window.attributes = lp
     }
 
