@@ -12,6 +12,8 @@ import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,7 +45,6 @@ import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.databinding.ActivityMainBinding
 import com.github.tvbox.osc.event.AppearanceChangedEvent
-import com.github.tvbox.osc.ui.compose.AppUiBackdrop
 import com.github.tvbox.osc.ui.compose.LastViewedTip
 import com.github.tvbox.osc.ui.compose.LiquidBarSpec
 import com.github.tvbox.osc.ui.compose.LiquidBottomBar
@@ -56,6 +57,7 @@ import com.github.tvbox.osc.ui.fragment.MyFragment
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.view.BarAutoHide
 import com.github.tvbox.osc.view.MaterialBarHelper
+import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.orhanobut.hawk.Hawk
 import kotlin.system.exitProcess
@@ -135,15 +137,41 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         mBinding.vp.offscreenPageLimit = 1
         mBinding.vp.postDelayed({ mBinding.vp.offscreenPageLimit = fragments.size - 1 }, 600)
 
-        // 玻璃背板: 共享 LayerBackdrop 供底栏折射真实页面内容——
-        // 底栏组合创建, 各 Compose 页面根节点经 AppUiBackdrop 注册 layerBackdrop,
-        // 悬浮底栏/筛选钮/上次观看条的玻璃即可「透出后方内容」(官方 LiquidBottomTabs 行为)。
+        // 玻璃背板: 采样层为与主题背景同色系的柔和渐变(alpha 0f 不参与屏幕显示)。
+        // 注: 曾试验让各页面根节点注册共享 LayerBackdrop 以采样真实页面内容, 但
+        // View+Compose 混合 ViewPager 下注册节点(verticalScroll 根)的内容会被抽进
+        // 采样层不再上屏(卡片底可见、文字/图标/海报消失), 故回退渐变采样——
+        // 玻璃观感仍为液态/磨砂, 仅采样源为渐变而非真实内容。
         mBinding.composeBottomBar.setContent {
             TvBoxTheme {
+                val screenHeight = with(LocalDensity.current) {
+                    resources.displayMetrics.heightPixels.toDp()
+                }
+                val baseColor = MaterialTheme.colorScheme.background
+                val surfaceColor = MaterialTheme.colorScheme.surface
                 val backdrop = rememberLayerBackdrop()
-                AppUiBackdrop.layer.value = backdrop
 
                 Box(Modifier.fillMaxSize()) {
+
+                    // 仅作采样源
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .alpha(0f)
+                            .layerBackdrop(backdrop)
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(screenHeight)
+                                .align(Alignment.BottomCenter)
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(surfaceColor, baseColor, surfaceColor)
+                                    )
+                                )
+                        )
+                    }
 
                     // 底栏右侧筛选玻璃钮: 主页 tab 且当前分类页(GridFragment)有筛选条件时显示
                     val homeFragment = fragments.getOrNull(0) as? HomeFragment

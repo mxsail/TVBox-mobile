@@ -63,7 +63,6 @@ import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.util.DefaultConfig
 import com.github.tvbox.osc.util.MD5
 import com.github.tvbox.osc.util.UA
-import com.kyant.backdrop.backdrops.layerBackdrop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -201,11 +200,6 @@ class MyFragment : Fragment() {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .then(
-                    com.github.tvbox.osc.ui.compose.AppUiBackdrop.layer.value?.let {
-                        Modifier.layerBackdrop(it)
-                    } ?: Modifier
-                )
         ) {
             Text(
                 stringResource(R.string.app_name),

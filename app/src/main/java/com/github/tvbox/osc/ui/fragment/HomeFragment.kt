@@ -71,12 +71,10 @@ import com.github.tvbox.osc.ui.activity.FastSearchActivity
 import com.github.tvbox.osc.ui.activity.MainActivity
 import com.github.tvbox.osc.ui.activity.SubscriptionActivity
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
-import com.github.tvbox.osc.ui.compose.AppUiBackdrop
 import com.github.tvbox.osc.ui.compose.HomeCategoryBar
 import com.github.tvbox.osc.ui.compose.LoadState
 import com.github.tvbox.osc.ui.compose.LoadStateBox
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
-import com.kyant.backdrop.backdrops.layerBackdrop
 import com.github.tvbox.osc.ui.dialog.SelectDialog
 import com.github.tvbox.osc.ui.dialog.TipDialog
 import com.github.tvbox.osc.util.DefaultConfig
@@ -525,9 +523,6 @@ class HomeFragment : Fragment() {
             Modifier
                 .fillMaxSize()
                 .background(colorScheme.background)
-                .then(
-                    AppUiBackdrop.layer.value?.let { Modifier.layerBackdrop(it) } ?: Modifier
-                )
         ) {
             Column(Modifier.fillMaxSize()) {
                 Spacer(Modifier.height(44.dp)) // 原 topLayout marginTop(状态栏区)
