@@ -282,6 +282,11 @@ class HomeFragment : Fragment() {
                 if (ApiConfig.get().spider.isEmpty()) {
                     jarInitOk = true
                 }
+                // 「上次观看」悬浮条在配置就绪时预约(分类装载完成后显示);
+                // 不能挂在 loadJar 成功上——jar 加载可能长时间阻塞, 主页内容却早已就绪
+                if (!onlyConfigChanged) {
+                    historyPending = true
+                }
                 mHandler.postDelayed({ initData() }, 50)
             }
 
@@ -290,6 +295,9 @@ class HomeFragment : Fragment() {
                     mHandler.post {
                         dataInitOk = true
                         jarInitOk = true
+                        if (!onlyConfigChanged) {
+                            historyPending = true
+                        }
                         initData()
                     }
                 } else {
@@ -307,9 +315,6 @@ class HomeFragment : Fragment() {
                 object : LoadConfigCallback {
                     override fun success() {
                         jarInitOk = true
-                        if (!onlyConfigChanged) {
-                            historyPending = true
-                        }
                         mHandler.postDelayed({
                             initData()
                         }, 50)

@@ -14,6 +14,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -148,7 +149,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                 val surfaceColor = MaterialTheme.colorScheme.surface
                 val backdrop = rememberLayerBackdrop()
 
-                Box {
+                Box(Modifier.fillMaxSize()) {
                     // 仅作采样源: 与屏幕主题背景一致, 底栏后方不会再出现壁纸花纹。
                     // 全屏高度底对齐使记录层截到的是底栏对应区域。
                     Box(
@@ -189,7 +190,11 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                         pageScrollFraction = if (pageScrollOffsetState.floatValue >= 0f) pageScrollOffsetState.floatValue else null,
                         backdrop = backdrop,
                         filterVisible = barFilterVisible,
-                        onFilterClick = { currentGrid?.showFilter() }
+                        onFilterClick = { currentGrid?.showFilter() },
+                        // 底栏沉到全屏容器底部; 容器撑满全屏是为了让「上次观看」悬浮条
+                        // (底栏上方 76dp) 落在 View 边界内——否则 View 层点击派发不到
+                        // 悬浮条, 会穿透到下层卡片
+                        modifier = Modifier.align(Alignment.BottomCenter)
                     )
 
                     // 「上次观看」悬浮条: matchParentSize 覆盖层 + offset 定位——

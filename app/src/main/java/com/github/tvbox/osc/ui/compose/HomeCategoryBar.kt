@@ -178,13 +178,13 @@ fun HomeCategoryBar(
                     displayCategories.forEachIndexed { index, name ->
                         val isSelected = index == validIndex
                         val indicatorColor = MaterialTheme.colorScheme.primary
-                        Text(
-                            text = name,
-                            fontSize = if (isSelected) 16.sp else 14.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            softWrap = false,
+                            Text(
+                                text = name,
+                                fontSize = if (isSelected) 18.sp else 15.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                softWrap = false,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable(
