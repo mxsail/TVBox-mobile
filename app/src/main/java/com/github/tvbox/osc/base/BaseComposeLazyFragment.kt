@@ -27,14 +27,23 @@ abstract class BaseComposeLazyFragment : BaseLazyFragment() {
         savedInstanceState: Bundle?
     ): View {
         AutoSize.autoConvertDensity(activity, sizeInDp, isBaseOnWidth)
-        if (rootView == null) {
-            rootView = ComposeView(requireContext()).apply {
-                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-                setContent { TvBoxTheme { Content() } }
-            }
+        // 不跨 onDestroyView 复用 ComposeView: FragmentStatePagerAdapter 销毁离屏子页后
+        // 旧组合已被 DisposeOnViewTreeLifecycleDestroyed 释放, 复用同一实例重挂载不重建 → 白屏。
+        // 每次新建组合即可; 页面数据都在 fragment 的 state 字段里, 视图重建不丢。
+        // 注意不可写 setContent { Content() }: 下方 apply 的接收者是 ComposeView, 无限定的
+        // Content() 会遮蔽解析到 AbstractComposeView.Content(内部回调本 content lambda,
+        // 与 setContent lambda 互相递归 → StackOverflow), 必须 this@ 限定到本 Fragment
+        rootView = ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent { TvBoxTheme { this@BaseComposeLazyFragment.Content() } }
         }
         isViewCreated = true
         return rootView!!
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        rootView = null
     }
 
     // 原基类走 LoadSir 视图切换, Compose 版改为状态驱动; XML 布局不再使用

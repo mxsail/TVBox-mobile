@@ -46,7 +46,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -502,8 +501,8 @@ class FastSearchActivity : BaseActivity() {
                                 textSize = 14f
                                 setSingleLine(true)
                                 hint = "搜索"
-                                setTextColor(ContextCompat.getColor(ctx, resolveColorOnSurface()))
-                                setHintTextColor(ContextCompat.getColor(ctx, resolveColorOnSurfaceVariant()))
+                                setTextColor(resolveColorOnSurface())
+                                setHintTextColor(resolveColorOnSurfaceVariant())
                                 imeOptions = EditorInfo.IME_ACTION_SEARCH
                                 setOnEditorActionListener { _: TextView?, actionId: Int, _: KeyEvent? ->
                                     if (actionId == EditorInfo.IME_ACTION_SEARCH) {
