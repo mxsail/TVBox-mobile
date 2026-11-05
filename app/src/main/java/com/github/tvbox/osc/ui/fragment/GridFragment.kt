@@ -6,28 +6,21 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.blankj.utilcode.util.GsonUtils
-import com.github.tvbox.osc.R
 import com.github.tvbox.osc.api.ApiConfig
 import com.github.tvbox.osc.base.BaseComposeLazyFragment
 import com.github.tvbox.osc.bean.AbsXml
@@ -145,6 +138,9 @@ class GridFragment : BaseComposeLazyFragment() {
     fun isLoad(): Boolean {
         return isLoad || levels.isNotEmpty() //如果有缓存页的话也可以认为是加载了数据的
     }
+
+    /** 当前分类是否有筛选条件(驱动底栏右侧筛选玻璃钮显隐) */
+    fun hasFilters(): Boolean = !sortData?.filters.isNullOrEmpty()
 
     fun isTop(): Boolean {
         return isTop
@@ -305,23 +301,6 @@ class GridFragment : BaseComposeLazyFragment() {
                             onLongClick = { onGridItemLongClick(video, clickView) }
                         )
                     }
-                }
-            }
-
-            // 筛选入口(原 fragment_grid 的 btn_filter FAB, 无筛选条件时不显示)
-            if (!sortData?.filters.isNullOrEmpty()) {
-                FloatingActionButton(
-                    onClick = { showFilter() },
-                    containerColor = colorScheme.primaryContainer,
-                    contentColor = colorScheme.onPrimaryContainer,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(20.dp)
-                ) {
-                    Icon(
-                        painterResource(R.drawable.ic_filter_list),
-                        contentDescription = "筛选"
-                    )
                 }
             }
         }

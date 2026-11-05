@@ -170,6 +170,13 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                         )
                     }
 
+                    // 底栏右侧筛选玻璃钮: 主页 tab 且当前分类页(GridFragment)有筛选条件时显示
+                    val homeFragment = fragments.getOrNull(0) as? HomeFragment
+                    val currentGrid = homeFragment
+                        ?.allFragments?.getOrNull(homeFragment.tabIndex) as? GridFragment
+                    val barFilterVisible = currentTabState.intValue == 0 &&
+                        homeFragment != null && homeFragment.categoryCount > 0 &&
+                        currentGrid?.hasFilters() == true
                     LiquidBottomBar(
                         selectedIndex = currentTabState.intValue,
                         onTabSelected = { index ->
@@ -180,7 +187,9 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                         material = materialState.value,
                         navInsetBottom = (navInsetState.intValue / resources.displayMetrics.density).dp,
                         pageScrollFraction = if (pageScrollOffsetState.floatValue >= 0f) pageScrollOffsetState.floatValue else null,
-                        backdrop = backdrop
+                        backdrop = backdrop,
+                        filterVisible = barFilterVisible,
+                        onFilterClick = { currentGrid?.showFilter() }
                     )
 
                     // 「上次观看」悬浮条: matchParentSize 覆盖层 + offset 定位——

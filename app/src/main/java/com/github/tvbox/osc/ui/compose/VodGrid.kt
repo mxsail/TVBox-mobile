@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -32,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -42,10 +42,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.util.DefaultConfig
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
 import com.squareup.picasso.Picasso
 
 /**
@@ -94,77 +90,60 @@ fun VodCardItem(
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    // 文字底衬背板: 对海报采样做真模糊提升可读性(Android 12+; 低版本降级纯渐变)
-    val cardBackdrop = rememberLayerBackdrop()
-    Box(
+    Column(
         modifier = modifier
-            .aspectRatio(0.75f)
-            // clip 必须在 background 之前: 海报是 AndroidView(ImageView), 不裁剪会
-            // 以方角盖住圆角背景 → 卡片看起来没圆角、行间视觉上挤在一起
             .clip(RoundedCornerShape(16.dp))
-            .background(colorScheme.surfaceContainer)
             .combinedClickable(onClick = onClick, onLongClick = { onLongClick?.invoke() })
     ) {
-        PosterImage(card.pic, Modifier.fillMaxSize().layerBackdrop(cardBackdrop))
-        if (card.badge.isNotEmpty()) {
-            Text(
-                card.badge,
-                color = colorScheme.onPrimaryContainer,
-                fontSize = 10.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .padding(4.dp)
-                    .background(colorScheme.surfaceContainerHigh, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 5.dp, vertical = 3.dp)
-            )
-        }
-        val bottomShape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
-        val infoModifier = if (isLiquidGlassSupported) {
-            Modifier.drawBackdrop(
-                backdrop = cardBackdrop,
-                shape = { bottomShape },
-                effects = { blur(12f) },
-                onDrawSurface = {
-                    drawRect(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            1f to Color(0x99000000)
-                        )
-                    )
-                }
-            )
-        } else {
-            Modifier.background(
-                Brush.verticalGradient(listOf(Color.Transparent, Color(0xB2000000))),
-                bottomShape
-            )
-        }
-        Column(
+        Box(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .then(infoModifier)
-                .padding(horizontal = 10.dp, vertical = 4.dp)
+                .aspectRatio(0.75f)
+                // clip 必须在 background 之前: 海报是 AndroidView(ImageView), 不裁剪会
+                // 以方角盖住圆角背景 → 卡片看起来没圆角、行间视觉上挤在一起
+                .clip(RoundedCornerShape(16.dp))
+                .background(colorScheme.surfaceContainer)
         ) {
+            PosterImage(card.pic, Modifier.fillMaxSize())
+            if (card.badge.isNotEmpty()) {
+                Text(
+                    card.badge,
+                    color = colorScheme.onPrimaryContainer,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .background(colorScheme.surfaceContainerHigh, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 5.dp, vertical = 3.dp)
+                )
+            }
             if (!card.note.isNullOrEmpty()) {
+                // 评分: 海报右下角小胶囊
                 Text(
                     card.note,
                     color = Color.White,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(6.dp)
+                        .widthIn(max = 96.dp)
+                        .background(Color(0x99000000), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
-            Text(
-                card.name,
-                color = Color.White,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp)
-            )
         }
+        // 名称移到卡片下方
+        Text(
+            card.name,
+            color = colorScheme.onSurface,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 5.dp, start = 2.dp, end = 2.dp)
+        )
     }
 }
 

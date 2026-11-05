@@ -152,6 +152,10 @@ class HomeFragment : Fragment() {
     val tabIndex: Int
         get() = selectedTabState.intValue
 
+    /** 已装载的分类数(供底栏筛选钮显隐订阅分类装载变化) */
+    val categoryCount: Int
+        get() = categoriesState.value.size
+
     /**
      * 提供给主页返回操作
      */

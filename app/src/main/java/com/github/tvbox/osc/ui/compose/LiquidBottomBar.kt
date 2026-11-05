@@ -1,10 +1,16 @@
 package com.github.tvbox.osc.ui.compose
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.MutatorMutex
 import androidx.compose.foundation.clickable
@@ -24,6 +30,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -711,11 +719,13 @@ fun LiquidBottomBar(
     material: String = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID),
     navInsetBottom: Dp = 0.dp,
     backdrop: Backdrop = emptyBackdrop(),
-    pageScrollFraction: Float? = null
+    pageScrollFraction: Float? = null,
+    filterVisible: Boolean = false,
+    onFilterClick: () -> Unit = {}
 ) {
     val tabs = MainBottomTabs
 
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(
@@ -724,14 +734,15 @@ fun LiquidBottomBar(
                 top = LiquidBarSpec.TopInsetDp.dp, // 预留水滴膨胀 (约 1.4x) 突破边界的渲染视野
                 bottom = if (floating) (navInsetBottom + 10.dp) else navInsetBottom
             )
-            .graphicsLayer { clip = false }
+            .graphicsLayer { clip = false },
+        verticalAlignment = Alignment.CenterVertically
     ) {
         LiquidBottomTabs(
             selectedTabIndex = { selectedIndex },
             onTabSelected = onTabSelected,
             backdrop = backdrop,
             tabsCount = tabs.size,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f), // 筛选钮可见时底栏收窄让位
             pageScrollFraction = pageScrollFraction
         ) {
             tabs.forEachIndexed { index, item ->
@@ -750,6 +761,49 @@ fun LiquidBottomBar(
                         )
                     }
                 }
+            }
+        }
+
+        // 分类筛选玻璃圆钮: 与底栏并排, 样式同底栏玻璃( vibrancy+blur+lens+40% 表面色 ),
+        // 展开/收起带横向伸缩动画; 展开时底栏经 weight 重分配平滑收窄
+        AnimatedVisibility(
+            visible = filterVisible,
+            enter = expandHorizontally(
+                animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+                expandFrom = Alignment.End
+            ) + fadeIn(tween(180)),
+            exit = shrinkHorizontally(tween(180), shrinkTowards = Alignment.End) +
+                fadeOut(tween(140))
+        ) {
+            val isLightTheme = !isSystemInDarkTheme()
+            val containerColor = if (isLightTheme) Color(0xFFFAFAFA).copy(0.4f) else Color(0xFF121212).copy(0.4f)
+            Box(
+                modifier = Modifier
+                    .padding(start = 10.dp)
+                    .size(LiquidBarSpec.HeightDp.dp)
+                    .drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { CircleShape },
+                        effects = {
+                            vibrancy()
+                            blur(8f.dp.toPx())
+                            lens(24f.dp.toPx(), 24f.dp.toPx())
+                        },
+                        onDrawSurface = { drawRect(containerColor) }
+                    )
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onFilterClick
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_filter_list),
+                    contentDescription = "筛选",
+                    tint = if (isLightTheme) Color.Black else Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
     }
