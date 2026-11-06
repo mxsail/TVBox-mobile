@@ -9,7 +9,6 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -86,15 +85,6 @@ import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.Utils
 import com.google.android.material.color.MaterialColors
 import com.orhanobut.hawk.Hawk
-import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
-import com.kyant.backdrop.isRenderEffectSupported
-import com.kyant.backdrop.isRuntimeShaderSupported
 import org.greenrobot.eventbus.EventBus
 import java.io.File
 
@@ -108,9 +98,8 @@ class AppearanceActivity : BaseActivity() {
 
     private val THEME_MODES = listOf("跟随系统", "浅色", "深色")
     private val MATERIAL_OPTIONS = listOf(
-        Triple(ThemeManager.MATERIAL_YOU, "Material You", "实底 · 跟随动态色"),
-        Triple(ThemeManager.MATERIAL_LIQUID, "液态玻璃", "折射 · 色散 · 高光"),
-        Triple(ThemeManager.MATERIAL_FROSTED, "轻透磨砂", "毛玻璃 · 高透"),
+        Triple(ThemeManager.MATERIAL_YOU, "Material You", "实底 · 经典原生规范"),
+        Triple(ThemeManager.MATERIAL_LIQUID, "液态玻璃", "折射 · 色散 · 动态高光"),
     )
 
     private val fontPicker = registerForActivityResult(
@@ -283,7 +272,12 @@ class AppearanceActivity : BaseActivity() {
         var liquidDispersion by remember { mutableStateOf(Hawk.get(HawkConfig.LIQUID_DISPERSION, true)) }
         var fontPath by remember { mutableStateOf(Hawk.get(HawkConfig.FONT_PATH, "")) }
         var predictive by remember { mutableStateOf(Hawk.get(HawkConfig.PREDICTIVE_BACK, false)) }
-        var barFloating by remember { mutableStateOf(Hawk.get(HawkConfig.BAR_FLOATING, false)) }
+        var barFloating by remember {
+            mutableStateOf(
+                if (material == ThemeManager.MATERIAL_LIQUID) true
+                else Hawk.get(HawkConfig.BAR_FLOATING, false)
+            )
+        }
         var barLabels by remember { mutableStateOf(Hawk.get(HawkConfig.BAR_SHOW_LABELS, true)) }
         var barAutoHide by remember { mutableStateOf(Hawk.get(HawkConfig.BAR_AUTO_HIDE, false)) }
 
@@ -322,9 +316,11 @@ class AppearanceActivity : BaseActivity() {
                     themeColor = themeColor,
                     material = material,
                     blurRadius = liquidBlurRadius,
-                    refractionHeight = liquidRefractionHeight,
                     refractionAmount = liquidRefractionAmount,
-                    dispersion = liquidDispersion
+                    dispersion = liquidDispersion,
+                    barFloating = if (material == ThemeManager.MATERIAL_LIQUID) true else barFloating,
+                    barLabels = barLabels,
+                    fontPath = fontPath
                 )
 
                 SectionTitle("主题")
@@ -409,7 +405,7 @@ class AppearanceActivity : BaseActivity() {
                     }
                 }
 
-                SectionTitle("界面材质")
+                SectionTitle("底栏与材质")
                 GroupCard {
                     var materialExpanded by remember { mutableStateOf(false) }
                     ExposedDropdownMenuBox(
@@ -453,6 +449,10 @@ class AppearanceActivity : BaseActivity() {
                                         if (material != code) {
                                             Hawk.put(HawkConfig.UI_MATERIAL, code)
                                             material = code
+                                            if (code == ThemeManager.MATERIAL_LIQUID) {
+                                                barFloating = true
+                                                Hawk.put(HawkConfig.BAR_FLOATING, true)
+                                            }
                                             EventBus.getDefault()
                                                 .post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
                                         }
@@ -462,6 +462,39 @@ class AppearanceActivity : BaseActivity() {
                             }
                         }
                     }
+                    val isLiquidMode = material == ThemeManager.MATERIAL_LIQUID
+                    SwitchRow(
+                        icon = R.drawable.ic_dock_48,
+                        title = "悬浮底栏",
+                        checked = if (isLiquidMode) true else barFloating,
+                        subtitle = if (isLiquidMode) "液态玻璃仅支持悬浮形态" else null,
+                        enabled = !isLiquidMode,
+                        onToggle = { newValue ->
+                            barFloating = newValue
+                            Hawk.put(HawkConfig.BAR_FLOATING, newValue)
+                            EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
+                        }
+                    )
+                    SwitchRow(
+                        icon = R.drawable.ic_label_48,
+                        title = "底栏显示名称",
+                        checked = barLabels,
+                        onToggle = { newValue ->
+                            barLabels = newValue
+                            Hawk.put(HawkConfig.BAR_SHOW_LABELS, newValue)
+                            EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
+                        }
+                    )
+                    SwitchRow(
+                        icon = R.drawable.ic_auto_hide_48,
+                        title = "底栏随滚动隐藏",
+                        checked = barAutoHide,
+                        onToggle = { newValue ->
+                            barAutoHide = newValue
+                            Hawk.put(HawkConfig.BAR_AUTO_HIDE, newValue)
+                            EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
+                        }
+                    )
                 }
 
                 if (material == ThemeManager.MATERIAL_LIQUID) {
@@ -513,7 +546,7 @@ class AppearanceActivity : BaseActivity() {
                     }
                 }
 
-                SectionTitle("字体")
+                SectionTitle("字体与手势")
                 GroupCard {
                     MenuRow(
                         icon = R.drawable.ic_font_48,
@@ -541,10 +574,6 @@ class AppearanceActivity : BaseActivity() {
                                 .show()
                         }
                     )
-                }
-
-                SectionTitle("手势与底栏")
-                GroupCard {
                     SwitchRow(
                         icon = R.drawable.ic_gesture_48,
                         title = "预见性返回手势",
@@ -552,36 +581,6 @@ class AppearanceActivity : BaseActivity() {
                         onToggle = { newValue ->
                             predictive = newValue
                             Hawk.put(HawkConfig.PREDICTIVE_BACK, newValue)
-                        }
-                    )
-                    SwitchRow(
-                        icon = R.drawable.ic_dock_48,
-                        title = "悬浮底栏",
-                        checked = barFloating,
-                        onToggle = { newValue ->
-                            barFloating = newValue
-                            Hawk.put(HawkConfig.BAR_FLOATING, newValue)
-                            EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
-                        }
-                    )
-                    SwitchRow(
-                        icon = R.drawable.ic_label_48,
-                        title = "底栏显示名称",
-                        checked = barLabels,
-                        onToggle = { newValue ->
-                            barLabels = newValue
-                            Hawk.put(HawkConfig.BAR_SHOW_LABELS, newValue)
-                            EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
-                        }
-                    )
-                    SwitchRow(
-                        icon = R.drawable.ic_auto_hide_48,
-                        title = "底栏随滚动隐藏",
-                        checked = barAutoHide,
-                        onToggle = { newValue ->
-                            barAutoHide = newValue
-                            Hawk.put(HawkConfig.BAR_AUTO_HIDE, newValue)
-                            EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
                         }
                     )
                 }
@@ -604,9 +603,11 @@ class AppearanceActivity : BaseActivity() {
         themeColor: String,
         material: String,
         blurRadius: Float,
-        refractionHeight: Float,
         refractionAmount: Float,
-        dispersion: Boolean
+        dispersion: Boolean,
+        barFloating: Boolean,
+        barLabels: Boolean,
+        fontPath: String
     ) {
         val previewDark = when (themeMode) {
             0 -> (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
@@ -624,99 +625,166 @@ class AppearanceActivity : BaseActivity() {
         val bg = if (previewDark) Color(0xFF141418) else Color(0xFFFAF8FF)
         val surfaceHigh = if (previewDark) Color(0xFF2A2B31) else Color(0xFFECECF1)
         val onSurface = if (previewDark) Color(0xFFE4E2E8) else Color(0xFF1B1B1F)
-        val barTint = if (previewDark) Color(0xFF121212).copy(alpha = 0.4f)
-        else Color(0xFFFAFAFA).copy(alpha = 0.4f)
+
+        // 自定义字体联动
+        val previewFontFamily = remember(fontPath) {
+            if (fontPath.isNotEmpty() && File(fontPath).exists()) {
+                try {
+                    FontFamily(android.graphics.Typeface.createFromFile(File(fontPath)))
+                } catch (_: Exception) {
+                    FontFamily.Default
+                }
+            } else {
+                FontFamily.Default
+            }
+        }
 
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Column(
                 modifier = Modifier
-                    .width(190.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .border(2.dp, colorScheme.outlineVariant, RoundedCornerShape(22.dp))
+                    .width(126.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.5.dp, colorScheme.outlineVariant, RoundedCornerShape(16.dp))
                     .background(bg)
             ) {
-                val previewBackdrop = rememberLayerBackdrop()
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .height(310.dp)
-                        .layerBackdrop(previewBackdrop)
+                        .height(224.dp)
                 ) {
                     // 状态栏区
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(10.dp)
-                            .background(if (previewDark) Color.Black else Color(0xFFF2F2F7))
+                            .height(8.dp)
+                            .background(if (previewDark) Color.Black else Color(0xFFECECEE))
                     )
-                    // 顶栏
+                    // 顶栏: TVBox 标题 + 右侧主题主色圆点
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("TVBox", color = onSurface, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "TVBox",
+                            color = onSurface,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = previewFontFamily
+                        )
                         Spacer(Modifier.weight(1f))
-                        Box(Modifier.size(8.dp).background(primary, CircleShape))
+                        Box(Modifier.size(6.dp).background(primary, CircleShape))
                     }
-                    // 内容区: 搜索条 + 海报墙 + 卡片
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp)) {
+                    // 内容区: 搜索条 + 海报墙 + Banner 卡片
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 7.dp)) {
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .height(14.dp)
-                                .background(surfaceHigh, RoundedCornerShape(7.dp))
+                                .height(10.dp)
+                                .background(surfaceHigh, RoundedCornerShape(5.dp))
                         )
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                .padding(top = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             repeat(3) {
                                 Box(
                                     Modifier
                                         .weight(1f)
-                                        .aspectRatio(0.75f)
-                                        .background(surfaceHigh, RoundedCornerShape(6.dp))
+                                        .aspectRatio(0.72f)
+                                        .background(surfaceHigh, RoundedCornerShape(4.dp))
                                 )
                             }
                         }
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(top = 8.dp)
-                                .height(20.dp)
-                                .background(surfaceHigh, RoundedCornerShape(6.dp))
+                                .padding(top = 6.dp)
+                                .height(14.dp)
+                                .background(surfaceHigh, RoundedCornerShape(4.dp))
                         )
                     }
                     Spacer(Modifier.weight(1f))
-                    // mini 底栏: 按材质呈现(液态玻璃/磨砂为真背板采样玻璃)
-                    Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+
+                    // mini 底栏: 联动 悬浮底栏(barFloating) + 显示名称(barLabels) + 材质(material) + 液态微调
+                    val barHeight = if (barLabels) 22.dp else 17.dp
+                    val barShape = if (barFloating) RoundedCornerShape(9.dp) else androidx.compose.ui.graphics.RectangleShape
+
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (barFloating) Modifier.padding(start = 6.dp, end = 6.dp, bottom = 4.dp)
+                                else Modifier
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(22.dp)
+                                .height(barHeight)
                                 .then(
                                     miniBarModifier(
-                                        material, previewBackdrop, previewDark,
-                                        blurRadius, refractionHeight, refractionAmount, dispersion
+                                        material = material,
+                                        dark = previewDark,
+                                        shape = barShape,
+                                        blurRadius = blurRadius,
+                                        refractionAmount = refractionAmount,
+                                        dispersion = dispersion
                                     )
                                 )
-                                .padding(horizontal = 12.dp),
+                                .padding(horizontal = if (barFloating) 8.dp else 6.dp),
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            repeat(4) { i ->
-                                Box(
-                                    Modifier
-                                        .size(if (i == 0) 12.dp else 7.dp)
-                                        .background(
-                                            if (i == 0) primary else onSurface.copy(alpha = 0.55f),
-                                            CircleShape
+                            val tabs = listOf("首页", "直播", "缓存", "我的")
+                            tabs.forEachIndexed { i, label ->
+                                val selected = i == 0
+                                Box(contentAlignment = Alignment.Center) {
+                                    if (material == ThemeManager.MATERIAL_YOU && selected) {
+                                        Box(
+                                            Modifier
+                                                .size(if (barLabels) 20.dp else 14.dp, if (barLabels) 12.dp else 8.dp)
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(primary.copy(alpha = 0.22f))
                                         )
-                                )
+                                    }
+                                    if (barLabels) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Box(
+                                                Modifier
+                                                    .size(if (selected) 4.5.dp else 3.5.dp)
+                                                    .background(
+                                                        if (selected) primary else onSurface.copy(alpha = 0.5f),
+                                                        CircleShape
+                                                    )
+                                            )
+                                            Text(
+                                                text = label,
+                                                fontSize = 5.sp,
+                                                lineHeight = 6.sp,
+                                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (selected) primary else onSurface.copy(alpha = 0.6f),
+                                                fontFamily = previewFontFamily
+                                            )
+                                        }
+                                    } else {
+                                        Box(
+                                            Modifier
+                                                .size(if (selected) 7.dp else 4.5.dp)
+                                                .background(
+                                                    if (selected) primary else onSurface.copy(alpha = 0.55f),
+                                                    CircleShape
+                                                )
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -725,44 +793,47 @@ class AppearanceActivity : BaseActivity() {
         }
     }
 
-    /** 预览用迷你底栏配方: 与主界面材质三分类一致 */
+    /** 预览用迷你底栏配方: 联动材质、微调模糊与折射参数、色散彩虹边框 */
     @Composable
     private fun miniBarModifier(
         material: String,
-        backdrop: com.kyant.backdrop.Backdrop,
         dark: Boolean,
+        shape: androidx.compose.ui.graphics.Shape,
         blurRadius: Float,
-        refractionHeight: Float,
         refractionAmount: Float,
-        dispersion: Boolean
+        dispersion: Boolean = false
     ): Modifier {
-        val shape = RoundedCornerShape(11.dp)
-        if (material == ThemeManager.MATERIAL_YOU || !isRenderEffectSupported()) {
-            val solid = if (dark) Color(0xFF202024) else Color(0xFFF7F7F9)
-            return Modifier.background(solid.copy(alpha = 0.92f), shape)
-        }
-        val tint = if (dark) Color(0xFF121212).copy(alpha = 0.4f) else Color(0xFFFAFAFA).copy(alpha = 0.4f)
-        return Modifier.drawBackdrop(
-            backdrop = backdrop,
-            shape = { shape },
-            effects = {
-                if (material == ThemeManager.MATERIAL_FROSTED) {
-                    blur((blurRadius * 1.2f).coerceAtLeast(10f))
-                } else {
-                    vibrancy()
-                    blur(blurRadius)
-                    if (isRuntimeShaderSupported()) {
-                        lens(
-                            refractionHeight,
-                            refractionAmount,
-                            depthEffect = true,
-                            chromaticAberration = dispersion
+        return when (material) {
+            ThemeManager.MATERIAL_YOU -> {
+                val solid = if (dark) Color(0xFF202024) else Color(0xFFF7F7F9)
+                Modifier.background(solid.copy(alpha = 0.95f), shape)
+            }
+            else -> { // MATERIAL_LIQUID
+                val liquidBg = if (dark) Color(0x55323444) else Color(0x88FFFFFF)
+                val strokeBrush = if (dispersion) {
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xCCFFFFFF),
+                            Color(0x8876A0FF),
+                            Color(0x88FF8A80),
+                            Color(0xCCFFFFFF)
                         )
-                    }
+                    )
+                } else {
+                    // 折射强度联动: 高光边界更亮
+                    val highAlpha = (0.50f + (refractionAmount / 30f) * 0.40f).coerceIn(0.4f, 0.95f)
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = highAlpha),
+                            Color.White.copy(alpha = 0.15f)
+                        )
+                    )
                 }
-            },
-            onDrawSurface = { drawRect(tint) }
-        )
+                Modifier
+                    .background(liquidBg, shape)
+                    .border(1.dp, strokeBrush, shape)
+            }
+        }
     }
 
     @Composable
@@ -829,29 +900,52 @@ class AppearanceActivity : BaseActivity() {
     }
 
     @Composable
-    private fun SwitchRow(icon: Int, title: String, checked: Boolean, onToggle: (Boolean) -> Unit) {
+    private fun SwitchRow(
+        icon: Int,
+        title: String,
+        checked: Boolean,
+        subtitle: String? = null,
+        enabled: Boolean = true,
+        onToggle: (Boolean) -> Unit
+    ) {
+        val alpha = if (enabled) 1f else 0.45f
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onToggle(!checked) }
+                .clickable(enabled = enabled) { onToggle(!checked) }
                 .padding(start = 20.dp, end = 16.dp, top = 15.dp, bottom = 15.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 painterResource(icon),
                 contentDescription = null,
-                tint = colorScheme.primary,
+                tint = colorScheme.primary.copy(alpha = alpha),
                 modifier = Modifier.size(24.dp)
             )
-            Text(
-                title,
-                color = colorScheme.onSurface,
-                fontSize = 16.sp,
+            Column(
                 modifier = Modifier
                     .padding(start = 20.dp)
                     .weight(1f)
+            ) {
+                Text(
+                    title,
+                    color = colorScheme.onSurface.copy(alpha = alpha),
+                    fontSize = 16.sp
+                )
+                if (subtitle != null) {
+                    Text(
+                        subtitle,
+                        color = colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+            Switch(
+                checked = checked,
+                enabled = enabled,
+                onCheckedChange = if (enabled) onToggle else null
             )
-            Switch(checked = checked, onCheckedChange = { onToggle(it) })
         }
     }
 

@@ -4,6 +4,7 @@ import androidx.annotation.FloatRange
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.util.fastCoerceAtLeast
 import androidx.compose.ui.util.fastCoerceAtMost
@@ -103,6 +104,10 @@ private val BackdropEffectScope.cornerRadii: FloatArray?
                     bottomRight.fastCoerceAtMost(maxRadius),
                     bottomLeft.fastCoerceAtMost(maxRadius)
                 )
+            }
+
+            RectangleShape -> {
+                floatArrayOf(0f, 0f, 0f, 0f)
             }
 
             else -> null

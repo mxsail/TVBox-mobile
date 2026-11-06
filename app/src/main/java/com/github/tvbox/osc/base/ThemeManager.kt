@@ -20,24 +20,17 @@ object ThemeManager {
     /** 主题颜色: 动态取色(Android 12+ 跟随壁纸; 低版本无此能力, 保持品牌蓝) */
     const val COLOR_DYNAMIC = "dynamic"
 
-    // 界面材质取值(HawkConfig.UI_MATERIAL), 三选
+    // 界面材质取值(HawkConfig.UI_MATERIAL), 二选
     const val MATERIAL_YOU = "you"                 // Material You: 实底跟随 M3 动态色
     const val MATERIAL_LIQUID = "liquid"           // 液态玻璃(默认): 折射+色散+高光
-    const val MATERIAL_FROSTED = "frosted"         // 轻透磨砂: 类 iOS 26 毛玻璃, 仅模糊高透
 
-    /** 读取材质并迁移旧四选取值(solid/translucent→you, blur→frosted) */
+    /** 读取材质(二选: Material You / 液态玻璃; 非悬浮底栏状态下强制为 Material You) */
     @JvmStatic
     fun material(): String {
+        val floating = Hawk.get(HawkConfig.BAR_FLOATING, false)
+        if (!floating) return MATERIAL_YOU
         val stored = Hawk.get(HawkConfig.UI_MATERIAL, MATERIAL_LIQUID)
-        val migrated = when (stored) {
-            "solid", "translucent" -> MATERIAL_YOU
-            "blur" -> MATERIAL_FROSTED
-            else -> stored
-        }
-        if (migrated != stored) {
-            Hawk.put(HawkConfig.UI_MATERIAL, migrated)
-        }
-        return migrated
+        return if (stored == MATERIAL_YOU) MATERIAL_YOU else MATERIAL_LIQUID
     }
 
     class Preset(val id: String, val label: String, val overlayRes: Int, val swatchRes: Int)

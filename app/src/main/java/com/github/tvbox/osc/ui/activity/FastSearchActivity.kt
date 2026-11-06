@@ -16,6 +16,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -69,8 +73,11 @@ import com.github.tvbox.osc.bean.SourceBean
 import com.github.tvbox.osc.event.RefreshEvent
 import com.github.tvbox.osc.event.ServerEvent
 import com.github.tvbox.osc.ui.adapter.FastSearchAdapter
+import com.github.tvbox.osc.ui.compose.HomeCategoryBar
 import com.github.tvbox.osc.ui.compose.PosterImage
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.VodCard
+import com.github.tvbox.osc.ui.compose.VodCardItem
 import com.github.tvbox.osc.ui.dialog.DoubanSuggestDialog
 import com.github.tvbox.osc.ui.dialog.SearchCheckboxDialog
 import com.github.tvbox.osc.ui.dialog.SearchSuggestionsDialog
@@ -126,6 +133,7 @@ class FastSearchActivity : BaseActivity() {
     private val resultItems = mutableStateOf<List<Movie.Video>>(emptyList())
     private val sourceTabs = mutableStateOf(listOf("全部显示" to ""))
     private val selectedTabKey = mutableStateOf("")
+    private val isSourceTabsExpanded = mutableStateOf(false)
     private val showSuggestPage = mutableStateOf(true) // true=历史/热词页 false=结果页
     private val loadState = mutableIntStateOf(1) // 1=初始 2=内容 3=空
     private val historyWords = mutableStateOf<List<String>>(emptyList())
@@ -138,6 +146,11 @@ class FastSearchActivity : BaseActivity() {
     override fun getLayoutResID(): Int = -1
 
     override fun initVb() {
+        com.gyf.immersionbar.ImmersionBar.with(this)
+            .transparentStatusBar()
+            .statusBarDarkFont(!com.github.tvbox.osc.util.Utils.isDarkTheme())
+            .navigationBarColor(android.R.color.transparent)
+            .init()
         // 进页自动拉起输入法: STATE_VISIBLE + EditText requestFocus,
         // (仅 post showSoftInput 会在窗口拿到焦点前被吞掉)
         window.setSoftInputMode(
@@ -147,6 +160,14 @@ class FastSearchActivity : BaseActivity() {
         val composeView = androidx.compose.ui.platform.ComposeView(this)
         setContentView(composeView)
         composeView.setContent { TvBoxTheme { FastSearchScreen() } }
+    }
+
+    override fun onBackHandled() {
+        if (isSourceTabsExpanded.value) {
+            isSourceTabsExpanded.value = false
+            return
+        }
+        super.onBackHandled()
     }
 
     override fun init() {
@@ -481,8 +502,8 @@ class FastSearchActivity : BaseActivity() {
         Column(
             Modifier
                 .fillMaxSize()
-                .statusBarsPadding() // 顶栏避开状态栏(原 View 版由 ImmersionBar fitsSystemWindows 承担)
                 .background(colorScheme.background)
+                .statusBarsPadding()
         ) {
             // 顶栏: 返回 + 搜索框(内含搜索钮) + 过滤。图标尺寸统一 22dp
             Row(
@@ -528,16 +549,30 @@ class FastSearchActivity : BaseActivity() {
                                                 true
                                             } else false
                                         }
+                                        if (inputText.value.isNotEmpty()) {
+                                            setText(inputText.value)
+                                            setSelection(inputText.value.length)
+                                        }
                                         addTextChangedListener(textWatcher)
-                                        // 进页自动聚焦并拉起输入法
+                                        // 进页自动聚焦并拉起输入法(若已有搜索关键词则不自动拉起键盘挡住内容)
                                         isFocusableInTouchMode = true
-                                        post {
-                                            requestFocus()
-                                            val imm =
-                                                ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                                            imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+                                        if (inputText.value.isEmpty()) {
+                                            post {
+                                                requestFocus()
+                                                val imm =
+                                                    ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                                                imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+                                            }
                                         }
                                     }.also { searchEditText = it }
+                                },
+                                update = { et ->
+                                    if (et.text.toString() != inputText.value) {
+                                        et.removeTextChangedListener(textWatcher)
+                                        et.setText(inputText.value)
+                                        et.setSelection(inputText.value.length)
+                                        et.addTextChangedListener(textWatcher)
+                                    }
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -655,45 +690,81 @@ class FastSearchActivity : BaseActivity() {
         }
     }
 
-    /** 结果页: 源过滤 chips + 列表 */
+    /** 结果页: 顶部筛选栏(样式与首页分类栏一致，带独立平滑指示器与悬浮下拉筛选，不挤压内容) + 自适应多列卡片网格 */
     @Composable
     private fun ResultPage() {
-        Column(Modifier.fillMaxSize()) {
-            // 源过滤 chips(横向滚动)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
-                    .horizontalScroll(rememberScrollState()),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                sourceTabs.value.forEach { (name, key) ->
-                    val selected = selectedTabKey.value == key
-                    Text(
-                        name,
-                        color = if (selected) colorScheme.primary else colorScheme.onSurfaceVariant,
-                        fontSize = 14.sp,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier
-                            .clickable {
-                                selectedTabKey.value = key
-                                searchFilterKey = key
-                            }
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                    )
+        Box(Modifier.fillMaxSize()) {
+            // 1. 底层: 结果内容区 (顶部留出 38dp 给分类栏常态让位)
+            Column(Modifier.fillMaxSize()) {
+                if (sourceTabs.value.isNotEmpty()) {
+                    Spacer(Modifier.height(38.dp))
                 }
-            }
-            when {
-                loadState.value == 1 -> SearchHint("正在搜索…")
-                loadState.value == 3 && displayed().isEmpty() -> SearchHint("暂无搜索结果")
-                else -> {
-                    val list = displayed()
-                    LazyColumn(Modifier.fillMaxSize()) {
-                        itemsIndexed(list) { _, video ->
-                            ResultRow(video) { openVideo(video) }
+                when {
+                    loadState.value == 1 && displayed().isEmpty() -> SearchHint("正在搜索…")
+                    loadState.value == 3 && displayed().isEmpty() -> SearchHint("暂无搜索结果")
+                    else -> {
+                        val list = displayed()
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = 105.dp),
+                            contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(list) { video ->
+                                val sourceName = try {
+                                    ApiConfig.get().getSource(video.sourceKey)?.name ?: ""
+                                } catch (_: Exception) { "" }
+                                VodCardItem(
+                                    card = VodCard(
+                                        key = video.id ?: "",
+                                        name = video.name ?: "",
+                                        pic = video.pic ?: "",
+                                        badge = sourceName,
+                                        note = video.note
+                                    ),
+                                    onClick = { openVideo(video) }
+                                )
+                            }
                         }
                     }
                 }
+            }
+
+            // 2. 中层: 分类展开时的半透明遮罩 (点击可直接收起展开菜单)
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isSourceTabsExpanded.value,
+                enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(240)),
+                exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200))
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(androidx.compose.ui.graphics.Color(0x73000000))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { isSourceTabsExpanded.value = false }
+                )
+            }
+
+            // 3. 顶层: 悬浮的分类栏 (展开时自然向下悬浮延展，不挤压内容区)
+            if (sourceTabs.value.isNotEmpty()) {
+                val tabNames = sourceTabs.value.map { it.first }
+                val currentTabIdx = sourceTabs.value.indexOfFirst { it.second == selectedTabKey.value }.coerceAtLeast(0)
+                HomeCategoryBar(
+                    categories = tabNames,
+                    selectedIndex = currentTabIdx,
+                    onTabSelected = { idx ->
+                        if (idx in sourceTabs.value.indices) {
+                            val item = sourceTabs.value[idx]
+                            selectedTabKey.value = item.second
+                            searchFilterKey = item.second
+                        }
+                    },
+                    isExpanded = isSourceTabsExpanded.value,
+                    onExpandChanged = { isSourceTabsExpanded.value = it }
+                )
             }
         }
     }

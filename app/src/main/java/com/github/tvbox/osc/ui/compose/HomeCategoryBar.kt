@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,7 +38,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,12 +52,17 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.util.HawkConfig
@@ -153,31 +161,55 @@ fun HomeCategoryBar(
                     .height(38.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val density = LocalDensity.current
                 val rowScrollState = rememberScrollState()
-                val tabWidths = remember { mutableStateMapOf<Int, Int>() }
+                var rowCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+                val tabOffsets = remember { mutableStateMapOf<Int, Float>() }
+                val tabWidths = remember { mutableStateMapOf<Int, Float>() }
+
+                val textPaddingPx = with(density) { 6.dp.toPx() }
+                val targetOffsetPx = tabOffsets[validIndex]?.let { it + textPaddingPx } ?: 0f
+                val targetWidthPx = tabWidths[validIndex]?.let { (it - textPaddingPx * 2).coerceAtLeast(0f) } ?: 0f
+
+                val animOffsetPx by animateFloatAsState(
+                    targetValue = targetOffsetPx,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "tabIndicatorOffset"
+                )
+                val animWidthPx by animateFloatAsState(
+                    targetValue = targetWidthPx,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "tabIndicatorWidth"
+                )
+
                 // 切换分类(含展开面板点选远处分类)时把选中项滚到可见
-                LaunchedEffect(validIndex, displayCategories.size) {
-                    var target = 0
-                    var found = false
-                    for (i in 0 until displayCategories.size) {
-                        val w = tabWidths[i] ?: break
-                        if (i == validIndex) {
-                            found = true
-                            break
-                        }
-                        target += w
+                LaunchedEffect(validIndex, tabOffsets[validIndex]) {
+                    val target = tabOffsets[validIndex]?.toInt() ?: 0
+                    if (target > 0) {
+                        rowScrollState.animateScrollTo((target - 40).coerceAtLeast(0))
                     }
-                    if (found && target > 0) rowScrollState.animateScrollTo(target)
                 }
-                Row(
+
+                Box(
                     modifier = Modifier
                         .weight(1f)
                         .horizontalScroll(rowScrollState)
                 ) {
-                    Spacer(Modifier.width(4.dp)) // 4dp + 分类内边距 6dp = 10dp, 与网格卡片左缘对齐
-                    displayCategories.forEachIndexed { index, name ->
-                        val isSelected = index == validIndex
-                        val indicatorColor = MaterialTheme.colorScheme.primary
+                    Row(
+                        modifier = Modifier
+                            .height(38.dp)
+                            .onGloballyPositioned { rowCoordinates = it },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Spacer(Modifier.width(4.dp)) // 4dp + 分类内边距 6dp = 10dp, 与网格卡片左缘对齐
+                        displayCategories.forEachIndexed { index, name ->
+                            val isSelected = index == validIndex
                             Text(
                                 text = name,
                                 fontSize = if (isSelected) 18.sp else 15.sp,
@@ -185,31 +217,43 @@ fun HomeCategoryBar(
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 softWrap = false,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    onTabSelected(index)
-                                }
-                                .padding(start = 6.dp, end = 6.dp, bottom = 4.dp)
-                                .onSizeChanged { tabWidths[index] = it.width }
-                                .drawBehind {
-                                    // 选中指示条: 紧贴文字底部的两端圆润胶囊, 宽度=文字宽度
-                                    if (isSelected) {
-                                        val pill = 3.dp.toPx()
-                                        drawRoundRect(
-                                            color = indicatorColor,
-                                            topLeft = Offset(0f, size.height - pill),
-                                            size = Size(size.width, pill),
-                                            cornerRadius = CornerRadius(pill / 2f, pill / 2f)
-                                        )
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
+                                        onTabSelected(index)
                                     }
-                                }
+                                    .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 4.dp)
+                                    .onGloballyPositioned { coords ->
+                                        rowCoordinates?.let { rowCoords ->
+                                            if (rowCoords.isAttached && coords.isAttached) {
+                                                val relPos = rowCoords.localPositionOf(coords, Offset.Zero)
+                                                tabOffsets[index] = relPos.x
+                                                tabWidths[index] = coords.size.width.toFloat()
+                                            }
+                                        }
+                                    }
+                            )
+                        }
+                        Spacer(Modifier.width(4.dp))
+                    }
+
+                    // 独立平滑滑动胶囊指示条: 独立于文字下方, 随切换平滑平移与伸缩
+                    if (targetWidthPx > 0f || animWidthPx > 0f) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .offset { IntOffset(animOffsetPx.roundToInt(), 0) }
+                                .width(with(density) { animWidthPx.toDp() })
+                                .height(3.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = RoundedCornerShape(percent = 50)
+                                )
                         )
                     }
-                    Spacer(Modifier.width(4.dp))
                 }
 
                 // 右侧展开按钮 (分类数大于1时展示)

@@ -67,20 +67,6 @@ fun Modifier.materialGlass(
         return this.background(MaterialTheme.colorScheme.surface, shape)
     }
 
-    // 轻透磨砂: 仅重模糊 + 高透表面(iOS 26 毛玻璃观感), 无折射无高光
-    if (material == ThemeManager.MATERIAL_FROSTED) {
-        val frostedTint = MaterialTheme.colorScheme.surface.copy(alpha = 0.26f)
-        val frostedBorder = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-        return this
-            .drawBackdrop(
-                backdrop = backdrop,
-                shape = { shape },
-                effects = { blur(20f) },
-                onDrawSurface = { drawRect(frostedTint) }
-            )
-            .border(0.5.dp, frostedBorder, shape)
-    }
-
     // 液态玻璃: 物理折射(Android 14+)+色散+高光+模糊
     val isRuntimeShaderOk = isRuntimeShaderSupported()
     return this.drawBackdrop(
@@ -125,9 +111,6 @@ fun Modifier.barGlass(
             blur(8f.dp.toPx())
             if (material == ThemeManager.MATERIAL_LIQUID && isRuntimeShaderSupported()) {
                 lens(24f.dp.toPx(), 24f.dp.toPx())
-            }
-            if (material == ThemeManager.MATERIAL_FROSTED) {
-                blur(14f)
             }
         },
         onDrawSurface = { drawRect(containerColor) }

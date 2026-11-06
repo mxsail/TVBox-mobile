@@ -158,10 +158,10 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         initData();
         registerReceiver(mBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         ImmersionBar.with(this)
-                .statusBarColor(R.color.black)
+                .transparentStatusBar()
+                .statusBarDarkFont(!com.github.tvbox.osc.util.Utils.isDarkTheme())
                 .navigationBarColor(android.R.color.transparent)
                 .fitsSystemWindows(true)
-                .statusBarDarkFont(false)
                 .init();
         toggleScreenShotListen(true);
     }

@@ -45,9 +45,7 @@ object MaterialBarHelper {
     /** 纯逻辑(供单测): 材质降级规则 */
     @JvmStatic
     fun normalizeMaterial(m: String, sdkInt: Int): String {
-        return if ((m == ThemeManager.MATERIAL_LIQUID || m == ThemeManager.MATERIAL_FROSTED)
-            && sdkInt < Build.VERSION_CODES.S
-        ) {
+        return if (m == ThemeManager.MATERIAL_LIQUID && sdkInt < Build.VERSION_CODES.S) {
             ThemeManager.MATERIAL_YOU
         } else {
             m
@@ -144,8 +142,7 @@ object MaterialBarHelper {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
         val lp = window.attributes
-        // 轻透磨砂比液态玻璃模糊更重
-        lp.blurBehindRadius = dp(window.context, if (effectiveMaterial() == ThemeManager.MATERIAL_FROSTED) 36 else 28)
+        lp.blurBehindRadius = dp(window.context, 28)
         window.attributes = lp
     }
 
