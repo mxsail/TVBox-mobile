@@ -46,7 +46,6 @@ import com.github.tvbox.osc.ui.compose.SectionTitle
 import com.github.tvbox.osc.ui.compose.SwitchRow
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.dialog.BackupDialog
-import com.github.tvbox.osc.ui.dialog.LiveApiDialog
 import com.github.tvbox.osc.ui.dialog.SelectDialog
 import com.github.tvbox.osc.util.FastClickCheckUtil
 import com.github.tvbox.osc.util.FileUtils
@@ -74,7 +73,24 @@ class SettingActivity : BaseActivity() {
 
     private var homeRec = Hawk.get(HawkConfig.HOME_REC, 0)
     private var dnsOpt = Hawk.get(HawkConfig.DOH_URL, 0)
-    private var currentLiveApi = Hawk.get(HawkConfig.LIVE_URL, "")
+
+    private val subSourceSummaryState = mutableStateOf("")
+    private val liveSourceSummaryState = mutableStateOf("")
+
+    private fun getSubscriptionSummary(): String {
+        val subs: List<com.github.tvbox.osc.bean.Subscription>? = Hawk.get(HawkConfig.SUBSCRIPTIONS, null)
+        return subs?.find { it.isChecked }?.name ?: "未设置"
+    }
+
+    private fun getLiveSourceSummary(): String {
+        return com.github.tvbox.osc.util.live.LiveSourceManager.getSelectedSourceName()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        subSourceSummaryState.value = getSubscriptionSummary()
+        liveSourceSummaryState.value = getLiveSourceSummary()
+    }
 
     override fun getLayoutResID(): Int = -1
 
@@ -107,13 +123,6 @@ class SettingActivity : BaseActivity() {
 
     private fun openAppearance() {
         jumpActivity(AppearanceActivity::class.java)
-    }
-
-    private fun openLiveApi() {
-        XPopup.Builder(this)
-            .autoFocusEditText(false)
-            .asCustom(LiveApiDialog(this))
-            .show()
     }
 
     private fun openBackup() {
@@ -186,15 +195,11 @@ class SettingActivity : BaseActivity() {
     override fun onBackHandled() {
         if (homeRec != Hawk.get(HawkConfig.HOME_REC, 0) || dnsOpt != Hawk.get(
                 HawkConfig.DOH_URL, 0
-            ) || currentLiveApi != Hawk.get(HawkConfig.LIVE_URL, "")
+            )
         ) {
-            if (currentLiveApi == Hawk.get(HawkConfig.LIVE_URL, "")) {
-                val bundle = Bundle()
-                bundle.putBoolean(IntentKey.CACHE_CONFIG_CHANGED, true)
-                jumpActivity(MainActivity::class.java, bundle)
-            } else {
-                jumpActivity(MainActivity::class.java)
-            }
+            val bundle = Bundle()
+            bundle.putBoolean(IntentKey.CACHE_CONFIG_CHANGED, true)
+            jumpActivity(MainActivity::class.java, bundle)
             overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
         } else {
             finish()
@@ -260,10 +265,19 @@ class SettingActivity : BaseActivity() {
                             homeRecValue = homeRecName(pos)
                         }
                     }
-                    MenuRow(R.drawable.ic_live_tv_48, "直播源", null) { openLiveApi() }
                     SwitchRow(R.drawable.ic_incognito_48, "无痕浏览", privateBrowsing) { newValue ->
                         privateBrowsing = newValue
                         Hawk.put(HawkConfig.PRIVATE_BROWSING, newValue)
+                    }
+                }
+
+                SectionTitle("播放源管理")
+                GroupCard {
+                    MenuRow(R.drawable.ic_database_48, "订阅源", subSourceSummaryState.value) {
+                        jumpActivity(SubscriptionActivity::class.java)
+                    }
+                    MenuRow(R.drawable.ic_live_tv_48, "直播源", liveSourceSummaryState.value) {
+                        jumpActivity(LiveSourceActivity::class.java)
                     }
                 }
 

@@ -44,6 +44,10 @@
             android:configChanges="orientation|screenSize"
             android:exported="false" />
         <activity
+            android:name=".ui.activity.LiveSourceActivity"
+            android:configChanges="orientation|screenSize"
+            android:exported="false" />
+        <activity
             android:name=".ui.activity.VideoListActivity"
             android:configChanges="orientation|screenSize"/>
         <activity

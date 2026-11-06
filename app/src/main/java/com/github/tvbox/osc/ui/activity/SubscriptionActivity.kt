@@ -20,6 +20,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -319,43 +321,44 @@ class SubscriptionActivity : BaseActivity() {
         val pos = indexOfUrl(url)
         if (pos < 0) return
         val item = mSubscriptions[pos]
-        XPopup.Builder(this).hasBlurBg(MaterialBarHelper.popupBlurEnabled())
-            .hasShadowBg(false)
-            .asAttachList(
-                arrayOf(if (item.isTop) "取消置顶" else "置顶", "重命名", "复制地址"), null
-            ) { index: Int, _: String? ->
-                when (index) {
+        val options = arrayOf(
+            if (item.isTop) "取消置顶" else "置顶",
+            "重命名",
+            "复制链接",
+            "删除"
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(item.name)
+            .setItems(options) { _, which ->
+                when (which) {
                     0 -> {
                         item.isTop = !item.isTop
                         refresh()
                     }
                     1 -> {
-                        XPopup.Builder(this).hasBlurBg(MaterialBarHelper.popupBlurEnabled())
-                            .asInputConfirm(
-                                "更改为",
-                                "",
-                                item.name,
-                                "新的订阅名",
-                                { text ->
-                                    if (!TextUtils.isEmpty(text)) {
-                                        if (text.trim { it <= ' ' }.length > 8) {
-                                            ToastUtils.showShort("不要过长,不方便记忆")
-                                        } else {
-                                            item.name = text.trim { it <= ' ' }
-                                            refresh()
-                                        }
+                        XPopup.Builder(this)
+                            .hasBlurBg(MaterialBarHelper.popupBlurEnabled())
+                            .asInputConfirm("重命名", null, item.name, "请输入名称") { text ->
+                                if (!TextUtils.isEmpty(text)) {
+                                    val trimmed = text.trim()
+                                    if (trimmed.length > 20) {
+                                        ToastUtils.showShort("名称过长")
+                                    } else {
+                                        item.name = trimmed
+                                        refresh()
                                     }
-                                },
-                                null,
-                                R.layout.dialog_input
-                            ).show()
+                                }
+                            }
+                            .show()
                     }
                     2 -> {
                         ClipboardUtils.copyText(item.url)
-                        ToastUtils.showLong("已复制")
+                        ToastUtils.showShort("已复制")
                     }
+                    3 -> deleteSubscription(item.url)
                 }
-            }.show()
+            }
+            .show()
     }
 
     // ---------------- 生命周期语义(沿用旧版) ----------------
@@ -393,7 +396,7 @@ class SubscriptionActivity : BaseActivity() {
             containerColor = colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text("订阅管理", fontWeight = FontWeight.Bold) },
+                    title = { Text("订阅源", fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
                             Icon(
@@ -461,7 +464,7 @@ class SubscriptionActivity : BaseActivity() {
                             Row(
                                 modifier = Modifier
                                     .clickable { indexOfUrl(row.url).takeIf { it >= 0 }?.let { pickSubscription(it) } }
-                                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+                                    .padding(start = 16.dp, top = 10.dp, bottom = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(Modifier.weight(1f)) {
@@ -471,11 +474,12 @@ class SubscriptionActivity : BaseActivity() {
                                                 "置顶",
                                                 color = colorScheme.primary,
                                                 fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
                                                 modifier = Modifier.padding(end = 6.dp)
                                             )
                                         }
                                         Text(
-                                            (if (selected) "✓ " else "") + row.name,
+                                            row.name,
                                             color = colorScheme.onSurface,
                                             fontSize = 15.sp,
                                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
@@ -489,19 +493,21 @@ class SubscriptionActivity : BaseActivity() {
                                         fontSize = 12.sp,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(top = 3.dp)
+                                        modifier = Modifier.padding(top = 2.dp)
                                     )
                                 }
-                                if (!selected) {
-                                    IconButton(onClick = { deleteSubscription(row.url) }) {
-                                        Icon(
-                                            painterResource(R.drawable.ic_close_24),
-                                            contentDescription = "删除",
-                                            tint = colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                } else {
-                                    Spacer(Modifier.size(48.dp))
+                                RadioButton(
+                                    selected = selected,
+                                    onClick = { indexOfUrl(row.url).takeIf { it >= 0 }?.let { pickSubscription(it) } },
+                                    colors = RadioButtonDefaults.colors(selectedColor = colorScheme.primary)
+                                )
+                                IconButton(onClick = { showItemMenu(row.url) }) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_more_vert),
+                                        contentDescription = "操作",
+                                        tint = colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
                             }
                         }

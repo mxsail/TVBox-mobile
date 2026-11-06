@@ -59,6 +59,10 @@ import com.github.tvbox.osc.ui.widget.PlayerTitleView;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.live.TxtSubscribe;
+import com.github.tvbox.osc.event.LiveSourceChangedEvent;
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 import com.google.gson.JsonArray;
 import com.lxj.xpopup.XPopup;
 import com.lxj.xpopup.core.BasePopupView;
@@ -144,6 +148,38 @@ public class LiveFragment extends BaseLazyFragment {
     // 首次切到本页(setUserVisibleHint=true)再充气完整布局, 让首帧布局只负担首页一页。
     private boolean realViewInflated = false;
     private FrameLayout stubContainer;
+
+    @Override
+    public void onCreate(@androidx.annotation.Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        if (!EventBus.getDefault().isRegistered(this)) {
+            EventBus.getDefault().register(this);
+        }
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onLiveSourceChanged(LiveSourceChangedEvent event) {
+        if (!isUiReady()) {
+            return;
+        }
+        if (event.isLoading()) {
+            // 切换直播源开始：立即停止旧播放并展示加载中标识，清空旧列表避免误导
+            if (mVideoView != null) {
+                mVideoView.release();
+            }
+            liveChannelGroupList.clear();
+            if (liveChannelGroupAdapter != null) {
+                liveChannelGroupAdapter.setNewData(new ArrayList<>());
+            }
+            if (liveChannelItemAdapter != null) {
+                liveChannelItemAdapter.setNewData(new ArrayList<>());
+            }
+            showLoading();
+        } else {
+            // 切换直播源完成：装载新频道列表并自动开播第一频道
+            initLiveChannelList();
+        }
+    }
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @androidx.annotation.Nullable ViewGroup container, @androidx.annotation.Nullable Bundle savedInstanceState) {
@@ -336,6 +372,9 @@ public class LiveFragment extends BaseLazyFragment {
 
     @Override
     public void onDestroy() {
+        if (EventBus.getDefault().isRegistered(this)) {
+            EventBus.getDefault().unregister(this);
+        }
         mHandler.removeCallbacksAndMessages(null);
         if (mVideoView != null) {
             mVideoView.release();
@@ -822,30 +861,49 @@ public class LiveFragment extends BaseLazyFragment {
     }
 
     private void initLiveChannelList() {
-        //配置解析会遗留无 channels 的 proxy 占位分组(ApiConfig takagen99 WIP 路径),先过滤,
-        //仅当不存在任何有效分组时(纯 proxy 懒加载场景)才保留原始列表
+        if (com.github.tvbox.osc.util.live.LiveSourceManager.INSTANCE.isReloading()) {
+            showLoading();
+            return;
+        }
         List<LiveChannelGroup> all = ApiConfig.get().getChannelGroupList();
         List<LiveChannelGroup> list = new ArrayList<>();
         for (LiveChannelGroup group : all) {
             if (group.getLiveChannels() != null && !group.getLiveChannels().isEmpty()) list.add(group);
         }
-        if (list.isEmpty()) {
+        if (list.isEmpty() && !all.isEmpty() && all.get(0).getLiveChannels() != null) {
             list = new ArrayList<>(all);
         }
         if (list.isEmpty()) {
-            Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
-            showEmpty();
+            showLoading();
+            com.github.tvbox.osc.util.live.LiveSourceManager.INSTANCE.reloadLiveChannels(false, success -> {
+                if (getActivity() == null || getActivity().isFinishing()) return kotlin.Unit.INSTANCE;
+                List<LiveChannelGroup> reloaded = ApiConfig.get().getChannelGroupList();
+                List<LiveChannelGroup> valid = new ArrayList<>();
+                for (LiveChannelGroup group : reloaded) {
+                    if (group.getLiveChannels() != null && !group.getLiveChannels().isEmpty()) valid.add(group);
+                }
+                if (valid.isEmpty() && !reloaded.isEmpty() && reloaded.get(0).getLiveChannels() != null) {
+                    valid = new ArrayList<>(reloaded);
+                }
+                if (valid.isEmpty()) {
+                    Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
+                    showEmpty();
+                } else {
+                    applyLiveChannelList(valid);
+                }
+                return kotlin.Unit.INSTANCE;
+            });
             return;
         }
 
-        if (list.size() == 1 && list.get(0).getGroupName().startsWith("http://127.0.0.1")) {
-            loadProxyLives(list.get(0).getGroupName());
-        } else {
-            liveChannelGroupList.clear();
-            liveChannelGroupList.addAll(list);
-            showSuccess();
-            initLiveState();
-        }
+        applyLiveChannelList(list);
+    }
+
+    private void applyLiveChannelList(List<LiveChannelGroup> list) {
+        liveChannelGroupList.clear();
+        liveChannelGroupList.addAll(list);
+        showSuccess();
+        initLiveState();
     }
 
     public void loadProxyLives(String url) {
@@ -919,11 +977,11 @@ public class LiveFragment extends BaseLazyFragment {
         tvRightSettingLayout.setVisibility(View.INVISIBLE);
 
         liveChannelGroupAdapter.setNewData(liveChannelGroupList);
-        //懒加载首进不自动开播:仅选中分组、填充频道列表并高亮上次频道,由用户点击频道开始播放
-        selectChannelGroup(lastChannelGroupIndex, false, -1);
-        if (lastLiveChannelIndex > -1) {
-            liveChannelItemAdapter.setSelectedChannelIndex(lastLiveChannelIndex);
-            mLiveChannelView.scrollToPosition(lastLiveChannelIndex);
+        int playChannelIndex = lastLiveChannelIndex > -1 ? lastLiveChannelIndex : 0;
+        selectChannelGroup(lastChannelGroupIndex, false, playChannelIndex);
+        if (playChannelIndex > -1) {
+            liveChannelItemAdapter.setSelectedChannelIndex(playChannelIndex);
+            mLiveChannelView.scrollToPosition(playChannelIndex);
         }
     }
 

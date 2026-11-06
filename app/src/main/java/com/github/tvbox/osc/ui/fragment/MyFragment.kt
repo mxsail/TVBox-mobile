@@ -55,6 +55,7 @@ import com.github.tvbox.osc.ui.activity.AboutActivity
 import com.github.tvbox.osc.ui.activity.CollectActivity
 import com.github.tvbox.osc.ui.activity.DetailActivity
 import com.github.tvbox.osc.ui.activity.HistoryActivity
+import com.github.tvbox.osc.ui.activity.LiveSourceActivity
 import com.github.tvbox.osc.ui.activity.MainActivity
 import com.github.tvbox.osc.ui.activity.SettingActivity
 import com.github.tvbox.osc.ui.activity.SubscriptionActivity
@@ -367,8 +368,8 @@ class MyFragment : Fragment() {
         val funcs = listOf(
             FuncEntry(R.drawable.ic_collect_48, "我的收藏") { jumpActivity(currentActivity, CollectActivity::class.java) },
             FuncEntry(R.drawable.ic_download_nav, "我的缓存") { onGoToTab?.invoke(2) ?: goMainTab(currentActivity, 2) },
-            FuncEntry(R.drawable.ic_live_tv_48, "直播") { onGoToTab?.invoke(1) ?: goMainTab(currentActivity, 1) },
-            FuncEntry(R.drawable.ic_database_48, "订阅管理") { jumpActivity(currentActivity, SubscriptionActivity::class.java) },
+            FuncEntry(R.drawable.ic_database_48, "订阅源") { jumpActivity(currentActivity, SubscriptionActivity::class.java) },
+            FuncEntry(R.drawable.ic_live_tv_48, "直播源") { jumpActivity(currentActivity, LiveSourceActivity::class.java) },
             FuncEntry(R.drawable.ic_settings, "设置") { jumpActivity(currentActivity, SettingActivity::class.java) },
             FuncEntry(R.drawable.ic_about_48, "关于") { jumpActivity(currentActivity, AboutActivity::class.java) }
         )
