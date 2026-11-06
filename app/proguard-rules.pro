@@ -228,3 +228,13 @@
   public static * bind(android.view.View);
 }
 
+# Cling & DLNA & Servlet
+-keep class org.fourthline.cling.** { *; }
+-keep class org.seamless.** { *; }
+-keep class org.eclipse.jetty.** { *; }
+-keep class javax.servlet.** { *; }
+-dontwarn org.fourthline.cling.**
+-dontwarn org.seamless.**
+-dontwarn org.eclipse.jetty.**
+-dontwarn javax.servlet.**
+

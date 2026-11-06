@@ -1,29 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/bg"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_gravity="center"
     android:background="@drawable/bg_bottom_dialog"
+    android:gravity="center_horizontal"
     android:orientation="vertical"
-    android:paddingTop="20dp"
-    android:paddingBottom="10dp"
-    android:gravity="center_horizontal">
+    android:paddingTop="12dp"
+    android:paddingBottom="10dp">
 
-        <View
+    <View
         android:id="@+id/v_gesture_line"
         android:layout_width="32dp"
         android:layout_height="4dp"
         android:background="@drawable/bg_m3_drag_handle" />
 
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:paddingHorizontal="16dp">
+
+        <!-- 左上角排序按钮 -->
+        <TextView
+            android:id="@+id/tvSort"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:drawableLeft="@drawable/ic_sort_18"
+            android:drawablePadding="4dp"
+            android:drawableTint="?attr/colorPrimary"
+            android:padding="6dp"
+            android:text="倒序"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="13sp" />
+
+        <!-- 中间标题 -->
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="选集"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <!-- 右上角关闭按钮 -->
+        <ImageView
+            android:id="@+id/ivClose"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_alignParentRight="true"
+            android:layout_centerVertical="true"
+            android:src="@drawable/ic_close_24"
+            app:tint="?attr/colorOnSurfaceVariant" />
+    </RelativeLayout>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv"
-        android:layout_width="360dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        tools:listitem="@layout/item_series"
-        />
+        android:layout_marginTop="12dp"
+        android:paddingHorizontal="14dp"
+        tools:listitem="@layout/item_series" />
 
 </LinearLayout>

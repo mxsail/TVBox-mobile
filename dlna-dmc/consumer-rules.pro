@@ -1,0 +1,2 @@
+-keep class javax.servlet.** { *; }
+-dontwarn javax.servlet.**
