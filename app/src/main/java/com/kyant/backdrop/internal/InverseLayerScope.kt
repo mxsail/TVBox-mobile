@@ -2,6 +2,7 @@ package com.kyant.backdrop.internal
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.GraphicsLayerScope
@@ -43,6 +44,7 @@ internal class InverseLayerScope : GraphicsLayerScope {
         density: Density,
         layerBlock: GraphicsLayerScope.() -> Unit
     ) {
+        this@InverseLayerScope.size = size
         this@InverseLayerScope.density = density.density
         fontScale = density.fontScale
         layerBlock()

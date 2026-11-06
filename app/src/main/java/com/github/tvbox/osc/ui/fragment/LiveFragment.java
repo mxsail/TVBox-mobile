@@ -386,10 +386,11 @@ public class LiveFragment extends BaseLazyFragment {
     @Override
     protected void onFragmentPause() {
         super.onFragmentPause();
-        //切走 tab 或应用退后台:暂停播放防止后台出声,并停掉挂起的超时换源(否则2秒后会自动续播)
+        // 切走 tab 或应用退后台: 暂停播放防止后台出声, 并停掉挂起的超时换源(否则2秒后会自动续播)
         if (mVideoView != null) {
             mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
-            if (mVideoView.getCurrentPlayState() == VideoView.STATE_PLAYING) {
+            int playState = mVideoView.getCurrentPlayState();
+            if (mVideoView.isPlaying() || playState == VideoView.STATE_PLAYING || playState == VideoView.STATE_BUFFERING || playState == VideoView.STATE_PREPARING) {
                 resumeOnTabReenter = true;
                 mVideoView.pause();
             }
@@ -399,10 +400,14 @@ public class LiveFragment extends BaseLazyFragment {
     @Override
     protected void onFragmentResume() {
         super.onFragmentResume();
-        //仅恢复因切走 tab 而暂停的播放,用户手动暂停的不恢复
-        if (mVideoView != null && resumeOnTabReenter) {
-            resumeOnTabReenter = false;
-            mVideoView.resume();
+        // 恢复因切走 tab 而暂停的播放；若尚未起播且频道已就绪则开始播放
+        if (mVideoView != null) {
+            if (resumeOnTabReenter) {
+                resumeOnTabReenter = false;
+                mVideoView.resume();
+            } else if (mVideoView.getCurrentPlayState() == VideoView.STATE_IDLE && currentLiveChannelIndex > -1) {
+                playChannel(currentChannelGroupIndex, currentLiveChannelIndex, false);
+            }
         }
     }
 
@@ -978,10 +983,22 @@ public class LiveFragment extends BaseLazyFragment {
 
         liveChannelGroupAdapter.setNewData(liveChannelGroupList);
         int playChannelIndex = lastLiveChannelIndex > -1 ? lastLiveChannelIndex : 0;
-        selectChannelGroup(lastChannelGroupIndex, false, playChannelIndex);
-        if (playChannelIndex > -1) {
-            liveChannelItemAdapter.setSelectedChannelIndex(playChannelIndex);
-            mLiveChannelView.scrollToPosition(playChannelIndex);
+        currentChannelGroupIndex = lastChannelGroupIndex;
+        currentLiveChannelIndex = playChannelIndex;
+        if (getUserVisibleHint()) {
+            selectChannelGroup(lastChannelGroupIndex, false, playChannelIndex);
+            if (playChannelIndex > -1) {
+                liveChannelItemAdapter.setSelectedChannelIndex(playChannelIndex);
+                mLiveChannelView.scrollToPosition(playChannelIndex);
+            }
+        } else {
+            // 不可见状态(冷启动尚未进入直播): 仅装载频道列表，暂不拉流起播
+            liveChannelItemAdapter.setNewData(getLiveChannels(lastChannelGroupIndex));
+            liveChannelGroupAdapter.setSelectedGroupIndex(lastChannelGroupIndex);
+            if (playChannelIndex > -1) {
+                liveChannelItemAdapter.setSelectedChannelIndex(playChannelIndex);
+                mLiveChannelView.scrollToPosition(playChannelIndex);
+            }
         }
     }
 

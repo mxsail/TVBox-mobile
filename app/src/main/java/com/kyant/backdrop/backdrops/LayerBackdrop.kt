@@ -55,9 +55,7 @@ class LayerBackdrop internal constructor(
         val layerCoordinates = layerCoordinates ?: return
         withTransform({
             if (layerBlock != null) {
-                val inverseScope = obtainInverseLayerScope()
-                inverseScope.size = size
-                with(inverseScope) { inverseTransform(density, layerBlock) }
+                with(obtainInverseLayerScope()) { inverseTransform(density, layerBlock) }
             }
             val offset =
                 try {

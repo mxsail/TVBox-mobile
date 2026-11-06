@@ -122,6 +122,10 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         initBarInsets()
         applyBarStyle()
 
+        val initialTab = intent.getIntExtra(EXTRA_TAB, 0)
+        currentTabState.intValue = initialTab
+        liveFragment.userVisibleHint = (initialTab == 1)
+
         if (supportFragmentManager.findFragmentByTag("live") == null) {
             supportFragmentManager.beginTransaction()
                 .add(homeFragment, "home")
@@ -130,9 +134,6 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                 .add(myFragment, "my")
                 .commitNowAllowingStateLoss()
         }
-
-        val initialTab = intent.getIntExtra(EXTRA_TAB, 0)
-        currentTabState.intValue = initialTab
 
         mBinding.composeRoot.setContent {
             TvBoxTheme {
@@ -175,7 +176,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         val backdrop = rememberLayerBackdrop()
         val navInsetDp = with(LocalDensity.current) { navInsetState.intValue.toDp() }
         val floating = floatingState.value
-        val bottomPadding = if (floating) (80.dp + navInsetDp) else (LiquidBarSpec.OccupiedHeightDp.dp + navInsetDp)
+        val bottomPadding = if (floating) (72.dp + navInsetDp) else (LiquidBarSpec.OccupiedHeightDp.dp + navInsetDp)
 
         val barOffsetY by animateDpAsState(
             targetValue = if (barShownState.value) 0.dp else 120.dp,
@@ -274,7 +275,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .offset(y = -(navInsetDp + 76.dp))
+                        .offset(y = -(navInsetDp + 68.dp))
                 )
             }
         }

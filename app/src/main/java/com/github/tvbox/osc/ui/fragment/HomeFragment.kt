@@ -86,6 +86,7 @@ import com.orhanobut.hawk.Hawk
 import com.owen.tvrecyclerview.widget.TvRecyclerView
 import com.owen.tvrecyclerview.widget.V7GridLayoutManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.greenrobot.eventbus.EventBus
@@ -600,24 +601,30 @@ class HomeFragment : Fragment() {
                 }
 
                 Box(Modifier.weight(1f)) {
+                    val categoryPagerState = androidx.compose.foundation.pager.rememberPagerState(
+                        initialPage = 0
+                    ) { categoriesState.value.size }
+
+                    // 仅在 Pager 完全停稳(settled)后同步状态到 selectedTabState, 绝不在翻页动画进行中用中间页打断跨页滚动
+                    androidx.compose.runtime.LaunchedEffect(categoryPagerState) {
+                        androidx.compose.runtime.snapshotFlow { categoryPagerState.settledPage }
+                            .collectLatest { settled ->
+                                selectedTabState.intValue = settled
+                            }
+                    }
+
+                    // 仅在外部主动修改 selectedTabState(如按返回键 scrollToFirstTab)且 Pager 未处于滚动中时触发滚动
+                    androidx.compose.runtime.LaunchedEffect(selectedTabState.intValue) {
+                        val target = selectedTabState.intValue
+                        if (categoryPagerState.currentPage != target && !categoryPagerState.isScrollInProgress) {
+                            categoryPagerState.animateScrollToPage(target)
+                        }
+                    }
+
                     Column(Modifier.fillMaxSize()) {
                         Spacer(Modifier.height(40.dp)) // 分类栏让位(分类栏已收窄至 38dp, 同步收紧)
                         LoadStateBox(pageLoadState.value, Modifier.fillMaxSize()) {
                             if (categoriesState.value.isNotEmpty()) {
-                                val categoryPagerState = androidx.compose.foundation.pager.rememberPagerState(
-                                    initialPage = 0
-                                ) { categoriesState.value.size }
-
-                                androidx.compose.runtime.LaunchedEffect(categoryPagerState.currentPage) {
-                                    selectedTabState.intValue = categoryPagerState.currentPage
-                                }
-
-                                androidx.compose.runtime.LaunchedEffect(selectedTabState.intValue) {
-                                    if (categoryPagerState.currentPage != selectedTabState.intValue) {
-                                        categoryPagerState.animateScrollToPage(selectedTabState.intValue)
-                                    }
-                                }
-
                                 androidx.compose.foundation.pager.HorizontalPager(
                                     state = categoryPagerState,
                                     beyondViewportPageCount = 1,
@@ -670,6 +677,9 @@ class HomeFragment : Fragment() {
                         selectedIndex = selectedTabState.intValue,
                         onTabSelected = { pos ->
                             selectedTabState.intValue = pos
+                            coroutineScope.launch {
+                                categoryPagerState.animateScrollToPage(pos)
+                            }
                         },
                         material = materialState.value,
                         isExpanded = isTabsExpandedState.value,
