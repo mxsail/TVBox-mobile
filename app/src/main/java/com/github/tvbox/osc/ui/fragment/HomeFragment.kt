@@ -60,6 +60,7 @@ import com.github.tvbox.osc.api.ApiConfig.LoadConfigCallback
 import com.github.tvbox.osc.base.BaseLazyFragment
 import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.bean.AbsSortXml
+import com.github.tvbox.osc.bean.Movie
 import com.github.tvbox.osc.bean.MovieSort.SortData
 import com.github.tvbox.osc.bean.SourceBean
 import com.github.tvbox.osc.bean.VodInfo
@@ -107,10 +108,9 @@ class HomeFragment : Fragment() {
     private val sourceNameState = mutableStateOf("")
     private val pageLoadState = mutableStateOf(LoadState.None)
 
-    /** 分类适配器版本(装载完成后递增, 触发 ViewPager 挂载) */
-    private val pagerVersion = mutableIntStateOf(0)
-    private var viewPager: ViewPager? = null
-    private var pendingPagerAdapter: FragmentStatePagerAdapter? = null
+    var mDisplaySortList: List<SortData> = ArrayList()
+    var homeRecVod: List<Movie.Video>? = null
+    val gridControllers = java.util.concurrent.ConcurrentHashMap<String, com.github.tvbox.osc.ui.compose.GridCategoryController>()
 
     fun collapseTabsIfExpanded(): Boolean {
         if (isTabsExpandedState.value) {
@@ -156,11 +156,20 @@ class HomeFragment : Fragment() {
     val categoryCount: Int
         get() = categoriesState.value.size
 
-    /**
-     * 提供给主页返回操作
-     */
-    val allFragments: List<BaseLazyFragment>
-        get() = fragments
+    fun hasCurrentCategoryFilters(): Boolean {
+        val curSort = mDisplaySortList.getOrNull(selectedTabState.intValue)
+        return curSort?.let { gridControllers[it.id]?.hasFilters() } ?: false
+    }
+
+    fun showCurrentCategoryFilter(context: android.content.Context) {
+        val curSort = mDisplaySortList.getOrNull(selectedTabState.intValue)
+        curSort?.let { gridControllers[it.id]?.showFilter(context) }
+    }
+
+    fun restoreCurrentCategoryView(): Boolean {
+        val curSort = mDisplaySortList.getOrNull(selectedTabState.intValue)
+        return curSort?.let { gridControllers[it.id]?.restoreView() } ?: false
+    }
 
     private var sourceViewModel: SourceViewModel? = null
     private val fragments: MutableList<BaseLazyFragment> = ArrayList()
@@ -377,42 +386,17 @@ class HomeFragment : Fragment() {
 
     private fun initViewPager(absXml: AbsSortXml?) {
         if (mSortDataList.isNotEmpty()) {
-            fragments.clear()
-            for (data in mSortDataList) {
-                if (data.id == "my0") { //tab是主页,添加主页fragment 根据设置项显示豆瓣热门/站点推荐(每个源不一样)/历史记录
-                    if (Hawk.get(
-                            HawkConfig.HOME_REC,
-                            0
-                        ) == 1 && absXml != null && absXml.videoList != null && absXml.videoList.size > 0
-                    ) { //站点推荐
-                        fragments.add(UserFragment.newInstance(absXml.videoList))
-                    } else { //豆瓣热门/历史记录
-                        fragments.add(UserFragment.newInstance(null))
-                    }
-                } else { //来自源的分类
-                    fragments.add(GridFragment.newInstance(data))
-                }
-            }
-            if (Hawk.get(HawkConfig.HOME_REC, 0) == 2) { //关闭主页
-                fragments.removeAt(0)
+            homeRecVod = if (Hawk.get(HawkConfig.HOME_REC, 0) == 1 && absXml?.videoList != null) {
+                absXml.videoList
+            } else null
+
+            mDisplaySortList = if (Hawk.get(HawkConfig.HOME_REC, 0) == 2 && mSortDataList.isNotEmpty()) {
+                mSortDataList.drop(1)
+            } else {
+                mSortDataList
             }
 
-            // 驱动 Compose 响应式刷新分类栏 (彻底解决异步加载分类不展示的问题)
-            categoriesState.value = mSortDataList.map { it.name }.let { names ->
-                if (Hawk.get(HawkConfig.HOME_REC, 0) == 2 && names.isNotEmpty()) names.drop(1) else names
-            }
-
-            //重新渲染vp
-            pendingPagerAdapter = object : FragmentStatePagerAdapter(childFragmentManager) {
-                override fun getItem(position: Int): Fragment {
-                    return fragments[position]
-                }
-
-                override fun getCount(): Int {
-                    return fragments.size
-                }
-            }
-            pagerVersion.intValue++
+            categoriesState.value = mDisplaySortList.map { it.name }
         }
     }
 
@@ -422,7 +406,6 @@ class HomeFragment : Fragment() {
     fun scrollToFirstTab(): Boolean {
         return if (selectedTabState.intValue != 0) {
             selectedTabState.intValue = 0
-            viewPager?.setCurrentItem(0, false)
             true
         } else {
             false
@@ -444,13 +427,15 @@ class HomeFragment : Fragment() {
     }
 
     private fun jumpActivity(clazz: Class<*>) {
-        startActivity(Intent(requireActivity(), clazz))
+        val act = activity ?: return
+        act.startActivity(Intent(act, clazz))
     }
 
     private fun showSiteSwitch() {
+        val act = activity ?: return
         val sites = ApiConfig.get().sourceBeanList
         if (sites.size > 0) {
-            val dialog = SelectDialog<SourceBean>(requireActivity())
+            val dialog = SelectDialog<SourceBean>(act)
             val tvRecyclerView = dialog.findViewById<TvRecyclerView>(R.id.list)
             tvRecyclerView.setLayoutManager(V7GridLayoutManager(dialog.context, 2))
             dialog.setTip("请选择首页数据源")
@@ -479,12 +464,13 @@ class HomeFragment : Fragment() {
     }
 
     private fun refreshHomeSources() {
-        val intent = Intent(requireActivity(), MainActivity::class.java)
+        val act = activity ?: return
+        val intent = Intent(act, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
         val bundle = Bundle()
         bundle.putBoolean(IntentKey.CACHE_CONFIG_CHANGED, true)
         intent.putExtras(bundle)
-        startActivity(intent)
+        act.startActivity(intent)
     }
 
     private fun queryHistory() {
@@ -518,7 +504,11 @@ class HomeFragment : Fragment() {
 
     @OptIn(ExperimentalFoundationApi::class)
     @Composable
-    private fun HomeScreen() {
+    fun HomeScreen(
+        bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
+        onScrollDelta: ((Int) -> Unit)? = null
+    ) {
+        val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
         Box(
             Modifier
                 .fillMaxSize()
@@ -585,7 +575,10 @@ class HomeFragment : Fragment() {
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
-                            ) { jumpActivity(FastSearchActivity::class.java) }
+                            ) {
+                                val act = activity ?: return@clickable
+                                act.startActivity(Intent(act, FastSearchActivity::class.java))
+                            }
                     ) {
                         Row(
                             Modifier
@@ -610,30 +603,47 @@ class HomeFragment : Fragment() {
                     Column(Modifier.fillMaxSize()) {
                         Spacer(Modifier.height(40.dp)) // 分类栏让位(分类栏已收窄至 38dp, 同步收紧)
                         LoadStateBox(pageLoadState.value, Modifier.fillMaxSize()) {
-                            AndroidView(
-                                factory = { ctx ->
-                                    ViewPager(ctx).apply {
-                                        // 固定原 XML 的 view id: FragmentStatePagerAdapter 以
-                                        // "android:switcher:id:position" 复用子 fragment, 重建后仍能命中
-                                        id = R.id.mViewPager
-                                        viewPager = this
-                                        addOnPageChangeListener(object :
-                                            ViewPager.SimpleOnPageChangeListener() {
-                                            override fun onPageSelected(position: Int) {
-                                                selectedTabState.intValue = position
-                                            }
-                                        })
+                            if (categoriesState.value.isNotEmpty()) {
+                                val categoryPagerState = androidx.compose.foundation.pager.rememberPagerState(
+                                    initialPage = 0
+                                ) { categoriesState.value.size }
+
+                                androidx.compose.runtime.LaunchedEffect(categoryPagerState.currentPage) {
+                                    selectedTabState.intValue = categoryPagerState.currentPage
+                                }
+
+                                androidx.compose.runtime.LaunchedEffect(selectedTabState.intValue) {
+                                    if (categoryPagerState.currentPage != selectedTabState.intValue) {
+                                        categoryPagerState.animateScrollToPage(selectedTabState.intValue)
                                     }
-                                },
-                                update = { vp ->
-                                    pagerVersion.intValue // 订阅适配器版本(分类装载完成后挂载/重建)
-                                    val adapter = pendingPagerAdapter
-                                    if (adapter != null && vp.adapter !== adapter) {
-                                        vp.adapter = adapter
+                                }
+
+                                androidx.compose.foundation.pager.HorizontalPager(
+                                    state = categoryPagerState,
+                                    beyondViewportPageCount = 1,
+                                    modifier = Modifier.fillMaxSize()
+                                ) { catIndex ->
+                                    val sortData = mDisplaySortList.getOrNull(catIndex)
+                                    if (sortData != null) {
+                                        if (sortData.id == "my0") {
+                                            com.github.tvbox.osc.ui.compose.UserCategoryScreen(
+                                                recVod = homeRecVod,
+                                                bottomPadding = bottomPadding,
+                                                onScrollDelta = onScrollDelta
+                                            )
+                                        } else {
+                                            com.github.tvbox.osc.ui.compose.GridCategoryScreen(
+                                                sortData = sortData,
+                                                bottomPadding = bottomPadding,
+                                                onScrollDelta = onScrollDelta,
+                                                onControllerReady = { ctrl ->
+                                                    gridControllers[sortData.id] = ctrl
+                                                }
+                                            )
+                                        }
                                     }
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
+                                }
+                            }
                         }
                     }
                     // 分类展开时的内容区压暗遮罩(淡入, 点击收起)
@@ -660,7 +670,6 @@ class HomeFragment : Fragment() {
                         selectedIndex = selectedTabState.intValue,
                         onTabSelected = { pos ->
                             selectedTabState.intValue = pos
-                            viewPager?.setCurrentItem(pos, false)
                         },
                         material = materialState.value,
                         isExpanded = isTabsExpandedState.value,

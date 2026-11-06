@@ -1,40 +1,41 @@
 package com.github.tvbox.osc.ui.activity
 
-import android.animation.ValueAnimator
 import android.content.Intent
 import android.graphics.Rect
 import android.os.Bundle
 import android.os.Process
 import android.view.KeyEvent
-import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
-import android.view.animation.DecelerateInterpolator
-import android.view.ViewGroup
-import android.widget.FrameLayout
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentPagerAdapter
-import androidx.viewpager.widget.ViewPager
+import androidx.fragment.app.FragmentActivity
+import androidx.fragment.app.FragmentContainerView
 import com.blankj.utilcode.util.ActivityUtils
 import com.blankj.utilcode.util.ToastUtils
 import com.github.tvbox.osc.R
@@ -50,16 +51,15 @@ import com.github.tvbox.osc.ui.compose.LiquidBarSpec
 import com.github.tvbox.osc.ui.compose.LiquidBottomBar
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.fragment.CacheFragment
-import com.github.tvbox.osc.ui.fragment.GridFragment
 import com.github.tvbox.osc.ui.fragment.HomeFragment
 import com.github.tvbox.osc.ui.fragment.LiveFragment
 import com.github.tvbox.osc.ui.fragment.MyFragment
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.view.BarAutoHide
-import com.github.tvbox.osc.view.MaterialBarHelper
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.orhanobut.hawk.Hawk
+import kotlinx.coroutines.launch
 import kotlin.system.exitProcess
 
 class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBarHost {
@@ -69,18 +69,20 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         const val EXTRA_TAB = "extra_tab"
     }
 
-    var fragments = listOf<Fragment>(HomeFragment(), LiveFragment(), CacheFragment(), MyFragment())
+    val homeFragment = HomeFragment()
+    val liveFragment = LiveFragment()
+    val cacheFragment = CacheFragment()
+    val myFragment = MyFragment()
+
     var useCacheConfig = false
     private var exitTime = 0L
 
     // 底栏显隐状态(滚动隐藏/呼出)
-    private var barShown = true
+    private val barShownState = mutableStateOf(true)
     private var navInset = 0
 
     // Compose 底栏响应状态
     private val currentTabState = mutableIntStateOf(0)
-    private val pageScrollOffsetState = mutableFloatStateOf(-1f)
-    private var isVpUserDragging = false
     private val floatingState = mutableStateOf(false)
     private val showLabelsState = mutableStateOf(true)
     private val materialState = mutableStateOf(Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID))
@@ -109,160 +111,173 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 启动窗由系统按 manifest 的 LaunchTheme(图标居中背景)绘制, 冷启动期间可见;
-        // 真实窗口在 decor 生成前把背景换成纯色, 图标层不会透到内容后面。
-        // 注意不能用 setTheme 切主题: 会把 DynamicColors 在 Activity 创建前套上的
-        // 动态取色覆盖层一并重置, 整个应用退回静态蓝色板(已踩坑)
         window.setBackgroundDrawableResource(R.color.launch_bg)
         super.onCreate(savedInstanceState)
     }
 
     override fun init() {
-
-        // 本 Activity 即启动入口, BaseActivity 的 isNormalStart 守卫在 init() 之后执行
         App.getInstance().isNormalStart = true
+        useCacheConfig = intent.extras?.getBoolean(IntentKey.CACHE_CONFIG_CHANGED, false) ?: false
 
-        useCacheConfig = intent.extras?.getBoolean(IntentKey.CACHE_CONFIG_CHANGED, false)?:false
-
-        mBinding.vp.adapter = object : FragmentPagerAdapter(supportFragmentManager) {
-            override fun getItem(position: Int): Fragment {
-                return fragments[position]
-            }
-
-            override fun getCount(): Int {
-                return fragments.size
-            }
-        }
-        // 4 个 tab 视图常驻:默认 offscreenPageLimit=1 时跨页跳转(首页↔我的等)
-        mBinding.vp.offscreenPageLimit = 1
-        mBinding.vp.postDelayed({ mBinding.vp.offscreenPageLimit = fragments.size - 1 }, 600)
-
-        // 玻璃背板: 采样层为与主题背景同色系的柔和渐变(alpha 0f 不参与屏幕显示)。
-        // 注: 曾试验让各页面根节点注册共享 LayerBackdrop 以采样真实页面内容, 但
-        // View+Compose 混合 ViewPager 下注册节点(verticalScroll 根)的内容会被抽进
-        // 采样层不再上屏(卡片底可见、文字/图标/海报消失), 故回退渐变采样——
-        // 玻璃观感仍为液态/磨砂, 仅采样源为渐变而非真实内容。
-        mBinding.composeBottomBar.setContent {
-            TvBoxTheme {
-                val screenHeight = with(LocalDensity.current) {
-                    resources.displayMetrics.heightPixels.toDp()
-                }
-                val baseColor = MaterialTheme.colorScheme.background
-                val surfaceColor = MaterialTheme.colorScheme.surface
-                val backdrop = rememberLayerBackdrop()
-
-                Box(Modifier.fillMaxSize()) {
-
-                    // 仅作采样源
-                    Box(
-                        Modifier
-                            .matchParentSize()
-                            .alpha(0f)
-                            .layerBackdrop(backdrop)
-                    ) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(screenHeight)
-                                .align(Alignment.BottomCenter)
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(surfaceColor, baseColor, surfaceColor)
-                                    )
-                                )
-                        )
-                    }
-
-                    // 底栏右侧筛选玻璃钮: 主页 tab 且当前分类页(GridFragment)有筛选条件时显示
-                    val homeFragment = fragments.getOrNull(0) as? HomeFragment
-                    val currentGrid = homeFragment
-                        ?.allFragments?.getOrNull(homeFragment.tabIndex) as? GridFragment
-                    val barFilterVisible = currentTabState.intValue == 0 &&
-                        homeFragment != null && homeFragment.categoryCount > 0 &&
-                        currentGrid?.hasFilters() == true
-                    LiquidBottomBar(
-                        selectedIndex = currentTabState.intValue,
-                        onTabSelected = { index ->
-                            goToTab(index)
-                        },
-                        floating = floatingState.value,
-                        showLabels = showLabelsState.value,
-                        material = materialState.value,
-                        navInsetBottom = (navInsetState.intValue / resources.displayMetrics.density).dp,
-                        pageScrollFraction = if (pageScrollOffsetState.floatValue >= 0f) pageScrollOffsetState.floatValue else null,
-                        backdrop = backdrop,
-                        filterVisible = barFilterVisible,
-                        onFilterClick = { currentGrid?.showFilter() },
-                        // 底栏沉到全屏容器底部; 容器撑满全屏是为了让「上次观看」悬浮条
-                        // (底栏上方 76dp) 落在 View 边界内——否则 View 层点击派发不到
-                        // 悬浮条, 会穿透到下层卡片
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    )
-
-                    // 「上次观看」悬浮条: matchParentSize 覆盖层 + offset 定位——
-                    // 不参与 Box 测量, 否则会把底栏容器撑高、底栏被顶离屏幕底;
-                    // 位置 = 底栏(OccupiedHeight 64dp / 悬浮 66dp)上方约 10-12dp
-                    Box(Modifier.matchParentSize()) {
-                        val navInsetDp = with(LocalDensity.current) { navInsetState.intValue.toDp() }
-                        LastViewedTip(
-                            tip = lastViewedTipState.value.takeIf { currentTabState.intValue == 0 },
-                            material = materialState.value,
-                            backdrop = backdrop,
-                            onDismiss = { lastViewedTipState.value = null },
-                            onBounds = { lastViewedTipBounds = it },
-                            onOpen = { vod ->
-                                lastViewedTipState.value = null
-                                val bundle = Bundle().apply {
-                                    putString("id", vod.id)
-                                    putString("sourceKey", vod.sourceKey)
-                                }
-                                startActivity(
-                                    Intent(this@MainActivity, DetailActivity::class.java).putExtras(bundle)
-                                )
-                            },
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .offset(y = -(navInsetDp + 76.dp))
-                        )
-                    }
-                }
-            }
-        }
-
-        mBinding.vp.addOnPageChangeListener(object : ViewPager.OnPageChangeListener {
-            override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
-                if (isVpUserDragging) {
-                    pageScrollOffsetState.floatValue = position + positionOffset
-                    // 横向滑动切页时收起「上次观看」悬浮条
-                    if (lastViewedTipState.value != null && positionOffset > 0f) {
-                        lastViewedTipState.value = null
-                    }
-                }
-            }
-
-            override fun onPageSelected(position: Int) {
-                currentTabState.intValue = position
-                showMainBar() // 切 tab 始终呼出底栏, 避免隐藏状态下迷失
-            }
-
-            override fun onPageScrollStateChanged(state: Int) {
-                isVpUserDragging = (state == ViewPager.SCROLL_STATE_DRAGGING || state == ViewPager.SCROLL_STATE_SETTLING)
-                if (state == ViewPager.SCROLL_STATE_IDLE) {
-                    isVpUserDragging = false
-                    pageScrollOffsetState.floatValue = -1f
-                }
-            }
-        })
-
-        // 悬浮/材质/滚动隐藏装配(导航栏 inset 由本页统一接管, 见 autoNavigationBarInset)
         initBarInsets()
         applyBarStyle()
 
-        // 冷启动窗口背景(launch_bg 浅色)只服务启动动画衔接; 首帧后换成主题背景,
-        // 否则底栏让出的导航栏避让区域会透出浅色(深色模式下刺眼)
-        mBinding.vp.post { window.setBackgroundDrawableResource(R.color.md_background) }
+        if (supportFragmentManager.findFragmentByTag("live") == null) {
+            supportFragmentManager.beginTransaction()
+                .add(homeFragment, "home")
+                .add(liveFragment, "live")
+                .add(cacheFragment, "cache")
+                .add(myFragment, "my")
+                .commitNowAllowingStateLoss()
+        }
 
-        goToTab(intent.getIntExtra(EXTRA_TAB, 0))
+        val initialTab = intent.getIntExtra(EXTRA_TAB, 0)
+        currentTabState.intValue = initialTab
+
+        mBinding.composeRoot.setContent {
+            TvBoxTheme {
+                MainScreen(initialTab)
+            }
+        }
+
+        mBinding.composeRoot.post { window.setBackgroundDrawableResource(R.color.md_background) }
+    }
+
+    @OptIn(ExperimentalFoundationApi::class)
+    @Composable
+    private fun MainScreen(initialTab: Int) {
+        val coroutineScope = rememberCoroutineScope()
+        val pagerState = rememberPagerState(initialPage = initialTab) { 4 }
+
+        // 仅在 pager 未处于滚动状态且与目标 tab 不一致时(如外部入口调用 goToTab/onNewIntent)触发动画滚动
+        LaunchedEffect(currentTabState.intValue) {
+            val target = currentTabState.intValue
+            if (pagerState.currentPage != target && !pagerState.isScrollInProgress) {
+                pagerState.animateScrollToPage(target)
+            }
+        }
+
+        // 仅在 Pager 完全停稳(settled)后同步状态，绝不打断跨页连续滚动动画
+        LaunchedEffect(pagerState) {
+            snapshotFlow { pagerState.settledPage }
+                .collectLatest { settled ->
+                    currentTabState.intValue = settled
+                    liveFragment.setUserVisibleHint(settled == 1)
+                    if (settled == 0) {
+                        homeFragment.showTopBar()
+                    } else {
+                        lastViewedTipState.value = null
+                    }
+                    showMainBar()
+                }
+        }
+
+        val backdrop = rememberLayerBackdrop()
+        val navInsetDp = with(LocalDensity.current) { navInsetState.intValue.toDp() }
+        val floating = floatingState.value
+        val bottomPadding = if (floating) (80.dp + navInsetDp) else (LiquidBarSpec.OccupiedHeightDp.dp + navInsetDp)
+
+        val barOffsetY by animateDpAsState(
+            targetValue = if (barShownState.value) 0.dp else 120.dp,
+            animationSpec = tween(220, easing = FastOutSlowInEasing),
+            label = "barOffset"
+        )
+
+        Box(Modifier.fillMaxSize()) {
+            // 1. 真实全屏内容容器 (layerBackdrop 注册给 backdrop, 供 LiquidBottomBar 采样真页面内容)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(backdrop)
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    beyondViewportPageCount = 3,
+                    modifier = Modifier.fillMaxSize()
+                ) { pageIndex ->
+                    when (pageIndex) {
+                        0 -> homeFragment.HomeScreen(
+                            bottomPadding = bottomPadding,
+                            onScrollDelta = { onMainScrollDelta(it) }
+                        )
+                        1 -> {
+                            AndroidView(
+                                factory = { ctx ->
+                                    val v = liveFragment.onCreateView(android.view.LayoutInflater.from(ctx), null, null)
+                                        ?: android.widget.FrameLayout(ctx)
+                                    liveFragment.onViewCreated(v, null)
+                                    v
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        2 -> cacheFragment.CacheScreen(
+                            bottomPadding = bottomPadding,
+                            onScrollDelta = { onMainScrollDelta(it) }
+                        )
+                        3 -> myFragment.MyScreen(
+                            bottomPadding = bottomPadding,
+                            onScrollDelta = { onMainScrollDelta(it) },
+                            onGoToTab = { goToTab(it) }
+                        )
+                    }
+                }
+            }
+
+            // 2. 底栏
+            val barFilterVisible = currentTabState.intValue == 0 &&
+                homeFragment.categoryCount > 0 &&
+                homeFragment.hasCurrentCategoryFilters()
+
+            val scrollFraction = pagerState.currentPage + pagerState.currentPageOffsetFraction
+
+            LiquidBottomBar(
+                selectedIndex = pagerState.currentPage,
+                onTabSelected = { index ->
+                    currentTabState.intValue = index
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(index)
+                    }
+                },
+                floating = floating,
+                showLabels = showLabelsState.value,
+                material = materialState.value,
+                navInsetBottom = navInsetDp,
+                pageScrollFraction = scrollFraction,
+                backdrop = backdrop,
+                filterVisible = barFilterVisible,
+                onFilterClick = {
+                    homeFragment.showCurrentCategoryFilter(this@MainActivity)
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset(y = barOffsetY)
+            )
+
+            // 3. 「上次观看」悬浮条
+            Box(Modifier.matchParentSize()) {
+                LastViewedTip(
+                    tip = lastViewedTipState.value.takeIf { currentTabState.intValue == 0 },
+                    material = materialState.value,
+                    backdrop = backdrop,
+                    onDismiss = { lastViewedTipState.value = null },
+                    onBounds = { lastViewedTipBounds = it },
+                    onOpen = { vod ->
+                        lastViewedTipState.value = null
+                        val bundle = Bundle().apply {
+                            putString("id", vod.id)
+                            putString("sourceKey", vod.sourceKey)
+                        }
+                        startActivity(
+                            Intent(this@MainActivity, DetailActivity::class.java).putExtras(bundle)
+                        )
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset(y = -(navInsetDp + 76.dp))
+                )
+            }
+        }
     }
 
     public override fun onNewIntent(intent: Intent) {
@@ -273,74 +288,52 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
             recreate()
             return
         }
-        // singleTop 复用实例(通知点击/缓存页转跳)时切到指定 tab
         goToTab(intent.getIntExtra(EXTRA_TAB, 0))
     }
 
     /** 切换底部 tab(直播标题栏返回/我的页入口/通知点击等统一入口) */
     fun goToTab(index: Int) {
-        if (index < 0 || index >= fragments.size) return
-        if (index == 0) {
-            (fragments.getOrNull(0) as? HomeFragment)?.showTopBar() // 回主页呼出顶栏
-        } else if (lastViewedTipState.value != null) {
-            lastViewedTipState.value = null // 离开主页 tab 时收起「上次观看」
-        }
+        if (index < 0 || index >= 4) return
         currentTabState.intValue = index
-        mBinding.vp.currentItem = index
+        if (index == 0) {
+            homeFragment.showTopBar()
+        } else if (lastViewedTipState.value != null) {
+            lastViewedTipState.value = null
+        }
+        showMainBar()
     }
 
-    // 主页返回层级复杂(直播层/首页网格栈/双击退出), 预见性模式下也保持自行拦截
     override fun keepBackIntercept(): Boolean = true
 
     override fun onBackHandled() {
-        if (mBinding.vp.currentItem != 0) {
-            // 直播 tab 内部有可回退层(侧边设置/全屏)时先消化,否则切回首页 tab
-            val liveFragment = fragments[1] as LiveFragment
-            if (liveFragment.isUiReady() && liveFragment.handleBack()) {
+        if (currentTabState.intValue != 0) {
+            if (currentTabState.intValue == 1 && liveFragment.isUiReady() && liveFragment.handleBack()) {
                 return
             }
-            mBinding.vp.currentItem = 0
+            goToTab(0)
             return
         }
-        val homeFragment = fragments[0] as HomeFragment
-        if (homeFragment.isAdded && homeFragment.collapseTabsIfExpanded()) {
+        if (homeFragment.collapseTabsIfExpanded()) {
             return
         }
-        if (!homeFragment.isAdded) { // 资源不足销毁重建时未挂载到activity时getChildFragmentManager会崩溃
-            confirmExit()
+        if (homeFragment.restoreCurrentCategoryView()) {
             return
         }
-        val childFragments = homeFragment.allFragments
-        if (childFragments.isEmpty()) { //加载中(没有tab)
-            confirmExit()
+        if (homeFragment.scrollToFirstTab()) {
             return
         }
-        val fragment: Fragment = childFragments[homeFragment.tabIndex]
-        if (fragment is GridFragment) { // 首页数据源动态加载的tab
-            if (!fragment.restoreView()) { // 有回退的view,先回退(AList等文件夹列表),没有可回退的,返到主页tab
-                if (!homeFragment.scrollToFirstTab()) {
-                    confirmExit()
-                }
-            }
-        } else {
-            confirmExit()
-        }
+        confirmExit()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // 直播 tab 内遥控器按键(换台/呼出频道列表)交给直播页处理
-        if (mBinding.vp.currentItem == 1) {
-            val liveFragment = fragments[1] as LiveFragment
-            if (liveFragment.isUiReady()) {
-                liveFragment.handleKeyEvent(event)
-            }
+        if (currentTabState.intValue == 1 && liveFragment.isUiReady()) {
+            liveFragment.handleKeyEvent(event)
         }
         return super.dispatchKeyEvent(event)
     }
 
     // ---------------- 底栏: 悬浮形态 / 界面材质 / 滚动隐藏 ----------------
 
-    /** BaseVbActivity/BaseActivity 的默认导航栏避让关闭, 由本页把「导航栏 inset + 停靠底栏占位」统一算给 content */
     override fun autoNavigationBarInset(): Boolean = false
 
     private fun initBarInsets() {
@@ -351,7 +344,6 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
             applyBarStyle()
             insets
         }
-        // insets 沿视图树可能被中间层级错过, 首帧布局后从 window 根兜底再取一次
         content.post {
             ViewCompat.getRootWindowInsets(content)?.let {
                 navInset = it.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
@@ -361,10 +353,6 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         }
     }
 
-    /**
-     * 按当前设置(悬浮/停靠/材质/是否显示名称)装配 Compose 底栏。
-     * 外观材质、高光与透镜折射完全由 Compose 侧 LiquidBottomBar 自治渲染。
-     */
     fun applyBarStyle() {
         val floating = Hawk.get(HawkConfig.BAR_FLOATING, false)
         val showLabels = Hawk.get(HawkConfig.BAR_SHOW_LABELS, true)
@@ -373,84 +361,25 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         showLabelsState.value = showLabels
         materialState.value = material
         navInsetState.intValue = navInset
-
-        val lp = mBinding.barContainer.layoutParams as FrameLayout.LayoutParams
-        lp.leftMargin = 0
-        lp.rightMargin = 0
-        lp.bottomMargin = 0
-        mBinding.barContainer.layoutParams = lp
-        mBinding.barContainer.elevation = 0f
-        mBinding.barContainer.background = null
-        mBinding.barContainer.foreground = null
-        mBinding.barContainer.clipToOutline = false
-        mBinding.barContainer.clipChildren = false
-        mBinding.composeBottomBar.clipChildren = false
-        (mBinding.barContainer.parent as? ViewGroup)?.clipChildren = false
-
-        mBinding.barContainer.post { updateVpPadding() }
-    }
-
-    /** 页面内容对停靠底栏的避让: vp bottom padding = 底栏占位高度 + 导航栏高度 */
-    private fun updateVpPadding() {
-        val floating = Hawk.get(HawkConfig.BAR_FLOATING, false)
-        val extra = if (barShown && !floating) {
-            dp(LiquidBarSpec.OccupiedHeightDp) + navInset
-        } else {
-            0
-        }
-        if (mBinding.vp.paddingBottom != extra) mBinding.vp.updatePadding(bottom = extra)
     }
 
     override fun onMainScrollDelta(dy: Int) {
-        // 「上次观看」悬浮条: 内容区滚动即收起
         if (lastViewedTipState.value != null && (dy > 8 || dy < -8)) {
             lastViewedTipState.value = null
         }
-        // 主页顶栏(数据源/搜索)随内容滚动收起/呼出(仅主页 tab)
         if (currentTabState.intValue == 0) {
-            (fragments.getOrNull(0) as? HomeFragment)?.onHomeContentScroll(dy)
+            homeFragment.onHomeContentScroll(dy)
         }
         if (!Hawk.get(HawkConfig.BAR_AUTO_HIDE, false)) return
-        if (dy > 8 && barShown) {
-            setBarShown(false)
-        } else if (dy < -8 && !barShown) {
-            setBarShown(true)
+        if (dy > 8 && barShownState.value) {
+            barShownState.value = false
+        } else if (dy < -8 && !barShownState.value) {
+            barShownState.value = true
         }
     }
 
-    /** 强制呼出底栏(切 tab 时) */
     fun showMainBar() {
-        if (!barShown) setBarShown(true)
-    }
-
-    private fun setBarShown(shown: Boolean) {
-        if (barShown == shown) return
-        barShown = shown
-        val container = mBinding.barContainer
-        val hideY = container.height + dp(12)
-        container.animate()
-            .translationY(if (shown) 0f else hideY.toFloat())
-            .setDuration(220)
-            .setInterpolator(DecelerateInterpolator())
-            .start()
-        if (Hawk.get(HawkConfig.BAR_FLOATING, false)) {
-            // 悬浮模式不占内容位, 只动底栏本身
-        } else {
-            val extra = dp(LiquidBarSpec.OccupiedHeightDp) + navInset
-            val from = mBinding.vp.paddingBottom
-            val to = if (shown) extra else navInset
-            ValueAnimator.ofInt(from, to).apply {
-                duration = 220
-                addUpdateListener { anim ->
-                    mBinding.vp.updatePadding(bottom = anim.animatedValue as Int)
-                }
-                start()
-            }
-        }
-    }
-
-    private fun dp(v: Int): Int {
-        return (v * resources.displayMetrics.density).toInt()
+        barShownState.value = true
     }
 
     // ---------------- 外观变更广播 ----------------
@@ -459,7 +388,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
     fun onAppearanceChanged(event: AppearanceChangedEvent) {
         when (event.type) {
             AppearanceChangedEvent.TYPE_STYLE -> applyBarStyle()
-            AppearanceChangedEvent.TYPE_RECREATE -> recreate() // 主题色/字体变了, 重建套新覆盖层
+            AppearanceChangedEvent.TYPE_RECREATE -> recreate()
         }
     }
 

@@ -31,7 +31,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import com.github.tvbox.osc.ui.compose.ObserveBarHideDeltas
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,16 +83,16 @@ class MyFragment : Fragment() {
     private val historyItems = mutableStateOf<List<HistoryEntry>?>(null)
 
     /** 海报持久缓存目录(filesDir, 不受"清空缓存"影响): 一次下载, 长期复用 */
-    private val posterDir: File by lazy {
-        File(requireContext().filesDir, "history_posters").apply { mkdirs() }
+    private fun getPosterDir(context: android.content.Context): File {
+        return File(context.filesDir, "history_posters").apply { mkdirs() }
     }
 
     private val posterHttpClient by lazy { okhttp3.OkHttpClient() }
 
     /** 海报持久缓存: 已缓存直接返回文件; 未缓存走本地代理下载并落盘 */
-    private fun downloadPoster(url: String): File? {
+    private fun downloadPoster(context: android.content.Context, url: String): File? {
         return try {
-            val target = posterDir.resolve(MD5.string2MD5(url) + ".jpg")
+            val target = getPosterDir(context).resolve(MD5.string2MD5(url) + ".jpg")
             if (target.exists() && target.length() > 0) return target
             val request = okhttp3.Request.Builder()
                 .url(DefaultConfig.checkReplaceProxy(url))
@@ -121,16 +123,16 @@ class MyFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        loadHistory()
+        context?.let { loadHistory(it) }
     }
 
     override fun onResume() {
         super.onResume()
-        loadHistory() // 看完剧回来刷新进度
+        context?.let { loadHistory(it) } // 看完剧回来刷新进度
     }
 
-    private fun loadHistory() {
-        viewLifecycleOwner.lifecycleScope.launch {
+    fun loadHistory(context: android.content.Context) {
+        kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
             // 第一步: 立即装载记录(名称/集数/进度), 海报以占位图先行, 不阻塞任何元素
             val entries = withContext(Dispatchers.IO) {
                 try {
@@ -149,7 +151,7 @@ class MyFragment : Fragment() {
             withContext(Dispatchers.IO) {
                 entries.forEachIndexed { index, entry ->
                     val file = entry.vod.pic.takeIf { p -> !p.isNullOrEmpty() }
-                        ?.let { downloadPoster(it) }
+                        ?.let { downloadPoster(context, it) }
                     if (file != null) {
                         historyItems.value = historyItems.value?.mapIndexed { i, e ->
                             if (i == index) e.copy(posterFile = file) else e
@@ -181,24 +183,39 @@ class MyFragment : Fragment() {
         else String.format("%02d:%02d", m, s)
     }
 
-    private fun jumpActivity(clazz: Class<*>) {
-        startActivity(Intent(requireActivity(), clazz))
+    private fun jumpActivity(act: android.app.Activity?, clazz: Class<*>, bundle: Bundle? = null) {
+        val a = act ?: activity ?: return
+        val intent = Intent(a, clazz)
+        if (bundle != null) intent.putExtras(bundle)
+        a.startActivity(intent)
     }
 
-    private fun jumpActivity(clazz: Class<*>, bundle: Bundle) {
-        startActivity(Intent(requireActivity(), clazz).putExtras(bundle))
-    }
-
-    private fun goMainTab(index: Int) {
-        (requireActivity() as? MainActivity)?.goToTab(index)
+    private fun goMainTab(act: android.app.Activity?, index: Int) {
+        ((act ?: activity) as? MainActivity)?.goToTab(index)
     }
 
     @Composable
-    private fun MyScreen() {
+    fun MyScreen(
+        bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
+        onScrollDelta: ((Int) -> Unit)? = null,
+        onGoToTab: ((Int) -> Unit)? = null
+    ) {
+        val currentContext = androidx.compose.ui.platform.LocalContext.current
+        val currentActivity = (activity ?: currentContext as? android.app.Activity)
+        val scrollState = rememberScrollState()
+        scrollState.ObserveBarHideDeltas { dy ->
+            onScrollDelta?.invoke(dy) ?: (currentActivity as? com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost)?.onMainScrollDelta(dy)
+        }
+
+        LaunchedEffect(Unit) {
+            loadHistory(currentContext)
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
+                .padding(bottom = bottomPadding)
         ) {
             Text(
                 stringResource(R.string.app_name),
@@ -208,23 +225,23 @@ class MyFragment : Fragment() {
                 modifier = Modifier
                     .padding(start = 20.dp, top = 40.dp, bottom = 12.dp)
             )
-            HistoryCard()
+            HistoryCard(currentActivity)
             Spacer(Modifier.height(12.dp))
-            FunctionsCard()
+            FunctionsCard(currentActivity, onGoToTab)
         }
     }
 
     // ---------------- 卡片1: 观看历史 ----------------
 
     @Composable
-    private fun HistoryCard() {
+    private fun HistoryCard(currentActivity: android.app.Activity?) {
         GroupCard {
             Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 // 头部: 标题 + 右箭头, 点击进观看历史页
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { jumpActivity(HistoryActivity::class.java) }
+                        .clickable { jumpActivity(currentActivity, HistoryActivity::class.java) }
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -274,7 +291,7 @@ class MyFragment : Fragment() {
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(items) { entry ->
-                            HistoryPoster(entry)
+                            HistoryPoster(currentActivity, entry)
                         }
                     }
                 }
@@ -283,7 +300,7 @@ class MyFragment : Fragment() {
     }
 
     @Composable
-    private fun HistoryPoster(entry: HistoryEntry) {
+    private fun HistoryPoster(currentActivity: android.app.Activity?, entry: HistoryEntry) {
         Column(
             modifier = Modifier
                 .width(104.dp)
@@ -293,7 +310,7 @@ class MyFragment : Fragment() {
                         putString("id", entry.vod.id)
                         putString("sourceKey", entry.vod.sourceKey)
                     }
-                    jumpActivity(DetailActivity::class.java, bundle)
+                    jumpActivity(currentActivity, DetailActivity::class.java, bundle)
                 }
         ) {
             Box(
@@ -346,14 +363,14 @@ class MyFragment : Fragment() {
     private data class FuncEntry(val icon: Int, val label: String, val action: () -> Unit)
 
     @Composable
-    private fun FunctionsCard() {
+    private fun FunctionsCard(currentActivity: android.app.Activity?, onGoToTab: ((Int) -> Unit)?) {
         val funcs = listOf(
-            FuncEntry(R.drawable.ic_collect_48, "我的收藏") { jumpActivity(CollectActivity::class.java) },
-            FuncEntry(R.drawable.ic_download_nav, "我的缓存") { goMainTab(2) },
-            FuncEntry(R.drawable.ic_live_tv_48, "直播") { goMainTab(1) },
-            FuncEntry(R.drawable.ic_database_48, "订阅管理") { jumpActivity(SubscriptionActivity::class.java) },
-            FuncEntry(R.drawable.ic_settings, "设置") { jumpActivity(SettingActivity::class.java) },
-            FuncEntry(R.drawable.ic_about_48, "关于") { jumpActivity(AboutActivity::class.java) }
+            FuncEntry(R.drawable.ic_collect_48, "我的收藏") { jumpActivity(currentActivity, CollectActivity::class.java) },
+            FuncEntry(R.drawable.ic_download_nav, "我的缓存") { onGoToTab?.invoke(2) ?: goMainTab(currentActivity, 2) },
+            FuncEntry(R.drawable.ic_live_tv_48, "直播") { onGoToTab?.invoke(1) ?: goMainTab(currentActivity, 1) },
+            FuncEntry(R.drawable.ic_database_48, "订阅管理") { jumpActivity(currentActivity, SubscriptionActivity::class.java) },
+            FuncEntry(R.drawable.ic_settings, "设置") { jumpActivity(currentActivity, SettingActivity::class.java) },
+            FuncEntry(R.drawable.ic_about_48, "关于") { jumpActivity(currentActivity, AboutActivity::class.java) }
         )
         GroupCard {
             Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {

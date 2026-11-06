@@ -112,11 +112,16 @@ class CacheFragment : Fragment() {
     }
 
     @Composable
-    private fun CacheScreen() {
+    fun CacheScreen(
+        bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
+        onScrollDelta: ((Int) -> Unit)? = null
+    ) {
         val gridState = rememberLazyGridState()
         gridState.ObserveBarHideDeltas { dy ->
-            (activity as? com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost)?.onMainScrollDelta(dy)
+            onScrollDelta?.invoke(dy) ?: (activity as? com.github.tvbox.osc.view.BarAutoHide.ScrollBarHost)?.onMainScrollDelta(dy)
         }
+        val currentContext = androidx.compose.ui.platform.LocalContext.current
+        val currentActivity = (activity ?: currentContext as? android.app.Activity)
         Column(
             Modifier
                 .fillMaxSize()
@@ -134,7 +139,7 @@ class CacheFragment : Fragment() {
                     fontSize = 14.sp,
                     modifier = Modifier.weight(1f)
                 )
-                IconButton(onClick = { confirmClearAll() }) {
+                IconButton(onClick = { currentActivity?.let { confirmClearAll(it) } }) {
                     Icon(
                         androidx.compose.ui.res.painterResource(R.drawable.ic_clear),
                         contentDescription = "清空缓存",
@@ -155,7 +160,7 @@ class CacheFragment : Fragment() {
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 4.dp, bottom = bottomPadding),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     state = gridState,
@@ -173,11 +178,12 @@ class CacheFragment : Fragment() {
                                 note = card.note
                             ),
                             onClick = {
-                                val intent = Intent(requireActivity(), DownloadActivity::class.java)
+                                val act = currentActivity ?: return@VodCardItem
+                                val intent = Intent(act, DownloadActivity::class.java)
                                 intent.putExtra(DownloadActivity.EXTRA_GROUP_KEY, card.groupKey)
-                                startActivity(intent)
+                                act.startActivity(intent)
                             },
-                            onLongClick = { confirmDeleteSeries(card.groupKey, card.name) }
+                            onLongClick = { currentActivity?.let { confirmDeleteSeries(it, card.groupKey, card.name) } }
                         )
                     }
                 }
@@ -372,12 +378,12 @@ class CacheFragment : Fragment() {
     }
 
     private fun runOnUi(action: () -> Unit) {
-        if (!isAdded()) return
-        requireActivity().runOnUiThread(action)
+        val act = activity ?: return
+        act.runOnUiThread(action)
     }
 
-    private fun confirmDeleteSeries(groupKey: String, seriesName: String) {
-        MaterialAlertDialogBuilder(requireActivity())
+    private fun confirmDeleteSeries(act: android.app.Activity, groupKey: String, seriesName: String) {
+        MaterialAlertDialogBuilder(act)
             .setTitle("删除缓存")
             .setMessage("确定删除《${seriesName ?: ""}》的全部缓存文件吗?")
             .setNegativeButton("取消", null)
@@ -403,8 +409,8 @@ class CacheFragment : Fragment() {
             .show()
     }
 
-    private fun confirmClearAll() {
-        MaterialAlertDialogBuilder(requireActivity())
+    private fun confirmClearAll(act: android.app.Activity) {
+        MaterialAlertDialogBuilder(act)
             .setTitle("清空缓存")
             .setMessage("确定删除全部缓存文件吗?")
             .setNegativeButton("取消", null)

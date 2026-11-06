@@ -1,7 +1,7 @@
 package com.github.tvbox.osc.ui.compose
 
-import android.widget.ImageView
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -26,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,15 +36,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.util.DefaultConfig
 import com.squareup.picasso.Picasso
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -58,63 +64,92 @@ data class VodCard(
     val note: String? = null,
 )
 
-/** Picasso 海报(复用既有加载链: proxy 替换/占位图) */
+/** 纯 Compose 原生海报(直接由 Compose DrawScope 渲染, 允许 LayerBackdrop 采样真实海报) */
 @Composable
 fun PosterImage(url: String, modifier: Modifier = Modifier) {
-    AndroidView(
-        factory = { ctx ->
-            ImageView(ctx).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                setImageResource(R.drawable.img_loading_placeholder)
+    var bitmap by remember(url) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(url) {
+        if (url.isNotEmpty()) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val replaced = DefaultConfig.checkReplaceProxy(url)
+                    val bmp = Picasso.get().load(replaced).get()
+                    if (bmp != null) {
+                        bitmap = bmp.asImageBitmap()
+                    }
+                } catch (_: Throwable) {
+                    bitmap = null
+                }
             }
-        },
-        update = { iv ->
-            if (url.isNotEmpty()) {
-                Picasso.get()
-                    .load(DefaultConfig.checkReplaceProxy(url))
-                    .placeholder(R.drawable.img_loading_placeholder)
-                    .error(R.drawable.img_loading_placeholder)
-                    .into(iv)
-            } else {
-                iv.setImageResource(R.drawable.img_loading_placeholder)
-            }
-        },
-        modifier = modifier
-    )
+        } else {
+            bitmap = null
+        }
+    }
+    val currentBmp = bitmap
+    if (currentBmp != null) {
+        Image(
+            bitmap = currentBmp,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+    } else {
+        Box(
+            modifier = modifier.background(colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(R.drawable.icon_img_placeholder),
+                contentDescription = null,
+                modifier = Modifier.size(36.dp)
+            )
+        }
+    }
 }
 
 /**
  * 本地文件海报(观看历史墙): 海报已持久缓存到本地文件时直接解码显示(零网络等待),
- * 未缓存时走网络加载并显示占位图(占位图先行, 不阻塞其他元素)。
+ * 未缓存时走网络加载并显示占位图(占位图先行, 不阻塞其他元素)。纯 Compose 渲染。
  */
 @Composable
 fun PosterFileImage(file: File?, url: String, modifier: Modifier = Modifier) {
-    AndroidView(
-        factory = { ctx ->
-            ImageView(ctx).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                setImageResource(R.drawable.img_loading_placeholder)
+    var bitmap by remember(file?.path, url) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(file?.path, url) {
+        withContext(Dispatchers.IO) {
+            try {
+                val bmp = when {
+                    file != null && file.exists() -> Picasso.get().load(file).get()
+                    url.isNotEmpty() -> Picasso.get().load(DefaultConfig.checkReplaceProxy(url)).get()
+                    else -> null
+                }
+                if (bmp != null) {
+                    bitmap = bmp.asImageBitmap()
+                }
+            } catch (_: Throwable) {
+                bitmap = null
             }
-        },
-        update = { iv ->
-            val placeholder = R.drawable.img_loading_placeholder
-            when {
-                file != null && file.exists() ->
-                    Picasso.get()
-                        .load(file)
-                        .placeholder(placeholder)
-                        .error(placeholder)
-                        .into(iv)
-                url.isNotEmpty() ->
-                    Picasso.get()
-                        .load(DefaultConfig.checkReplaceProxy(url))
-                        .placeholder(placeholder)
-                        .error(placeholder)
-                        .into(iv)
-            }
-        },
-        modifier = modifier
-    )
+        }
+    }
+    val currentBmp = bitmap
+    if (currentBmp != null) {
+        Image(
+            bitmap = currentBmp,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+    } else {
+        Box(
+            modifier = modifier.background(colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(R.drawable.icon_img_placeholder),
+                contentDescription = null,
+                modifier = Modifier.size(36.dp)
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)

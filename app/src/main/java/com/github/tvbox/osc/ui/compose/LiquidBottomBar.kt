@@ -521,6 +521,7 @@ fun LiquidBottomTabs(
                     val targetIndex = targetValue.fastRoundToInt().coerceIn(0, tabsCount - 1)
                     currentIndex = targetIndex
                     animateToValue(targetIndex.toFloat())
+                    onTabSelected(targetIndex)
                     animationScope.launch {
                         offsetAnimation.animateTo(
                             0f,
@@ -533,9 +534,6 @@ fun LiquidBottomTabs(
                         (targetValue + dragAmount.x / tabWidth * if (isLtr) 1f else -1f)
                             .fastCoerceIn(0f, (tabsCount - 1).toFloat())
                     )
-                    animationScope.launch {
-                        offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x)
-                    }
                 }
             )
         }
@@ -543,14 +541,6 @@ fun LiquidBottomTabs(
             snapshotFlow { selectedTabIndex() }
                 .collectLatest { index ->
                     currentIndex = index
-                }
-        }
-        LaunchedEffect(dampedDragAnimation) {
-            snapshotFlow { currentIndex }
-                .drop(1)
-                .collectLatest { index ->
-                    dampedDragAnimation.animateToValue(index.toFloat())
-                    onTabSelected(index)
                 }
         }
         LaunchedEffect(pageScrollFraction) {
@@ -593,12 +583,6 @@ fun LiquidBottomTabs(
                                     lens(24f.dp.toPx(), 24f.dp.toPx())
                                 }
                             },
-                            layerBlock = {
-                                val progress = dampedDragAnimation.pressProgress
-                                val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
-                                scaleX = scale
-                                scaleY = scale
-                            },
                             onDrawSurface = { drawRect(containerColor) }
                         )
                         .then(interactiveHighlight.modifier)
@@ -614,54 +598,26 @@ fun LiquidBottomTabs(
                 )
             }
 
-            // Layer 2: 采样层 tabsBackdrop (放大 1.2x 染色图文)
+            // Layer 2: 采样层 tabsBackdrop (高亮图文纯色染色，透明背景，与 Layer 1 几何坐标 100% 精确对齐)
             CompositionLocalProvider(
-                LocalLiquidBottomTabScale provides {
-                    lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
-                },
+                LocalLiquidBottomTabScale provides { 1f },
                 androidx.compose.material3.LocalContentColor provides accentColor
             ) {
                 Row(
                     Modifier
                         .clearAndSetSemantics {}
                         .alpha(0f)
-                        .layerBackdrop(tabsBackdrop)
                         .graphicsLayer {
                             translationX = panelOffset
                         }
-                        .drawBackdrop(
-                            backdrop = backdrop,
-                            shape = { barShape },
-                            effects = {
-                                val progress = dampedDragAnimation.pressProgress
-                                vibrancy()
-                                blur(8f.dp.toPx())
-                                if (floating) {
-                                    lens(
-                                        24f.dp.toPx() * progress,
-                                        24f.dp.toPx() * progress
-                                    )
-                                }
-                            },
-                            highlight = {
-                                val progress = dampedDragAnimation.pressProgress
-                                Highlight.Default.copy(alpha = progress)
-                            },
-                            onDrawSurface = { drawRect(containerColor) }
-                        )
-                        .then(interactiveHighlight.modifier)
+                        .layerBackdrop(tabsBackdrop)
                         .height(barHeight)
                         .fillMaxWidth()
                         .padding(horizontal = LiquidBarSpec.InsetDp.dp)
                         .padding(
                             top = LiquidBarSpec.InsetDp.dp,
                             bottom = LiquidBarSpec.InsetDp.dp + if (floating) 0.dp else navInsetBottom
-                        )
-                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                        .drawWithContent {
-                            drawContent()
-                            drawRect(color = accentColor, blendMode = BlendMode.SrcIn)
-                        },
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                     content = content
                 )
@@ -842,7 +798,7 @@ fun LiquidBottomBar(
                         Text(
                             text = item.title,
                             fontSize = 12.sp,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            fontWeight = if (selected && material == ThemeManager.MATERIAL_YOU) FontWeight.Bold else FontWeight.Medium,
                             color = labelColor,
                             maxLines = 1
                         )

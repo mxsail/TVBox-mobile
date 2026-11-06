@@ -1,35 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 主界面: FrameLayout 让底栏可悬浮于内容之上(玻璃材质时内容从底栏背后滚过),
-     停靠模式由 MainActivity 统一给 content 加底栏高度的内边距 -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<!-- 主界面纯 Compose 根容器: 所有页面由统一 Compose Tree 与 HorizontalPager 驱动,
+     底栏可采样真实全屏画面内容 (实现真液态玻璃光折射) -->
+<androidx.compose.ui.platform.ComposeView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/compose_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".ui.activity.MainActivity">
-
-    <androidx.viewpager.widget.ViewPager
-        android:id="@+id/vp"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
-
-    <FrameLayout
-        android:id="@+id/bar_container"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom">
-
-        <androidx.compose.ui.platform.ComposeView
-            android:id="@+id/compose_bottom_bar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <com.google.android.material.bottomnavigation.BottomNavigationView
-            android:id="@+id/bottom_nav"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:visibility="gone"
-            app:itemRippleColor="@android:color/transparent"
-            app:menu="@menu/main_bottom_navigation" />
-    </FrameLayout>
-</FrameLayout>
+    android:layout_height="match_parent" />
