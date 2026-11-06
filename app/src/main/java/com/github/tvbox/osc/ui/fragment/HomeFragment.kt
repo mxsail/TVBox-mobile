@@ -390,6 +390,7 @@ class HomeFragment : Fragment() {
     }
 
     private fun initViewPager(absXml: AbsSortXml?) {
+        gridControllers.clear()
         if (mSortDataList.isNotEmpty()) {
             homeRecVod = if (Hawk.get(HawkConfig.HOME_REC, 0) == 1 && absXml?.videoList != null) {
                 absXml.videoList
@@ -654,13 +655,17 @@ class HomeFragment : Fragment() {
                                                 onScrollDelta = onScrollDelta
                                             )
                                         } else {
+                                            val ctrl = gridControllers.getOrPut(sortData.id) {
+                                                com.github.tvbox.osc.ui.compose.GridCategoryController(
+                                                    sortData,
+                                                    requireActivity()
+                                                )
+                                            }
                                             com.github.tvbox.osc.ui.compose.GridCategoryScreen(
                                                 sortData = sortData,
+                                                controller = ctrl,
                                                 bottomPadding = bottomPadding,
-                                                onScrollDelta = onScrollDelta,
-                                                onControllerReady = { ctrl ->
-                                                    gridControllers[sortData.id] = ctrl
-                                                }
+                                                onScrollDelta = onScrollDelta
                                             )
                                         }
                                     }

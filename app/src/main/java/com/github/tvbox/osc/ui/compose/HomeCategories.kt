@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -209,6 +210,7 @@ class GridCategoryController(
     val loadState = mutableStateOf(LoadState.Loading)
     val canLoadMore = mutableStateOf(true)
     val loadingMore = mutableStateOf(false)
+    val isRefreshing = mutableStateOf(false)
     var page = 1
     var maxPage = 1
     var isLoad = false
@@ -228,16 +230,25 @@ class GridCategoryController(
     private var gridFilterDialog: GridFilterDialog? = null
 
     fun init() {
+        if (isLoad && gridItems.value.isNotEmpty()) {
+            return
+        }
+        ensureViewModel()
+        loadData()
+    }
+
+    private fun ensureViewModel() {
         if (sourceViewModel == null) {
             val owner = activity as? ViewModelStoreOwner ?: return
             sourceViewModel = ViewModelProvider(owner, ViewModelProvider.NewInstanceFactory())
                 .get("grid_${sortData.id}", SourceViewModel::class.java)
             sourceViewModel?.listResult?.observe(activity as LifecycleOwner) { absXml: AbsXml? ->
                 loadingMore.value = false
+                isRefreshing.value = false
                 if (absXml?.movie?.videoList != null && absXml.movie.videoList.isNotEmpty()) {
+                    loadState.value = LoadState.Success
+                    isLoad = true
                     if (page == 1) {
-                        loadState.value = LoadState.Success
-                        isLoad = true
                         gridItems.value = absXml.movie.videoList
                     } else {
                         gridItems.value = gridItems.value + absXml.movie.videoList
@@ -246,23 +257,33 @@ class GridCategoryController(
                     maxPage = absXml.movie.pagecount
                     canLoadMore.value = page <= maxPage
                 } else {
-                    if (page == 1) {
+                    if (page == 1 && gridItems.value.isEmpty()) {
                         loadState.value = LoadState.Empty
                     }
                     canLoadMore.value = false
                 }
             }
         }
-        loadData()
     }
 
-    fun loadData() {
+    fun refresh() {
+        ensureViewModel()
+        page = 1
+        maxPage = 1
+        canLoadMore.value = true
+        isRefreshing.value = true
+        loadData(isRefresh = true)
+    }
+
+    fun loadData(isRefresh: Boolean = false) {
         if (ApiConfig.get().homeSourceBean?.api == null) {
             loadState.value = LoadState.Empty
+            isRefreshing.value = false
             return
         }
-        loadState.value = LoadState.Loading
-        isLoad = false
+        if (gridItems.value.isEmpty() && !isRefresh) {
+            loadState.value = LoadState.Loading
+        }
         sourceViewModel?.getList(sortData, page)
     }
 
@@ -331,20 +352,15 @@ class GridCategoryController(
 /**
  * 首页分类 2..N: 动态分类数据源 3 列网格 (纯 Compose 渲染)
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun GridCategoryScreen(
     sortData: MovieSort.SortData,
+    controller: GridCategoryController,
     bottomPadding: Dp,
-    onScrollDelta: ((Int) -> Unit)? = null,
-    onControllerReady: ((GridCategoryController) -> Unit)? = null
+    onScrollDelta: ((Int) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val activity = context as? Activity
-    val controller = remember(sortData.id) {
-        GridCategoryController(sortData, activity ?: Activity()).also {
-            onControllerReady?.invoke(it)
-        }
-    }
 
     LaunchedEffect(sortData.id) {
         controller.init()
@@ -359,55 +375,61 @@ fun GridCategoryScreen(
 
     Box(Modifier.fillMaxSize()) {
         LoadStateBox(controller.loadState.value, Modifier.fillMaxSize()) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                state = scrollState,
-                contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 6.dp, bottom = bottomPadding),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                isRefreshing = controller.isRefreshing.value,
+                onRefresh = { controller.refresh() },
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(controller.gridItems.value) { video ->
-                    VodCardItem(
-                        card = VodCard(
-                            key = "${video.sourceKey}:${video.id}:${video.name}",
-                            name = video.name,
-                            pic = video.pic.trim(),
-                            badge = if (video.year > 0) video.year.toString() else "",
-                            note = video.note
-                        ),
-                        onClick = {
-                            val bundle = Bundle().apply {
-                                putString("id", video.id)
-                                putString("sourceKey", video.sourceKey)
-                                putString("title", video.name)
-                            }
-                            val homeSource = ApiConfig.get().homeSourceBean
-                            if (("12".indexOf(controller.getUITag()) != -1) && (video.tag == "folder" || video.tag == "cover")) {
-                                controller.changeView(video.id, video.tag == "folder")
-                            } else if (homeSource.isQuickSearch() && Hawk.get(HawkConfig.FAST_SEARCH_MODE, false) && controller.enableFastSearch()) {
-                                val intent = Intent(context, FastSearchActivity::class.java).putExtras(bundle)
-                                context.startActivity(intent)
-                            } else {
-                                if (TextUtils.isEmpty(video.id) || video.id.startsWith("msearch:")) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    state = scrollState,
+                    contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 6.dp, bottom = bottomPadding),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(controller.gridItems.value, key = { video -> "${video.sourceKey}:${video.id}:${video.name}" }) { video ->
+                        VodCardItem(
+                            card = VodCard(
+                                key = "${video.sourceKey}:${video.id}:${video.name}",
+                                name = video.name,
+                                pic = video.pic.trim(),
+                                badge = if (video.year > 0) video.year.toString() else "",
+                                note = video.note
+                            ),
+                            onClick = {
+                                val bundle = Bundle().apply {
+                                    putString("id", video.id)
+                                    putString("sourceKey", video.sourceKey)
+                                    putString("title", video.name)
+                                }
+                                val homeSource = ApiConfig.get().homeSourceBean
+                                if (("12".indexOf(controller.getUITag()) != -1) && (video.tag == "folder" || video.tag == "cover")) {
+                                    controller.changeView(video.id, video.tag == "folder")
+                                } else if (homeSource.isQuickSearch() && Hawk.get(HawkConfig.FAST_SEARCH_MODE, false) && controller.enableFastSearch()) {
                                     val intent = Intent(context, FastSearchActivity::class.java).putExtras(bundle)
                                     context.startActivity(intent)
                                 } else {
-                                    val intent = Intent(context, DetailActivity::class.java).putExtras(bundle)
-                                    context.startActivity(intent)
+                                    if (TextUtils.isEmpty(video.id) || video.id.startsWith("msearch:")) {
+                                        val intent = Intent(context, FastSearchActivity::class.java).putExtras(bundle)
+                                        context.startActivity(intent)
+                                    } else {
+                                        val intent = Intent(context, DetailActivity::class.java).putExtras(bundle)
+                                        context.startActivity(intent)
+                                    }
                                 }
+                            },
+                            onLongClick = {
+                                val bundle = Bundle().apply {
+                                    putString("id", video.id)
+                                    putString("sourceKey", video.sourceKey)
+                                    putString("title", video.name)
+                                }
+                                val intent = Intent(context, FastSearchActivity::class.java).putExtras(bundle)
+                                context.startActivity(intent)
                             }
-                        },
-                        onLongClick = {
-                            val bundle = Bundle().apply {
-                                putString("id", video.id)
-                                putString("sourceKey", video.sourceKey)
-                                putString("title", video.name)
-                            }
-                            val intent = Intent(context, FastSearchActivity::class.java).putExtras(bundle)
-                            context.startActivity(intent)
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
