@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -84,7 +85,9 @@ fun HomeCategoryBar(
     modifier: Modifier = Modifier,
     material: String = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID),
     isExpanded: Boolean = false,
-    onExpandChanged: (Boolean) -> Unit = {}
+    onExpandChanged: (Boolean) -> Unit = {},
+    pagerState: PagerState? = null,
+    isProgrammaticScroll: Boolean = false
 ) {
     val displayCategories = if (categories.isEmpty()) listOf("主页") else categories
     val validIndex = selectedIndex.coerceIn(0, displayCategories.size - 1)
@@ -188,9 +191,38 @@ fun HomeCategoryBar(
                     label = "tabIndicatorWidth"
                 )
 
+                // 手势拖拽实时跟手指示条计算:
+                // 当处于手动滑动(非程序动画)中时，直接根据 pagerState 的实时小数偏移做绝对插值，真正做到手指动、指示条毫秒级跟随
+                val isRealtimeTracking = pagerState != null && pagerState.isScrollInProgress && !isProgrammaticScroll
+                val (currentOffsetPx, currentWidthPx) = if (isRealtimeTracking && tabOffsets.isNotEmpty()) {
+                    val pageCount = displayCategories.size
+                    val rawPos = pagerState!!.currentPage + pagerState.currentPageOffsetFraction
+                    val clampedPos = rawPos.coerceIn(0f, (pageCount - 1).toFloat())
+                    val baseIndex = clampedPos.toInt()
+                    val nextIndex = (baseIndex + 1).coerceAtMost(pageCount - 1)
+                    val fraction = clampedPos - baseIndex
+
+                    val offsetA = (tabOffsets[baseIndex] ?: 0f) + textPaddingPx
+                    val offsetB = (tabOffsets[nextIndex] ?: offsetA) + textPaddingPx
+                    val widthA = ((tabWidths[baseIndex] ?: 0f) - textPaddingPx * 2).coerceAtLeast(0f)
+                    val widthB = ((tabWidths[nextIndex] ?: widthA) - textPaddingPx * 2).coerceAtLeast(0f)
+
+                    val realOffset = offsetA + (offsetB - offsetA) * fraction
+                    val realWidth = widthA + (widthB - widthA) * fraction
+                    realOffset to realWidth
+                } else {
+                    animOffsetPx to animWidthPx
+                }
+
+                val currentActiveTab = if (isRealtimeTracking) {
+                    (pagerState!!.currentPage + pagerState.currentPageOffsetFraction).roundToInt().coerceIn(0, displayCategories.size - 1)
+                } else {
+                    validIndex
+                }
+
                 // 切换分类(含展开面板点选远处分类)时把选中项滚到可见
-                LaunchedEffect(validIndex, tabOffsets[validIndex]) {
-                    val target = tabOffsets[validIndex]?.toInt() ?: 0
+                LaunchedEffect(currentActiveTab, tabOffsets[currentActiveTab]) {
+                    val target = tabOffsets[currentActiveTab]?.toInt() ?: 0
                     if (target > 0) {
                         rowScrollState.animateScrollTo((target - 40).coerceAtLeast(0))
                     }
@@ -209,7 +241,7 @@ fun HomeCategoryBar(
                     ) {
                         Spacer(Modifier.width(4.dp)) // 4dp + 分类内边距 6dp = 10dp, 与网格卡片左缘对齐
                         displayCategories.forEachIndexed { index, name ->
-                            val isSelected = index == validIndex
+                            val isSelected = index == currentActiveTab
                             Text(
                                 text = name,
                                 fontSize = if (isSelected) 18.sp else 15.sp,
@@ -241,12 +273,12 @@ fun HomeCategoryBar(
                     }
 
                     // 独立平滑滑动胶囊指示条: 独立于文字下方, 随切换平滑平移与伸缩
-                    if (targetWidthPx > 0f || animWidthPx > 0f) {
+                    if (targetWidthPx > 0f || currentWidthPx > 0f) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
-                                .offset { IntOffset(animOffsetPx.roundToInt(), 0) }
-                                .width(with(density) { animWidthPx.toDp() })
+                                .offset { IntOffset(currentOffsetPx.roundToInt(), 0) }
+                                .width(with(density) { currentWidthPx.toDp() })
                                 .height(3.dp)
                                 .background(
                                     color = MaterialTheme.colorScheme.primary,

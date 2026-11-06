@@ -34,6 +34,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -605,19 +609,30 @@ class HomeFragment : Fragment() {
                         initialPage = 0
                     ) { categoriesState.value.size }
 
-                    // 仅在 Pager 完全停稳(settled)后同步状态到 selectedTabState, 绝不在翻页动画进行中用中间页打断跨页滚动
-                    androidx.compose.runtime.LaunchedEffect(categoryPagerState) {
-                        androidx.compose.runtime.snapshotFlow { categoryPagerState.settledPage }
-                            .collectLatest { settled ->
-                                selectedTabState.intValue = settled
+                    var isProgrammaticScroll by remember { mutableStateOf(false) }
+
+                    // 实时同步分类高亮:
+                    // 手指滑动页面跨过一半时(currentPage 变动), 立即同步 selectedTabState,
+                    // 绝不等待 settledPage(避免停稳和列表加载完成后才切换的高延迟)
+                    LaunchedEffect(categoryPagerState) {
+                        snapshotFlow { categoryPagerState.currentPage }
+                            .collectLatest { page ->
+                                if (!isProgrammaticScroll) {
+                                    selectedTabState.intValue = page
+                                }
                             }
                     }
 
-                    // 仅在外部主动修改 selectedTabState(如按返回键 scrollToFirstTab)且 Pager 未处于滚动中时触发滚动
-                    androidx.compose.runtime.LaunchedEffect(selectedTabState.intValue) {
+                    // 外部触发跳转(例如按返回键 scrollToFirstTab)
+                    LaunchedEffect(selectedTabState.intValue) {
                         val target = selectedTabState.intValue
                         if (categoryPagerState.currentPage != target && !categoryPagerState.isScrollInProgress) {
-                            categoryPagerState.animateScrollToPage(target)
+                            isProgrammaticScroll = true
+                            try {
+                                categoryPagerState.animateScrollToPage(target)
+                            } finally {
+                                isProgrammaticScroll = false
+                            }
                         }
                     }
 
@@ -678,14 +693,21 @@ class HomeFragment : Fragment() {
                         onTabSelected = { pos ->
                             selectedTabState.intValue = pos
                             coroutineScope.launch {
-                                categoryPagerState.animateScrollToPage(pos)
+                                isProgrammaticScroll = true
+                                try {
+                                    categoryPagerState.animateScrollToPage(pos)
+                                } finally {
+                                    isProgrammaticScroll = false
+                                }
                             }
                         },
                         material = materialState.value,
                         isExpanded = isTabsExpandedState.value,
                         onExpandChanged = { expanded ->
                             setTabsExpanded(expanded)
-                        }
+                        },
+                        pagerState = categoryPagerState,
+                        isProgrammaticScroll = isProgrammaticScroll
                     )
                 }
             }
