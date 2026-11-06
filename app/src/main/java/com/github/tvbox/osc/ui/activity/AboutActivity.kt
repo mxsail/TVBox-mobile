@@ -43,10 +43,12 @@ import org.json.JSONObject
 class AboutActivity : BaseActivity() {
 
     companion object {
+        /** 开源仓库主页地址 */
+        private const val REPO_URL = "https://github.com/mxsail/TVBox-mobile"
         /** GitHub 最新 release 查询接口 */
-        private const val UPDATE_API = "https://api.github.com/repos/kertou/TVBox-mobile/releases/latest"
+        private const val UPDATE_API = "https://api.github.com/repos/mxsail/TVBox-mobile/releases/latest"
         /** 下载页地址(releases/latest 始终重定向到最新版) */
-        private const val RELEASE_URL = "https://github.com/kertou/TVBox-mobile/releases/latest"
+        private const val RELEASE_URL = "https://github.com/mxsail/TVBox-mobile/releases/latest"
 
         /** 版本号逐段数值比较(tag 形如 v3.1.0): a>b 返回 1, a<b 返回 -1, 相等返回 0 */
         fun compareVersion(a: String, b: String): Int {
@@ -156,7 +158,7 @@ class AboutActivity : BaseActivity() {
                 SectionTitle("项目")
                 GroupCard {
                     MenuRow(R.drawable.ic_copyright_48, "开源地址", value = "GitHub") {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(RELEASE_URL)))
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)))
                     }
                 }
             }

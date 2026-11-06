@@ -140,7 +140,7 @@
                     android:paddingHorizontal="16dp"
                     android:paddingVertical="10dp"
                     android:autoLink="web"
-                    android:text="https://github.com/kertou/TVBox-mobile"
+                    android:text="https://github.com/mxsail/TVBox-mobile"
                     android:textColorLink="?attr/colorPrimary"
                     android:textIsSelectable="true"
                     android:textSize="13sp" />
