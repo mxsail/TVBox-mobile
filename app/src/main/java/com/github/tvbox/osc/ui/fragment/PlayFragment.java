@@ -357,8 +357,12 @@ public class PlayFragment extends BaseLazyFragment {
         mVideoView.addOnStateChangeListener(new VideoView.SimpleOnStateChangeListener() {
             @Override
             public void onPlayStateChanged(int playState) {
-                if (playState == VideoView.STATE_PLAYING && mActivity instanceof DetailActivity) {
-                    ((DetailActivity) mActivity).onPlaybackStarted();
+                if (mActivity instanceof DetailActivity) {
+                    if (playState == VideoView.STATE_PLAYING) {
+                        ((DetailActivity) mActivity).onPlaybackStarted();
+                    } else {
+                        ((DetailActivity) mActivity).updatePipParams();
+                    }
                 }
             }
         });
@@ -1130,6 +1134,13 @@ public class PlayFragment extends BaseLazyFragment {
     @Override
     public void onPause() {
         super.onPause();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && getActivity() != null && getActivity().isInPictureInPictureMode()) {
+            return;
+        }
+        int bgPlayType = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0);
+        if (bgPlayType == 1) {
+            return;
+        }
         if (mVideoView != null) {
             mVideoView.pause();
         }

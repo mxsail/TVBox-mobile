@@ -12,6 +12,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.content.res.Configuration;
+import android.graphics.Rect;
 import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
@@ -79,6 +81,7 @@ import com.github.tvbox.osc.viewmodel.SourceViewModel;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.gyf.immersionbar.BarHide;
 import com.gyf.immersionbar.ImmersionBar;
 import com.lxj.xpopup.XPopup;
 import com.lxj.xpopup.core.BasePopupView;
@@ -132,11 +135,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     private BasePopupView mAllSeriesBottomDialog;
     private DetailComposeBridge composeBridge;
     /**
-     * Home键广播,用于触发后台服务
-     */
-    private BroadcastReceiver mHomeKeyReceiver;
-    /**
-     * 是否开启后台播放标记,不在广播开启,onPause根据标记开启
+     * 是否开启后台播放标记,在切后台/onPause中变动,强制开关
      */
     boolean openBackgroundPlay;
     private BroadcastReceiver mRemoteActionReceiver;
@@ -154,7 +153,6 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
 
     @Override
     protected void init() {
-        initReceiver();
         initView();
         initViewModel();
         initData();
@@ -171,13 +169,19 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     @Override
     protected void onResume() {
         super.onResume();
-        openBackgroundPlay = false;
-        playServerSwitch(false);
-        mBinding.composeDetail.postDelayed(NotificationUtils::cancelAll, 800);
+        if (openBackgroundPlay) {
+            openBackgroundPlay = false;
+            playServerSwitch(false);
+            mBinding.composeDetail.postDelayed(NotificationUtils::cancelAll, 800);
+        }
+        updatePipParams();
     }
 
     private void initView() {
         mBinding.previewPlayerPlace.setVisibility(showPreview ? View.VISIBLE : View.GONE);
+        windowsPreview = mBinding.previewPlayer.getLayoutParams();
+        windowsFull = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        mBinding.previewPlayer.post(this::updatePipParams);
 
         seriesAdapter = new SeriesAdapter(false);
         seriesFlagAdapter = new SeriesFlagAdapter();
@@ -289,26 +293,31 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     @Override
     protected void onPause() {
         super.onPause();
-        if (openBackgroundPlay) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) {
+            return;
+        }
+        int bgType = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0);
+        if (bgType == 1 && playFragment != null && playFragment.getPlayer() != null && playFragment.getPlayer().isPlaying()) {
+            openBackgroundPlay = true;
             playServerSwitch(true);
         }
     }
 
-    private void initReceiver() {
-        // 注册广播接收器
-        if (mHomeKeyReceiver == null) {
-            mHomeKeyReceiver = new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    String action = intent.getAction();
-                    if (action != null && action.equals(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)) {
-                        openBackgroundPlay = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0) == 1 && playFragment.getPlayer() != null && playFragment.getPlayer().isPlaying();
-                    }
-                }
-            };
-            // Android 14+ 要求非系统广播注册必须声明导出标志, 否则 SecurityException
-            ContextCompat.registerReceiver(this, mHomeKeyReceiver,
-                    new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS), ContextCompat.RECEIVER_NOT_EXPORTED);
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (playFragment == null || playFragment.getPlayer() == null) {
+            return;
+        }
+        int bgType = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0);
+        boolean isPlaying = playFragment.getPlayer().isPlaying();
+        if (bgType == 2 && isPlaying) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !isInPictureInPictureMode()) {
+                enterPip();
+            }
+        } else if (bgType == 1 && isPlaying) {
+            openBackgroundPlay = true;
+            playServerSwitch(true);
         }
     }
 
@@ -793,11 +802,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         registerActionReceiver(false);
         super.onDestroy();
         unregisterReceiver(mBatteryReceiver);
-        // 注销广播接收器
-        if (mHomeKeyReceiver != null) {
-            unregisterReceiver(mHomeKeyReceiver);
-            mHomeKeyReceiver = null;
-        }
+        toggleScreenShotListen(false);
 
         try {
             if (searchExecutorService != null) {
@@ -857,6 +862,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     boolean showPreview = Hawk.get(HawkConfig.SHOW_PREVIEW, true);
     ; // true 开启 false 关闭
     boolean fullWindows = false;
+    private boolean wasFullscreenBeforePip = false;
     ViewGroup.LayoutParams windowsPreview = null;
     ViewGroup.LayoutParams windowsFull = null;
 
@@ -875,6 +881,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         mBinding.previewPlayer.setLayoutParams(fullWindows ? windowsFull : windowsPreview);
         mBinding.llLayout.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
         toggleSubtitleTextSize();
+        updatePipParams();
     }
 
     void toggleSubtitleTextSize() {
@@ -942,6 +949,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     /** PlayFragment 首帧回调:任何一集真正开始播放,暂存的缓存任务一次性入队 */
     public void onPlaybackStarted() {
         playbackStarted = true;
+        updatePipParams();
         if (pendingDownloadTasks.isEmpty()) return;
         List<DownloadEpisode> tasks = new ArrayList<>(pendingDownloadTasks);
         pendingDownloadTasks.clear();
@@ -1010,58 +1018,123 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     }
 
     /**
-     * 画中画模式
+     * 计算视频画面在当前屏幕中的实际显示区域（去除播放器容器上下或左右的黑边）
      */
-    public void enterPip() {
-        if (Utils.supportsPiPMode()) {
-            // 创建一个Intent对象，模拟按下Home键
-            Intent intent = new Intent(Intent.ACTION_MAIN);
-            intent.addCategory(Intent.CATEGORY_HOME);
-            startActivity(intent);
-
-            // Calculate Video Resolution
-            int vWidth = playFragment.getPlayer().getVideoSize()[0];
-            int vHeight = playFragment.getPlayer().getVideoSize()[1];
-            Rational ratio;
-            if (vWidth != 0) {
-                if ((((double) vWidth) / ((double) vHeight)) > 2.39) {
-                    vHeight = (int) (((double) vWidth) / 2.35);
+    private Rect calculateVideoContentRect() {
+        if (playFragment != null && playFragment.getPlayer() != null) {
+            View renderView = playFragment.getPlayer().getRenderView();
+            if (renderView != null && renderView.isShown()) {
+                Rect renderRect = new Rect();
+                if (renderView.getGlobalVisibleRect(renderRect) && !renderRect.isEmpty()) {
+                    return renderRect;
                 }
-                ratio = new Rational(vWidth, vHeight);
+            }
+        }
+        Rect viewRect = new Rect();
+        if (!mBinding.previewPlayer.getGlobalVisibleRect(viewRect) || viewRect.isEmpty()) {
+            return null;
+        }
+        return viewRect;
+    }
+
+    /**
+     * 构建画中画参数 (比例、操作按钮、精确纯画面动画裁切、Android 12+ 手势自动进入)
+     */
+    private PictureInPictureParams buildPipParams() {
+        if (!Utils.supportsPiPMode()) return null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
+            int vWidth = 0;
+            int vHeight = 0;
+            if (playFragment != null && playFragment.getPlayer() != null) {
+                int[] size = playFragment.getPlayer().getVideoSize();
+                if (size != null && size.length >= 2) {
+                    vWidth = size[0];
+                    vHeight = size[1];
+                }
+            }
+            Rational ratio;
+            if (vWidth > 0 && vHeight > 0) {
+                double r = (double) vWidth / (double) vHeight;
+                if (r > 2.39) {
+                    ratio = new Rational(239, 100);
+                } else if (r < 1.0 / 2.39) {
+                    ratio = new Rational(100, 239);
+                } else {
+                    ratio = new Rational(vWidth, vHeight);
+                }
             } else {
                 ratio = new Rational(16, 9);
             }
-            List<RemoteAction> actions = new ArrayList<>();
-            actions.add(generateRemoteAction(android.R.drawable.ic_media_previous, IntentKey.BROADCAST_ACTION_PREV, "Prev", "Play Previous"));
-            actions.add(generateRemoteAction(android.R.drawable.ic_media_play, IntentKey.BROADCAST_ACTION_PLAYPAUSE, "Play", "Play/Pause"));
-            actions.add(generateRemoteAction(android.R.drawable.ic_media_next, IntentKey.BROADCAST_ACTION_NEXT, "Next", "Play Next"));
-            PictureInPictureParams params = new PictureInPictureParams.Builder()
-                    .setAspectRatio(ratio)
-                    .setActions(actions).build();
-            playFragment.getPlayer().postDelayed(() -> {//代码模拟home键时会立即执行,toggleFullPreview中竖屏有切换横屏操作,
-                if (!fullWindows) {
-                    toggleFullPreview();
-                }
-            }, 300);
-            enterPictureInPictureMode(params);
-            playFragment.getController().hideBottom();
+            builder.setAspectRatio(ratio);
 
-            playFragment.getPlayer().postDelayed(() -> {
-                if (!playFragment.getPlayer().isPlaying()) {
-                    playFragment.getController().togglePlay();
+            Rect videoRect = calculateVideoContentRect();
+            if (videoRect != null && !videoRect.isEmpty()) {
+                builder.setSourceRectHint(videoRect);
+            }
+
+            List<RemoteAction> actions = new ArrayList<>();
+            actions.add(generateRemoteAction(android.R.drawable.ic_media_previous, IntentKey.BROADCAST_ACTION_PREV, "上一集", "Play Previous"));
+            boolean isPlaying = playFragment != null && playFragment.getPlayer() != null && playFragment.getPlayer().isPlaying();
+            int playIcon = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
+            actions.add(generateRemoteAction(playIcon, IntentKey.BROADCAST_ACTION_PLAYPAUSE, isPlaying ? "暂停" : "播放", "Play/Pause"));
+            actions.add(generateRemoteAction(android.R.drawable.ic_media_next, IntentKey.BROADCAST_ACTION_NEXT, "下一集", "Play Next"));
+            builder.setActions(actions);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                int bgType = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0);
+                builder.setAutoEnterEnabled(bgType == 2 && isPlaying);
+            }
+            return builder.build();
+        }
+        return null;
+    }
+
+    /**
+     * 更新画中画参数(播放状态/比例变动时同步系统)
+     */
+    public void updatePipParams() {
+        if (!Utils.supportsPiPMode()) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                PictureInPictureParams params = buildPipParams();
+                if (params != null) {
+                    setPictureInPictureParams(params);
                 }
-            }, 400);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * 画中画模式
+     */
+    public void enterPip() {
+        if (!Utils.supportsPiPMode()) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                PictureInPictureParams params = buildPipParams();
+                if (params != null) {
+                    enterPictureInPictureMode(params);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     private RemoteAction generateRemoteAction(int iconResId, int actionCode, String title, String desc) {
+        Intent actionIntent = new Intent(IntentKey.BROADCAST_ACTION);
+        actionIntent.putExtra("action", actionCode);
+        actionIntent.setPackage(getPackageName());
         final PendingIntent intent =
                 PendingIntent.getBroadcast(
                         DetailActivity.this,
                         actionCode,
-                        new Intent(IntentKey.BROADCAST_ACTION).putExtra("action", actionCode),
-                        PendingIntent.FLAG_IMMUTABLE);
+                        actionIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         final Icon icon = Icon.createWithResource(DetailActivity.this, iconResId);
         return (new RemoteAction(icon, title, desc, intent));
     }
@@ -1072,11 +1145,14 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
      */
     private void registerActionReceiver(boolean isRegister) {
         if (isRegister) {
+            if (mRemoteActionReceiver != null) {
+                return;
+            }
             mRemoteActionReceiver = new BroadcastReceiver() {
 
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    if (intent == null || !intent.getAction().equals(IntentKey.BROADCAST_ACTION) || playFragment.getController() == null) {
+                    if (intent == null || !IntentKey.BROADCAST_ACTION.equals(intent.getAction()) || playFragment == null || playFragment.getController() == null) {
                         return;
                     }
 
@@ -1085,6 +1161,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                         playFragment.playPrevious();
                     } else if (currentStatus == IntentKey.BROADCAST_ACTION_PLAYPAUSE) {
                         playFragment.getController().togglePlay();
+                        updatePipParams();
                     } else if (currentStatus == IntentKey.BROADCAST_ACTION_NEXT) {
                         playFragment.playNext(false);
                     } else if (currentStatus == IntentKey.BROADCAST_ACTION_CLOSE) {
@@ -1098,19 +1175,72 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                     new IntentFilter(IntentKey.BROADCAST_ACTION), ContextCompat.RECEIVER_NOT_EXPORTED);
         } else {
             if (mRemoteActionReceiver != null) {
-                unregisterReceiver(mRemoteActionReceiver);
+                try {
+                    unregisterReceiver(mRemoteActionReceiver);
+                } catch (Exception ignored) {
+                }
                 mRemoteActionReceiver = null;
-            }
-            if (playFragment.getPlayer().isPlaying()) {// 退出画中画时,暂停播放(画中画的全屏也会触发,但全屏后会自动播放)
-                playFragment.getController().togglePlay();
             }
         }
     }
 
     @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        handlePipModeChanged(isInPictureInPictureMode);
+    }
+
+    @Override
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode);
-        registerActionReceiver(Utils.supportsPiPMode() && isInPictureInPictureMode);
+        handlePipModeChanged(isInPictureInPictureMode);
+    }
+
+    private void handlePipModeChanged(boolean isInPip) {
+        if (isInPip) {
+            wasFullscreenBeforePip = fullWindows;
+            if (playFragment != null) {
+                playFragment.hideAllDialogSuccess();
+                if (playFragment.getController() != null) {
+                    playFragment.getController().hide();
+                }
+            }
+            // 画中画模式：强制去除系统栏占位、避让及内边距，让纯视频铺满画中画窗口
+            ImmersionBar.with(this)
+                    .hideBar(BarHide.FLAG_HIDE_BAR)
+                    .fitsSystemWindows(false)
+                    .init();
+            View content = findViewById(android.R.id.content);
+            if (content != null) {
+                content.setPadding(0, 0, 0, 0);
+            }
+            mBinding.getRoot().setPadding(0, 0, 0, 0);
+            mBinding.previewPlayer.setPadding(0, 0, 0, 0);
+
+            mBinding.llLayout.setVisibility(View.GONE);
+            mBinding.previewPlayer.setLayoutParams(new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            registerActionReceiver(true);
+        } else {
+            // 退出画中画恢复时：严格根据进画中画前的状态（竖屏 vs 全屏）恢复
+            if (windowsPreview == null) {
+                windowsPreview = new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ConvertUtils.dp2px(250));
+            }
+            if (windowsFull == null) {
+                windowsFull = new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            }
+            fullWindows = wasFullscreenBeforePip;
+            mBinding.previewPlayer.setLayoutParams(fullWindows ? windowsFull : windowsPreview);
+            mBinding.llLayout.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
+            if (playFragment != null) {
+                playFragment.changedLandscape(fullWindows);
+            }
+            toggleSubtitleTextSize();
+            registerActionReceiver(false);
+            updatePipParams();
+        }
     }
 
     /**

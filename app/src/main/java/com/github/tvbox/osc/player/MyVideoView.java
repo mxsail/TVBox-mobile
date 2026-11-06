@@ -3,6 +3,8 @@ package com.github.tvbox.osc.player;
 import android.content.Context;
 import android.util.AttributeSet;
 
+import android.view.View;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -26,4 +28,7 @@ public class MyVideoView extends VideoView {
         return mMediaPlayer;
     }
 
+    public View getRenderView() {
+        return mRenderView != null ? mRenderView.getView() : null;
+    }
 }
