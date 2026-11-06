@@ -937,11 +937,68 @@ public class VodController extends BaseController {
         }
     }
 
+    private boolean mIsInPipMode = false;
+
+    public void setInPipMode(boolean inPip) {
+        this.mIsInPipMode = inPip;
+        if (inPip) {
+            hideImmediately();
+        }
+    }
+
+    public boolean isInPipMode() {
+        return mIsInPipMode;
+    }
+
+    public void hideImmediately() {
+        if (mHandler != null) {
+            mHandler.removeMessages(1002);
+            mHandler.removeMessages(1003);
+        }
+        if (myHandle != null && myRunnable != null) {
+            myHandle.removeCallbacks(myRunnable);
+        }
+        hideViewImmediately(mBottomRoot);
+        hideViewImmediately(mTopRoot1);
+        hideViewImmediately(mTopRoot2);
+        hideViewImmediately(mLockView);
+        if (mProgressRoot != null) {
+            mProgressRoot.setVisibility(GONE);
+        }
+        if (mParseRoot != null) {
+            mParseRoot.setVisibility(GONE);
+        }
+        if (mTopRightDeviceInfo != null) {
+            mTopRightDeviceInfo.setVisibility(GONE);
+        }
+        if (mLlSpeed != null) {
+            mLlSpeed.setVisibility(GONE);
+        }
+        if (listener != null) {
+            listener.onHideBottom();
+        }
+    }
+
+    private void hideViewImmediately(View view) {
+        if (view != null) {
+            view.animate().cancel();
+            view.setAlpha(0f);
+            view.setVisibility(GONE);
+        }
+    }
+
+    @Override
+    public void hide() {
+        super.hide();
+        hideImmediately();
+    }
+
     boolean isBottomVisible() {
-        return mBottomRoot.getVisibility() == VISIBLE;
+        return mBottomRoot != null && mBottomRoot.getVisibility() == VISIBLE;
     }
 
     void showBottom() {
+        if (mIsInPipMode) return;
         mHandler.removeMessages(1003);
         mHandler.sendEmptyMessage(1002);
     }
@@ -1022,6 +1079,7 @@ public class VodController extends BaseController {
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(MotionEvent e) {
+        if (mIsInPipMode) return false;
         if (e.getAction() == MotionEvent.ACTION_UP) {
             if (fromLongPress) {
                 fromLongPress = false;
@@ -1041,7 +1099,14 @@ public class VodController extends BaseController {
     }
 
     @Override
+    public boolean onDoubleTap(MotionEvent e) {
+        if (mIsInPipMode) return true;
+        return super.onDoubleTap(e);
+    }
+
+    @Override
     public boolean onSingleTapConfirmed(MotionEvent e) {
+        if (mIsInPipMode) return true;
         myHandle.removeCallbacks(myRunnable);
         if (!isBottomVisible()) {
             showBottom();

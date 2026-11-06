@@ -3,6 +3,9 @@ package com.github.tvbox.osc.ui.activity;
 import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.app.PictureInPictureParams;
+import android.app.PictureInPictureUiState;
+import androidx.annotation.NonNull;
+import com.github.tvbox.osc.player.controller.VodController;
 import android.app.RemoteAction;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -174,6 +177,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             playServerSwitch(false);
             mBinding.composeDetail.postDelayed(NotificationUtils::cancelAll, 800);
         }
+        if (playFragment != null && playFragment.getController() != null) {
+            playFragment.getController().setInPipMode(false);
+        }
         updatePipParams();
     }
 
@@ -297,7 +303,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             return;
         }
         int bgType = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0);
-        if (bgType == 1 && playFragment != null && playFragment.getPlayer() != null && playFragment.getPlayer().isPlaying()) {
+        if (bgType == 2 && playFragment != null && playFragment.getPlayer() != null && playFragment.getPlayer().isPlaying()) {
+            prepareForPip();
+        } else if (bgType == 1 && playFragment != null && playFragment.getPlayer() != null && playFragment.getPlayer().isPlaying()) {
             openBackgroundPlay = true;
             playServerSwitch(true);
         }
@@ -312,6 +320,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         int bgType = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0);
         boolean isPlaying = playFragment.getPlayer().isPlaying();
         if (bgType == 2 && isPlaying) {
+            prepareForPip();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !isInPictureInPictureMode()) {
                 enterPip();
             }
@@ -1112,6 +1121,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
      */
     public void enterPip() {
         if (!Utils.supportsPiPMode()) return;
+        prepareForPip();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
                 PictureInPictureParams params = buildPipParams();
@@ -1120,6 +1130,26 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+    }
+
+    private void prepareForPip() {
+        if (playFragment != null) {
+            playFragment.hideAllDialogSuccess();
+            VodController controller = playFragment.getController();
+            if (controller != null) {
+                controller.setInPipMode(true);
+            }
+        }
+    }
+
+    @Override
+    public void onPictureInPictureUiStateChanged(PictureInPictureUiState pipState) {
+        super.onPictureInPictureUiStateChanged(pipState);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            if (pipState.isTransitioningToPip()) {
+                prepareForPip();
             }
         }
     }
@@ -1199,12 +1229,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     private void handlePipModeChanged(boolean isInPip) {
         if (isInPip) {
             wasFullscreenBeforePip = fullWindows;
-            if (playFragment != null) {
-                playFragment.hideAllDialogSuccess();
-                if (playFragment.getController() != null) {
-                    playFragment.getController().hide();
-                }
-            }
+            prepareForPip();
             // 画中画模式：强制去除系统栏占位、避让及内边距，让纯视频铺满画中画窗口
             ImmersionBar.with(this)
                     .hideBar(BarHide.FLAG_HIDE_BAR)
@@ -1222,6 +1247,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             registerActionReceiver(true);
         } else {
+            if (playFragment != null && playFragment.getController() != null) {
+                playFragment.getController().setInPipMode(false);
+            }
             // 退出画中画恢复时：严格根据进画中画前的状态（竖屏 vs 全屏）恢复
             if (windowsPreview == null) {
                 windowsPreview = new FrameLayout.LayoutParams(
