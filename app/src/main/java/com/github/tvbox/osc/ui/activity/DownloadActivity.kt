@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -77,6 +80,7 @@ class DownloadActivity : BaseActivity() {
     data class EpRow(
         val id: Int,
         val name: String,
+        val status: Int,
         val stateText: String,
         val actionText: String,
         val actionVisible: Boolean,
@@ -356,16 +360,16 @@ class DownloadActivity : BaseActivity() {
         val live = liveProgress[ep.getId()]
         when (ep.status) {
             DownloadEpisode.STATUS_WAITING -> return EpRow(
-                ep.getId(), ep.episodeName,
+                ep.getId(), ep.episodeName, ep.status,
                 if (TextUtils.isEmpty(ep.errMsg)) "等待中…" else ep.errMsg!!,
                 "删除", true, -1
             )
             DownloadEpisode.STATUS_RESOLVING -> return EpRow(
-                ep.getId(), ep.episodeName, "正在解析播放地址…", "删除", true, -2
+                ep.getId(), ep.episodeName, ep.status, "正在解析播放地址…", "删除", true, -2
             )
             DownloadEpisode.STATUS_DOWNLOADING -> {
                 if (live != null && live.merging) {
-                    return EpRow(ep.getId(), ep.episodeName, "正在合成视频…", "", false, -2)
+                    return EpRow(ep.getId(), ep.episodeName, ep.status, "正在合成视频…", "", false, -2)
                 }
                 val doneB = if (live != null && live.downloadedBytes > 0) live.downloadedBytes else ep.downloadedBytes
                 val speed = live?.speedBytes ?: 0
@@ -383,7 +387,7 @@ class DownloadActivity : BaseActivity() {
                     progress = -2
                     state = if (doneB > 0) "已下载 " + DownloadStorage.formatSize(doneB) else "正在下载…"
                 }
-                return EpRow(ep.getId(), ep.episodeName, state, "暂停", true, progress)
+                return EpRow(ep.getId(), ep.episodeName, ep.status, state, "暂停", true, progress)
             }
             DownloadEpisode.STATUS_PAUSED -> {
                 val progress = if (ep.totalBytes > 0) (((ep.downloadedBytes * 100 / ep.totalBytes).toInt()).coerceAtMost(100)) else 0
@@ -392,15 +396,15 @@ class DownloadActivity : BaseActivity() {
                     pausedText += " · 已下载 " + DownloadStorage.formatSize(ep.downloadedBytes)
                 }
                 if (!TextUtils.isEmpty(ep.errMsg)) pausedText += " · " + ep.errMsg
-                return EpRow(ep.getId(), ep.episodeName, pausedText, "继续", true, progress)
+                return EpRow(ep.getId(), ep.episodeName, ep.status, pausedText, "继续", true, progress)
             }
             DownloadEpisode.STATUS_FAILED -> return EpRow(
-                ep.getId(), ep.episodeName,
+                ep.getId(), ep.episodeName, ep.status,
                 if (TextUtils.isEmpty(ep.errMsg)) "下载失败" else ep.errMsg!!,
                 "重试", true, -1
             )
             else -> return EpRow(
-                ep.getId(), ep.episodeName,
+                ep.getId(), ep.episodeName, DownloadEpisode.STATUS_DONE,
                 "已下载 · " + DownloadStorage.formatSize(ep.totalBytes)
                     + (if (ep.localFilePath != null && ep.localFilePath.endsWith(".m3u8")) " (分片模式)" else ""),
                 "删除", true, -1
@@ -451,52 +455,89 @@ class DownloadActivity : BaseActivity() {
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 header.value?.let { hd ->
                     item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            PosterImage(
-                                hd.pic,
-                                Modifier
-                                    .width(56.dp)
-                                    .height(78.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(colorScheme.surfaceContainerHigh)
-                            )
-                            Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                                Text(
-                                    hd.seriesName,
-                                    color = colorScheme.onSurface,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    "已下载 ${hd.doneCount}/${hd.totalCount} 集 · " + hd.sizeText,
-                                    color = colorScheme.onSurfaceVariant,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                            }
-                        }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 10.dp),
-                            horizontalArrangement = Arrangement.End
+                        // 剧集信息卡: 海报 + 名称/进度统计 + 操作按钮(M3)
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            TextButton(onClick = { playFirstOfGroup(detailGroupKey ?: return@TextButton) }) {
-                                Text("播放全部", color = colorScheme.primary)
-                            }
-                            if (hd.failedCount > 0) {
-                                Spacer(Modifier.width(8.dp))
-                                TextButton(onClick = {
-                                    val n = DownloadTaskManager.get().retryAllFailed()
-                                    if (n > 0) ToastUtils.showShort("已重新排队 $n 个失败集")
-                                }) {
-                                    Text("重试失败(${hd.failedCount})", color = colorScheme.primary)
+                            Column(Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    PosterImage(
+                                        hd.pic,
+                                        Modifier
+                                            .width(62.dp)
+                                            .height(86.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(colorScheme.surfaceContainerHigh)
+                                    )
+                                    Column(Modifier.padding(start = 14.dp).weight(1f)) {
+                                        Text(
+                                            hd.seriesName,
+                                            color = colorScheme.onSurface,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(top = 5.dp)
+                                        ) {
+                                            Icon(
+                                                painterResource(R.drawable.ic_check_circle),
+                                                contentDescription = null,
+                                                tint = colorScheme.primary,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Text(
+                                                " ${hd.doneCount}/${hd.totalCount} 集 · " + hd.sizeText,
+                                                color = colorScheme.onSurfaceVariant,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                        if (hd.failedCount > 0) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(top = 3.dp)
+                                            ) {
+                                                Icon(
+                                                    painterResource(R.drawable.icon_error),
+                                                    contentDescription = null,
+                                                    tint = colorScheme.error,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Text(
+                                                    " $hd.failedCount 集失败",
+                                                    color = colorScheme.error,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 12.dp),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    FilledTonalButton(onClick = { playFirstOfGroup(detailGroupKey ?: return@FilledTonalButton) }) {
+                                        Text("播放全部")
+                                    }
+                                    if (hd.failedCount > 0) {
+                                        Spacer(Modifier.width(8.dp))
+                                        TextButton(onClick = {
+                                            val n = DownloadTaskManager.get().retryAllFailed()
+                                            if (n > 0) ToastUtils.showShort("已重新排队 $n 个失败集")
+                                        }) {
+                                            Text("重试失败(${hd.failedCount})", color = colorScheme.primary)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -504,46 +545,64 @@ class DownloadActivity : BaseActivity() {
                 }
                 items(epRows.value.size) { index ->
                     val row = epRows.value[index]
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                row.name,
-                                color = colorScheme.onSurface,
-                                fontSize = 14.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 状态图标
+                            Icon(
+                                painterResource(statusIcon(row.status)),
+                                contentDescription = null,
+                                tint = statusTint(row.status),
+                                modifier = Modifier.size(22.dp)
                             )
-                            Text(
-                                row.stateText,
-                                color = colorScheme.onSurfaceVariant,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(top = 3.dp)
-                            )
-                            when (row.progress) {
-                                -2 -> LinearProgressIndicator(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 6.dp)
+                            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                                Text(
+                                    row.name,
+                                    color = colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                                in 0..100 -> LinearProgressIndicator(
-                                    progress = { row.progress / 100f },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 6.dp)
+                                Text(
+                                    row.stateText,
+                                    color = if (row.status == DownloadEpisode.STATUS_FAILED) colorScheme.error
+                                    else colorScheme.onSurfaceVariant,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(top = 3.dp)
                                 )
+                                when (row.progress) {
+                                    -2 -> LinearProgressIndicator(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 6.dp)
+                                    )
+                                    in 0..100 -> LinearProgressIndicator(
+                                        progress = { row.progress / 100f },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 6.dp)
+                                    )
+                                }
                             }
-                        }
-                        if (row.actionVisible) {
-                            TextButton(onClick = {
-                                val ep = RoomDataManger.getDownloadEpisode(row.id) ?: return@TextButton
-                                handleEpisodeAction(ep)
-                            }) {
-                                Text(row.actionText, color = colorScheme.primary)
+                            if (row.actionVisible) {
+                                TextButton(onClick = {
+                                    val ep = RoomDataManger.getDownloadEpisode(row.id) ?: return@TextButton
+                                    handleEpisodeAction(ep)
+                                }) {
+                                    Text(
+                                        row.actionText,
+                                        color = if (row.actionText == "删除") colorScheme.error else colorScheme.primary
+                                    )
+                                }
                             }
                         }
                     }
@@ -551,5 +610,22 @@ class DownloadActivity : BaseActivity() {
                 item { Spacer(Modifier.height(20.dp)) }
             }
         }
+    }
+
+    /** 集数行状态图标 */
+    private fun statusIcon(status: Int): Int = when (status) {
+        DownloadEpisode.STATUS_DONE -> R.drawable.ic_check_circle
+        DownloadEpisode.STATUS_FAILED -> R.drawable.icon_error
+        DownloadEpisode.STATUS_PAUSED -> R.drawable.ic_m3_pause
+        else -> R.drawable.ic_download_nav
+    }
+
+    /** 集数行状态图标颜色 */
+    @androidx.compose.runtime.Composable
+    private fun statusTint(status: Int): androidx.compose.ui.graphics.Color = when (status) {
+        DownloadEpisode.STATUS_DONE -> colorScheme.primary
+        DownloadEpisode.STATUS_FAILED -> colorScheme.error
+        DownloadEpisode.STATUS_PAUSED -> colorScheme.onSurfaceVariant
+        else -> colorScheme.primary
     }
 }
