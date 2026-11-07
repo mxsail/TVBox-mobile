@@ -1194,6 +1194,11 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                         updatePipParams();
                     } else if (currentStatus == IntentKey.BROADCAST_ACTION_NEXT) {
                         playFragment.playNext(false);
+                    } else if (currentStatus == IntentKey.BROADCAST_ACTION_SEEK) {
+                        // 通知栏媒体卡片拖动进度条
+                        if (playFragment.getPlayer() != null) {
+                            playFragment.getPlayer().seekTo(intent.getLongExtra(IntentKey.BROADCAST_ACTION_POSITION, 0));
+                        }
                     } else if (currentStatus == IntentKey.BROADCAST_ACTION_CLOSE) {
                         playServerSwitch(false);
                         finish();
