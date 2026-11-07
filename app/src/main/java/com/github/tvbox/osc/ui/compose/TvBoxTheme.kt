@@ -255,6 +255,32 @@ fun androidx.compose.foundation.lazy.grid.LazyGridState.ObserveBarHideDeltas(
 }
 
 /**
+ * LazyList 滚动增量 → 底栏滚动隐藏联动(逻辑同 LazyGridState 版)
+ */
+@Composable
+fun androidx.compose.foundation.lazy.LazyListState.ObserveBarHideDeltas(
+    onDelta: (Int) -> Unit
+) {
+    androidx.compose.runtime.LaunchedEffect(this) {
+        var lastIndex = 0
+        var lastOffset = 0
+        androidx.compose.runtime.snapshotFlow { firstVisibleItemIndex to firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                if (index == 0 && offset == 0) {
+                    lastIndex = 0
+                    lastOffset = 0
+                    onDelta(-100) // 到顶, 强制呼出
+                    return@collect
+                }
+                val dy = (index - lastIndex) * 500 + (offset - lastOffset)
+                lastIndex = index
+                lastOffset = offset
+                if (dy > 8 || dy < -8) onDelta(dy)
+            }
+    }
+}
+
+/**
  * ScrollState 滚动增量 → 底栏滚动隐藏联动
  */
 @Composable
