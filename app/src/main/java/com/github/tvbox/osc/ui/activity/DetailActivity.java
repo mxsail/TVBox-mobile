@@ -54,6 +54,7 @@ import com.github.tvbox.osc.bean.SourceBean;
 import com.github.tvbox.osc.bean.VodInfo;
 import com.github.tvbox.osc.cache.DownloadEpisode;
 import com.github.tvbox.osc.cache.RoomDataManger;
+import com.github.tvbox.osc.cache.VodSnapshotStore;
 import com.github.tvbox.osc.constant.IntentKey;
 import com.github.tvbox.osc.databinding.ActivityDetailBinding;
 import androidx.core.content.ContextCompat;
@@ -502,100 +503,178 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             @Override
             public void onChanged(AbsXml absXml) {
                 if (absXml != null && absXml.movie != null && absXml.movie.videoList != null && absXml.movie.videoList.size() > 0) {
-                    showSuccess();
                     mVideo = absXml.movie.videoList.get(0);
                     vodInfo = new VodInfo();
                     vodInfo.setVideo(mVideo);
                     vodInfo.sourceKey = mVideo.sourceKey;
-
-                    String srcName = ApiConfig.get().getSource(mVideo.sourceKey).getName();
-                    List<String> metaList = new ArrayList<>();
-                    if (mVideo.year > 0) {
-                        metaList.add("年份: " + mVideo.year);
-                    }
-                    if (!TextUtils.isEmpty(mVideo.area)) {
-                        metaList.add("地区: " + mVideo.area.trim());
-                    }
-                    if (!TextUtils.isEmpty(mVideo.type)) {
-                        metaList.add("类型: " + mVideo.type.trim());
-                    }
-                    if (!TextUtils.isEmpty(mVideo.lang)) {
-                        metaList.add("语言: " + mVideo.lang.trim());
-                    }
-                    String subInfo = TextUtils.join("   ", metaList);
-                    boolean isPrivate = Hawk.get(HawkConfig.PRIVATE_BROWSING, false);
-
-                    if (composeBridge != null) {
-                        composeBridge.updateVideoInfo(
-                                TextUtils.isEmpty(mVideo.name) ? "暂无信息" : mVideo.name,
-                                TextUtils.isEmpty(srcName) ? "未知" : srcName,
-                                subInfo,
-                                isPrivate
-                        );
-                        boolean isVodCollect = RoomDataManger.isVodCollect(sourceKey, vodId);
-                        composeBridge.updateCollectState(isVodCollect);
-                    }
-
-                    if (vodInfo.seriesMap != null && vodInfo.seriesMap.size() > 0) {//线路
-                        if (composeBridge != null) {
-                            composeBridge.setEmptyPlaylist(false);
-                        }
-
-                        VodInfo vodInfoRecord = RoomDataManger.getVodInfo(sourceKey, vodId);
-                        // 读取历史记录
-                        if (vodInfoRecord != null) {
-                            vodInfo.playIndex = Math.max(vodInfoRecord.playIndex, 0);
-                            vodInfo.playFlag = vodInfoRecord.playFlag;
-                            vodInfo.playerCfg = vodInfoRecord.playerCfg;
-                            vodInfo.reverseSort = vodInfoRecord.reverseSort;
-                        } else {
-                            vodInfo.playIndex = 0;
-                            vodInfo.playFlag = null;
-                            vodInfo.playerCfg = "";
-                            vodInfo.reverseSort = false;
-                        }
-
-                        if (vodInfo.reverseSort) {
-                            vodInfo.reverse();
-                        }
-
-                        if (vodInfo.playFlag == null || !vodInfo.seriesMap.containsKey(vodInfo.playFlag))
-                            vodInfo.playFlag = (String) vodInfo.seriesMap.keySet().toArray()[0];
-
-                        int flagScrollTo = 0;
-                        for (int j = 0; j < vodInfo.seriesFlags.size(); j++) {
-                            VodInfo.VodSeriesFlag flag = vodInfo.seriesFlags.get(j);
-                            if (flag.name.equals(vodInfo.playFlag)) {
-                                flagScrollTo = j;
-                                flag.selected = true;
-                            } else
-                                flag.selected = false;
-                        }
-//                        setTextShow(tvPlayUrl, "播放地址：", vodInfo.seriesMap.get(vodInfo.playFlag).get(0).url);
-                        //设置线路数据
-                        seriesFlagAdapter.setNewData(vodInfo.seriesFlags);
-                        if (composeBridge != null) {
-                            composeBridge.updateLines(vodInfo.seriesFlags, flagScrollTo);
-                        }
-
-                        refreshList();
-                        if (showPreview) {
-                            jumpToPlay();
-                            mBinding.previewPlayer.setVisibility(View.VISIBLE);
-                            toggleSubtitleTextSize();
-                        }
-                        // startQuickSearch();
-                    } else {//空布局
-                        if (composeBridge != null) {
-                            composeBridge.setEmptyPlaylist(true);
-                        }
-                    }
+                    // 详情/缓存/播放时机落地快照,离线秒开与下载页直达都依赖它
+                    VodSnapshotStore.save(vodInfo);
+                    applySeriesData();
                 } else {
-                    showEmpty();
-                    mBinding.previewPlayer.setVisibility(View.GONE);
+                    // 快照已渲染(离线/源暂时不可用): 保留当前界面,不回落空态
+                    if (!hydratedFromSnapshot) {
+                        showEmpty();
+                        mBinding.previewPlayer.setVisibility(View.GONE);
+                    }
                 }
             }
         });
+    }
+
+    /**
+     * 详情渲染公共后段(详情接口成功 / 快照兜底共用):
+     * 头部信息 + 历史进度合并 + 线路/选集渲染 + (可选)预览起播。
+     */
+    private void applySeriesData() {
+        if (vodInfo == null || vodInfo.seriesMap == null) return;
+        showSuccess();
+        renderHeader();
+        if (vodInfo.seriesMap.size() > 0) {//线路
+            if (composeBridge != null) {
+                composeBridge.setEmptyPlaylist(false);
+            }
+
+            VodInfo vodInfoRecord = RoomDataManger.getVodInfo(sourceKey, vodId);
+            // 读取历史记录
+            if (vodInfoRecord != null) {
+                vodInfo.playIndex = Math.max(vodInfoRecord.playIndex, 0);
+                vodInfo.playFlag = vodInfoRecord.playFlag;
+                vodInfo.playerCfg = vodInfoRecord.playerCfg;
+                vodInfo.reverseSort = vodInfoRecord.reverseSort;
+            } else {
+                vodInfo.playIndex = 0;
+                vodInfo.playFlag = null;
+                vodInfo.playerCfg = "";
+                vodInfo.reverseSort = false;
+            }
+
+            if (vodInfo.reverseSort) {
+                vodInfo.reverse();
+            }
+
+            if (vodInfo.playFlag == null || !vodInfo.seriesMap.containsKey(vodInfo.playFlag))
+                vodInfo.playFlag = (String) vodInfo.seriesMap.keySet().toArray()[0];
+
+            updateFlagSelection();
+
+            refreshList();
+            if (autoPlayFromCache) {
+                // 下载页直达: 直接跳指定集,不再先起播历史集(避免二次起播)
+                handleAutoPlayFromCache();
+            } else if (showPreview) {
+                jumpWhenPlayerReady();
+            }
+            // startQuickSearch();
+        } else {//空布局
+            if (composeBridge != null) {
+                composeBridge.setEmptyPlaylist(true);
+            }
+        }
+    }
+
+    /** 线路栏选中态 + 数据重绑 */
+    private void updateFlagSelection() {
+        if (vodInfo.seriesFlags == null) return;
+        int flagScrollTo = 0;
+        for (int j = 0; j < vodInfo.seriesFlags.size(); j++) {
+            VodInfo.VodSeriesFlag flag = vodInfo.seriesFlags.get(j);
+            if (flag.name.equals(vodInfo.playFlag)) {
+                flagScrollTo = j;
+                flag.selected = true;
+            } else {
+                flag.selected = false;
+            }
+        }
+        //设置线路数据
+        seriesFlagAdapter.setNewData(vodInfo.seriesFlags);
+        if (composeBridge != null) {
+            composeBridge.updateLines(vodInfo.seriesFlags, flagScrollTo);
+        }
+    }
+
+    /** 头部海报/名称/元信息(详情接口与快照共用,字段统一走 vodInfo) */
+    private void renderHeader() {
+        SourceBean sourceBean = ApiConfig.get().getSource(vodInfo.sourceKey);
+        String srcName = sourceBean == null ? null : sourceBean.getName();
+        List<String> metaList = new ArrayList<>();
+        if (vodInfo.year > 0) {
+            metaList.add("年份: " + vodInfo.year);
+        }
+        if (!TextUtils.isEmpty(vodInfo.area)) {
+            metaList.add("地区: " + vodInfo.area.trim());
+        }
+        if (!TextUtils.isEmpty(vodInfo.type)) {
+            metaList.add("类型: " + vodInfo.type.trim());
+        }
+        if (!TextUtils.isEmpty(vodInfo.lang)) {
+            metaList.add("语言: " + vodInfo.lang.trim());
+        }
+        String subInfo = TextUtils.join("   ", metaList);
+        boolean isPrivate = Hawk.get(HawkConfig.PRIVATE_BROWSING, false);
+
+        if (composeBridge != null) {
+            composeBridge.updateVideoInfo(
+                    TextUtils.isEmpty(vodInfo.name) ? "暂无信息" : vodInfo.name,
+                    TextUtils.isEmpty(srcName) ? "未知" : srcName,
+                    subInfo,
+                    isPrivate
+            );
+            boolean isVodCollect = RoomDataManger.isVodCollect(sourceKey, vodId);
+            composeBridge.updateCollectState(isVodCollect);
+        }
+    }
+
+    /** 下载页直达: 按 rawUrl 在线路上定位指定集并起播(线路不同则切换线路) */
+    private void handleAutoPlayFromCache() {
+        autoPlayFromCache = false;
+        if (vodInfo == null || TextUtils.isEmpty(autoPlayUrl)) return;
+        String flag = vodInfo.playFlag;
+        int index = indexOfSeriesUrl(vodInfo.seriesMap.get(flag), autoPlayUrl);
+        if (index < 0) {
+            for (java.util.Map.Entry<String, List<VodInfo.VodSeries>> entry : vodInfo.seriesMap.entrySet()) {
+                int i = indexOfSeriesUrl(entry.getValue(), autoPlayUrl);
+                if (i >= 0) {
+                    flag = entry.getKey();
+                    index = i;
+                    break;
+                }
+            }
+        }
+        autoPlayUrl = null;
+        if (index < 0) return;
+        vodInfo.playFlag = flag;
+        vodInfo.playIndex = index;
+        updateFlagSelection();
+        refreshList();
+        jumpWhenPlayerReady();
+    }
+
+    /**
+     * 预览起播需 PlayFragment 视图就绪: 快照路径在 init() 内同步执行,
+     * fragment 事务可能尚未跑完,post 一帧兜底(网络路径本来就是异步,不受影响)。
+     */
+    private void jumpWhenPlayerReady() {
+        if (playFragment != null && playFragment.getView() != null) {
+            doPreviewJump();
+        } else if (mBinding != null) {
+            mBinding.getRoot().post(this::doPreviewJump);
+        }
+    }
+
+    private void doPreviewJump() {
+        if (isFinishing() || isDestroyed()) return;
+        jumpToPlay();
+        mBinding.previewPlayer.setVisibility(View.VISIBLE);
+        toggleSubtitleTextSize();
+    }
+
+    private int indexOfSeriesUrl(List<VodInfo.VodSeries> list, String url) {
+        if (list == null || url == null) return -1;
+        for (int i = 0; i < list.size(); i++) {
+            VodInfo.VodSeries series = list.get(i);
+            if (series != null && url.equals(series.url)) return i;
+        }
+        return -1;
     }
 
     private String getHtml(String label, String content) {
@@ -609,6 +688,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         Intent intent = getIntent();
         if (intent != null && intent.getExtras() != null) {
             Bundle bundle = intent.getExtras();
+            // 下载页"复用在线播放页"直达指定集: 快照渲染后按 rawUrl 定位并起播
+            autoPlayFromCache = bundle.getBoolean("autoPlay", false);
+            autoPlayUrl = bundle.getString("playUrl", null);
             loadDetail(bundle.getString("id", null), bundle.getString("sourceKey", ""));
         }
     }
@@ -617,12 +699,45 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         if (vid != null) {
             vodId = vid;
             sourceKey = key;
-            showLoading();
+            // 快照秒开: 本地有详情快照(含老下载兜底)先渲染界面,详情接口异步刷新覆盖
+            if (!tryHydrateFromSnapshot()) {
+                showLoading();
+            }
             sourceViewModel.getDetail(sourceKey, vodId);
             boolean isVodCollect = RoomDataManger.isVodCollect(sourceKey, vodId);
             if (composeBridge != null) {
                 composeBridge.updateCollectState(isVodCollect);
             }
+        }
+    }
+
+    /** 快照已渲染过界面(详情接口失败时不再回落空态) */
+    private boolean hydratedFromSnapshot = false;
+    /** 下载页直达: 快照渲染后定位到指定集并起播 */
+    private boolean autoPlayFromCache = false;
+    private String autoPlayUrl = null;
+
+    /**
+     * 离线秒开: 从详情快照或下载任务兜底数据渲染详情页。
+     * 成功返回 true,后续在线详情到达后经 applySeriesData 覆盖刷新。
+     */
+    private boolean tryHydrateFromSnapshot() {
+        try {
+            VodInfo snap = VodSnapshotStore.load(sourceKey, vodId);
+            if (snap == null) {
+                List<DownloadEpisode> eps = RoomDataManger.getAllDownloadEpisodes();
+                snap = VodSnapshotStore.buildFromEpisodes(sourceKey, vodId, eps);
+            }
+            if (snap == null || snap.seriesMap == null || snap.seriesMap.isEmpty()) {
+                return false;
+            }
+            hydratedFromSnapshot = true;
+            vodInfo = snap;
+            applySeriesData();
+            return true;
+        } catch (Throwable th) {
+            th.printStackTrace();
+            return false;
         }
     }
 
@@ -704,7 +819,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         hadQuickStart = true;
         OkGo.getInstance().cancelTag("quick_search");
         quickSearchWord.clear();
-        searchTitle = mVideo.name;
+        // 快照兜底打开时 mVideo 可能为空,标题从 vodInfo 取
+        searchTitle = mVideo != null && mVideo.name != null ? mVideo.name
+                : (vodInfo != null && vodInfo.name != null ? vodInfo.name : "");
         quickSearchData.clear();
         quickSearchWord.addAll(SearchHelper.splitWords(searchTitle));
         // 分词

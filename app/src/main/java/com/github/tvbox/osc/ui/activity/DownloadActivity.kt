@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.text.TextUtils
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -41,11 +42,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
-import com.blankj.utilcode.util.GsonUtils
 import com.blankj.utilcode.util.ToastUtils
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.base.BaseActivity
-import com.github.tvbox.osc.bean.VideoInfo
 import com.github.tvbox.osc.cache.DownloadEpisode
 import com.github.tvbox.osc.cache.RoomDataManger
 import com.github.tvbox.osc.download.DownloadStorage
@@ -67,8 +66,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * 缓存详情页(Compose): 某剧的集数列表, 离线播放/暂停/继续/重试/删除。
- * 裸进入(无 groupKey)时转跳"我的下载" tab。业务逻辑(实时进度/后台加载)原样保留。
+ * 下载详情页(Compose): 某剧的集数列表, 离线播放/暂停/继续/重试/删除。
+ * 播放复用在线播放页(DetailActivity 详情快照秒开+选集打钩), 已下载集命中本地文件,
+ * 未下载集在线播放可直接连播; 裸进入(无 groupKey)时转跳"我的下载" tab。
+ * 业务逻辑(实时进度/后台加载)原样保留。
  */
 class DownloadActivity : BaseActivity() {
 
@@ -148,13 +149,30 @@ class DownloadActivity : BaseActivity() {
 
     private fun playFirstOfGroup(groupKey: String) {
         val eps = RoomDataManger.getAllDownloadEpisodes()
+        var first: DownloadEpisode? = null
         for (ep in eps) {
             if (groupKey == ep.groupKey() && ep.status == DownloadEpisode.STATUS_DONE) {
-                playEpisode(groupKey, ep.getId())
-                return
+                if (first == null || ep.episodeIndex < first!!.episodeIndex) first = ep
             }
         }
-        ToastUtils.showShort("还没有下载完成的剧集")
+        if (first == null) {
+            ToastUtils.showShort("还没有下载完成的剧集")
+            return
+        }
+        launchOnlinePlay(first!!)
+    }
+
+    /**
+     * 复用在线播放页(DetailActivity): 详情快照秒开、选集打钩、已下载集自动播本地文件,
+     * 未下载集在线播放,播完可直接连播下一集,无需退出。
+     */
+    private fun launchOnlinePlay(ep: DownloadEpisode) {
+        val intent = Intent(this, DetailActivity::class.java)
+        intent.putExtra("id", ep.vodId)
+        intent.putExtra("sourceKey", ep.sourceKey)
+        intent.putExtra("autoPlay", true)
+        intent.putExtra("playUrl", ep.rawUrl)
+        startActivity(intent)
     }
 
     private fun confirmDeleteSeries(groupKey: String?, seriesName: String?) {
@@ -211,43 +229,6 @@ class DownloadActivity : BaseActivity() {
                 }
             }
             .show()
-    }
-
-    /** 从同一剧集组中已完成的集数构建离线播放列表(复用本地播放器) */
-    private fun playEpisode(groupKey: String, episodeId: Int) {
-        val eps = RoomDataManger.getAllDownloadEpisodes()
-        val doneList = ArrayList<DownloadEpisode>()
-        var clicked: DownloadEpisode? = null
-        for (ep in eps) {
-            if (groupKey != ep.groupKey()) continue
-            if (ep.getId() == episodeId) clicked = ep
-            if (ep.status == DownloadEpisode.STATUS_DONE && ep.localFilePath != null
-                && File(ep.localFilePath).exists()
-            ) {
-                doneList.add(ep)
-            }
-        }
-        if (clicked == null || doneList.isEmpty()) {
-            ToastUtils.showShort("下载文件不存在")
-            loadData()
-            return
-        }
-        doneList.sortWith { a, b -> a.episodeIndex.compareTo(b.episodeIndex) }
-        val videoList = ArrayList<VideoInfo>()
-        var position = 0
-        for (i in doneList.indices) {
-            val ep = doneList[i]
-            if (ep.getId() == clicked.getId()) position = i
-            val vi = VideoInfo()
-            vi.path = ep.localFilePath
-            vi.displayName = ep.displayTitle()
-            vi.size = ep.totalBytes
-            videoList.add(vi)
-        }
-        val intent = Intent(this, LocalPlayActivity::class.java)
-        intent.putExtra("videoList", GsonUtils.toJson(videoList))
-        intent.putExtra("position", position)
-        startActivity(intent)
     }
 
     @Suppress("unused")
@@ -552,6 +533,16 @@ class DownloadActivity : BaseActivity() {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clickable(enabled = row.status == DownloadEpisode.STATUS_DONE) {
+                                    // 已下载集: 复用在线播放页,本地命中直接播
+                                    val ep = RoomDataManger.getDownloadEpisode(row.id)
+                                        ?: return@clickable
+                                    if (ep.localFilePath != null && File(ep.localFilePath).exists()) {
+                                        launchOnlinePlay(ep)
+                                    } else {
+                                        ToastUtils.showShort("下载文件不存在")
+                                    }
+                                }
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
