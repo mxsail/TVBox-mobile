@@ -66,11 +66,11 @@ public class CacheGridAdapter extends BaseQuickAdapter<CacheGridAdapter.Item, Ba
     public static String buildNote(int done, int total, int waiting, int resolving, int downloading,
                                    int paused, int failed) {
         if (done >= total && total > 0) {
-            return "已缓存 " + total + " 集";
+            return "已下载 " + total + " 集";
         }
         String prefix = null;
         if (downloading > 0 || resolving > 0) {
-            prefix = "缓存中 ";
+            prefix = "下载中 ";
         } else if (waiting > 0) {
             prefix = "排队中 ";
         } else if (paused > 0) {
@@ -78,7 +78,7 @@ public class CacheGridAdapter extends BaseQuickAdapter<CacheGridAdapter.Item, Ba
         } else if (failed > 0) {
             prefix = "有失败 ";
         }
-        String base = "已缓存 " + done + "/" + total + " 集";
+        String base = "已下载 " + done + "/" + total + " 集";
         if (failed > 0) {
             base += " · " + failed + " 集失败";
         }

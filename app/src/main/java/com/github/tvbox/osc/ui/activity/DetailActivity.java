@@ -944,11 +944,11 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     public void queueDownloadAfterPlay(List<DownloadEpisode> tasks) {
         if (playbackStarted || playFragment == null) {
             DownloadTaskManager.get().enqueue(tasks);
-            ToastUtils.showShort("已加入缓存队列,可在通知栏查看进度");
+            ToastUtils.showShort("已加入下载队列,可在通知栏查看进度");
             return;
         }
         pendingDownloadTasks.addAll(tasks);
-        ToastUtils.showShort(String.format("开始播放后将自动开始缓存(%d集)", tasks.size()));
+        ToastUtils.showShort(String.format("开始播放后将自动开始下载(%d集)", tasks.size()));
         // 播放器空闲/出错(没有在加载)时主动起播当前集;正在加载则等它自己起播
         if (playFragment.isPlayerIdleOrError()) {
             jumpToPlay();
@@ -963,11 +963,11 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         List<DownloadEpisode> tasks = new ArrayList<>(pendingDownloadTasks);
         pendingDownloadTasks.clear();
         DownloadTaskManager.get().enqueue(tasks);
-        ToastUtils.showShort(String.format("已开始播放,自动开始缓存(%d集)", tasks.size()));
+        ToastUtils.showShort(String.format("已开始播放,自动开始下载(%d集)", tasks.size()));
     }
 
     /**
-     * 刷新集数列表的"已缓存"角标
+     * 刷新集数列表的"已下载"角标
      */
     public void refreshCachedBadge() {
         if (vodInfo == null || vodInfo.seriesMap == null

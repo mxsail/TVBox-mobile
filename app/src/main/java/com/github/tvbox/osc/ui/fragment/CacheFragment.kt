@@ -63,7 +63,7 @@ import kotlin.collections.Map
 import kotlin.collections.Set
 
 /**
- * "我的缓存" tab(Compose 渲染层): 每部剧一张海报卡, 点卡片进详情(DownloadActivity 详情模式),
+ * "我的下载" tab(Compose 渲染层): 每部剧一张海报卡, 点卡片进详情(DownloadActivity 详情模式),
  * 长按删剧, 右上清空。下载业务逻辑(实时进度/两段渲染/大小缓存/节流)原样保留, 仅视图换 Compose。
  * 供 DownloadActivity(Java) 复用的静态缓存方法以 @JvmStatic 保留。
  */
@@ -144,7 +144,7 @@ class CacheFragment : Fragment() {
                 IconButton(onClick = { currentActivity?.let { confirmClearAll(it) } }) {
                     Icon(
                         androidx.compose.ui.res.painterResource(R.drawable.ic_clear),
-                        contentDescription = "清空缓存",
+                        contentDescription = "清空下载",
                         tint = colorScheme.onSurface
                     )
                 }
@@ -157,7 +157,7 @@ class CacheFragment : Fragment() {
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("暂无缓存", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    Text("暂无下载", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 }
             } else {
                 LazyVerticalGrid(
@@ -386,8 +386,8 @@ class CacheFragment : Fragment() {
 
     private fun confirmDeleteSeries(act: android.app.Activity, groupKey: String, seriesName: String) {
         MaterialAlertDialogBuilder(act)
-            .setTitle("删除缓存")
-            .setMessage("确定删除《${seriesName ?: ""}》的全部缓存文件吗?")
+            .setTitle("删除下载")
+            .setMessage("确定删除《${seriesName ?: ""}》的全部下载文件吗?")
             .setNegativeButton("取消", null)
             .setPositiveButton("确定") { _, _ ->
                 loadExecutor.execute {
@@ -413,8 +413,8 @@ class CacheFragment : Fragment() {
 
     private fun confirmClearAll(act: android.app.Activity) {
         MaterialAlertDialogBuilder(act)
-            .setTitle("清空缓存")
-            .setMessage("确定删除全部缓存文件吗?")
+            .setTitle("清空下载")
+            .setMessage("确定删除全部下载文件吗?")
             .setNegativeButton("取消", null)
             .setPositiveButton("确定") { _, _ ->
                 loadExecutor.execute {

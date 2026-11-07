@@ -83,11 +83,11 @@ public class DownloadService extends Service {
         EventBus.getDefault().register(this);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-            NotificationChannel progress = new NotificationChannel(CHANNEL_PROGRESS, "缓存进度",
+            NotificationChannel progress = new NotificationChannel(CHANNEL_PROGRESS, "下载进度",
                     NotificationManager.IMPORTANCE_LOW);
             progress.setShowBadge(false);
             nm.createNotificationChannel(progress);
-            NotificationChannel done = new NotificationChannel(CHANNEL_DONE, "缓存完成提醒",
+            NotificationChannel done = new NotificationChannel(CHANNEL_DONE, "下载完成提醒",
                     NotificationManager.IMPORTANCE_DEFAULT);
             nm.createNotificationChannel(done);
         }
@@ -107,13 +107,13 @@ public class DownloadService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // 初始通知必须如实反映全局暂停状态,否则暂停后服务重启会
-        // 重新显示"正在缓存视频/暂停全部",用户找不到任何"继续"入口
+        // 重新显示"正在下载视频/暂停全部",用户找不到任何"继续"入口
         if (DownloadTaskManager.get().isPausedAll()) {
             startForeground(FOREGROUND_ID,
                     buildNotification("已暂停", "下载已全部暂停,点击继续可恢复", 0, false));
         } else {
             startForeground(FOREGROUND_ID,
-                    buildNotification("正在缓存视频", "正在准备下载任务…", 0, true));
+                    buildNotification("正在下载视频", "正在准备下载任务…", 0, true));
         }
         if (!wakeLock.isHeld()) {
             wakeLock.acquire();
@@ -141,7 +141,7 @@ public class DownloadService extends Service {
         }
         if (event.type == DownloadEvent.TYPE_MERGING) {
             // 合并/转封装期间:不确定进度圈 + 固定文案
-            String title = (event.title == null || event.title.isEmpty()) ? "正在缓存视频" : event.title;
+            String title = (event.title == null || event.title.isEmpty()) ? "正在下载视频" : event.title;
             updateNotification(buildNotification(title, "正在合成视频…", 0, true));
             return;
         }
@@ -155,7 +155,7 @@ public class DownloadService extends Service {
         lastNotifyTime = now;
         // 进度事件不再查库(hasActiveTasks 是主线程全表查询):
         // 任务排空必然伴随 TASKS_CHANGED 事件,停服务在那边处理
-        String title = "正在缓存视频";
+        String title = "正在下载视频";
         String text = buildProgressText(event);
         updateNotification(buildNotification(title, text, percentOf(event), true));
     }
@@ -211,8 +211,8 @@ public class DownloadService extends Service {
         try {
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_DONE)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle("缓存完成")
-                    .setContentText((event.title == null ? "视频" : event.title) + " 已保存到应用内缓存")
+                    .setContentTitle("下载完成")
+                    .setContentText((event.title == null ? "视频" : event.title) + " 已保存到本地")
                     .setAutoCancel(true)
                     .setContentIntent(contentIntent());
             NotificationManagerCompat.from(this).notify(200 + event.episodeId, builder.build());
@@ -226,7 +226,7 @@ public class DownloadService extends Service {
     }
 
     private PendingIntent contentIntent() {
-        // 点击直达底部"我的缓存"tab(复用已存在的 MainActivity 实例)
+        // 点击直达底部"我的下载"tab(复用已存在的 MainActivity 实例)
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP
                 | Intent.FLAG_ACTIVITY_SINGLE_TOP);

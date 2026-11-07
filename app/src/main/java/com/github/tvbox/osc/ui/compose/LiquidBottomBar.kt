@@ -155,7 +155,7 @@ data class BottomBarTabItem(
 val MainBottomTabs = listOf(
     BottomBarTabItem(R.drawable.ic_home, "首页"),
     BottomBarTabItem(R.drawable.ic_live_tv_48, "直播"),
-    BottomBarTabItem(R.drawable.ic_download_nav, "缓存"),
+    BottomBarTabItem(R.drawable.ic_download_nav, "下载"),
     BottomBarTabItem(R.drawable.ic_my, "我的")
 )
 

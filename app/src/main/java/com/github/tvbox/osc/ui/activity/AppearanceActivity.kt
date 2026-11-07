@@ -740,7 +740,7 @@ class AppearanceActivity : BaseActivity() {
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val tabs = listOf("首页", "直播", "缓存", "我的")
+                            val tabs = listOf("首页", "直播", "下载", "我的")
                             tabs.forEachIndexed { i, label ->
                                 val selected = i == 0
                                 Box(contentAlignment = Alignment.Center) {

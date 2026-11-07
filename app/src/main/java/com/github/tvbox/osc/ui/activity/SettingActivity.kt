@@ -281,7 +281,7 @@ class SettingActivity : BaseActivity() {
                     }
                 }
 
-                SectionTitle("播放与缓存")
+                SectionTitle("播放与下载")
                 GroupCard {
                     MenuRow(R.drawable.ic_m3_play_arrow, "播放器", playValue) {
                         val players = PlayerHelper.getExistPlayerTypes()
@@ -299,7 +299,7 @@ class SettingActivity : BaseActivity() {
                         videoPurify = newValue
                         Hawk.put(HawkConfig.VIDEO_PURIFY, newValue)
                     }
-                    SwitchRow(R.drawable.ic_download_18, "缓存仅Wi-Fi下载", wifiOnly) { newValue ->
+                    SwitchRow(R.drawable.ic_download_18, "仅Wi-Fi下载", wifiOnly) { newValue ->
                         wifiOnly = newValue
                         Hawk.put(HawkConfig.DOWNLOAD_WIFI_ONLY, newValue)
                     }

@@ -92,7 +92,7 @@
 
                     <TextView
                         style="@style/M3MenuText"
-                        android:text="我的缓存" />
+                        android:text="我的下载" />
 
                     <Space
                         android:layout_width="0dp"

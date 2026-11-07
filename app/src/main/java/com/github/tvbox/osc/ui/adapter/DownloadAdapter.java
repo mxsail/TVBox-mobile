@@ -117,13 +117,13 @@ public class DownloadAdapter extends BaseSectionQuickAdapter<DownloadSection, Ba
                 break;
             case DownloadEpisode.STATUS_FAILED:
                 pb.setVisibility(View.GONE);
-                tvState.setText(TextUtils.isEmpty(ep.errMsg) ? "缓存失败" : ep.errMsg);
+                tvState.setText(TextUtils.isEmpty(ep.errMsg) ? "下载失败" : ep.errMsg);
                 btnAction.setText("重试");
                 break;
             case DownloadEpisode.STATUS_DONE:
             default:
                 pb.setVisibility(View.GONE);
-                tvState.setText("已缓存 · " + DownloadStorage.formatSize(ep.totalBytes)
+                tvState.setText("已下载 · " + DownloadStorage.formatSize(ep.totalBytes)
                         + (ep.localFilePath != null && ep.localFilePath.endsWith(".m3u8") ? " (分片模式)" : ""));
                 btnAction.setText("删除");
                 break;
@@ -138,7 +138,7 @@ public class DownloadAdapter extends BaseSectionQuickAdapter<DownloadSection, Ba
         ImageView ivPic = helper.getView(R.id.ivPic);
         TextView btnRetryFailed = helper.getView(R.id.btnRetryFailed);
         tvName.setText(section.seriesName);
-        tvState.setText("已缓存 " + section.doneCount + "/" + section.totalCount + " 集 · "
+        tvState.setText("已下载 " + section.doneCount + "/" + section.totalCount + " 集 · "
                 + DownloadStorage.formatSize(section.sizeBytes));
         // 统计本组失败集,有失败才显示一键重试按钮(episode section 的分组 key 要经 t.groupKey() 取)
         int failed = 0;

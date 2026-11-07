@@ -12,7 +12,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="缓存剧集"
+        android:text="下载剧集"
         android:textColor="?attr/colorOnSurface"
         android:textSize="18sp"
         android:textStyle="bold" />
@@ -114,7 +114,7 @@
             android:background="@drawable/shape_cache_confirm"
             android:paddingHorizontal="30dp"
             android:paddingVertical="10dp"
-            android:text="开始缓存(0集)"
+            android:text="开始下载(0集)"
             android:textColor="?attr/colorOnPrimary"
             android:textSize="14sp" />
     </LinearLayout>

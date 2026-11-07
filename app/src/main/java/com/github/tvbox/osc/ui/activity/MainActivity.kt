@@ -66,7 +66,7 @@ import kotlin.system.exitProcess
 class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBarHost {
 
     companion object {
-        /** 通知/页面跳转直达指定底部 tab(0=首页 1=直播 2=我的缓存 3=我的) */
+        /** 通知/页面跳转直达指定底部 tab(0=首页 1=直播 2=我的下载 3=我的) */
         const val EXTRA_TAB = "extra_tab"
     }
 

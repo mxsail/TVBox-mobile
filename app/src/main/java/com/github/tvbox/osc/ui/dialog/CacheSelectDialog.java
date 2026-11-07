@@ -92,7 +92,7 @@ public class CacheSelectDialog extends BottomPopupView {
         mAdapter.setOnItemClickListener((adapter, view, position) -> {
             CacheSelectAdapter.Item item = mAdapter.getData().get(position);
             if (item.cached) {
-                ToastUtils.showShort("该集已缓存");
+                ToastUtils.showShort("该集已下载");
                 return;
             }
             item.checked = !item.checked;
@@ -135,7 +135,7 @@ public class CacheSelectDialog extends BottomPopupView {
                 if (item.checked) selected.add(item);
             }
             if (selected.isEmpty()) {
-                ToastUtils.showShort("请先选择要缓存的剧集");
+                ToastUtils.showShort("请先选择要下载的剧集");
                 return;
             }
             startDownload(selected);
@@ -154,13 +154,13 @@ public class CacheSelectDialog extends BottomPopupView {
         for (CacheSelectAdapter.Item item : mAdapter.getData()) {
             if (item.checked) count++;
         }
-        tvConfirm.setText("开始缓存(" + count + "集)");
+        tvConfirm.setText("开始下载(" + count + "集)");
     }
 
     private void startDownload(List<CacheSelectAdapter.Item> selected) {
         if (TextUtils.isEmpty(mVodInfo.id)) {
             // 缺 id 的任务会落进 null_null 目录且分组/续播/优先播本地全部失效,直接拒绝
-            ToastUtils.showShort("该数据源未返回影片ID,暂不支持缓存");
+            ToastUtils.showShort("该数据源未返回影片ID,暂不支持下载");
             return;
         }
         if (!showDisclaimerIfNeeded()) {
@@ -187,7 +187,7 @@ public class CacheSelectDialog extends BottomPopupView {
             ((DetailActivity) getContext()).queueDownloadAfterPlay(tasks);
         } else {
             DownloadTaskManager.get().enqueue(tasks);
-            ToastUtils.showShort("已加入缓存队列,可在通知栏查看进度");
+            ToastUtils.showShort("已加入下载队列,可在通知栏查看进度");
         }
         dismiss();
     }
@@ -202,9 +202,9 @@ public class CacheSelectDialog extends BottomPopupView {
         Activity activity = (Activity) getContext();
         new MaterialAlertDialogBuilder(activity)
                 .setTitle("免责声明")
-                .setMessage("使用应用内缓存功能前,请仔细阅读并同意以下条款:\n\n" +
+                .setMessage("使用应用内下载功能前,请仔细阅读并同意以下条款:\n\n" +
                                 "1. 视频内容均来自第三方数据源,本应用不存储、不上传、不分发任何视频内容;\n\n" +
-                                "2. 缓存的视频仅供您本人在本应用内离线观看,严禁传播、分发或用于任何商业用途;\n\n" +
+                                "2. 下载的视频仅供您本人在本应用内离线观看,严禁传播、分发或用于任何商业用途;\n\n" +
                                 "3. 请尊重内容版权,支持正版;因使用本功能产生的任何法律责任由您自行承担。\n\n" +
                                 "点击\"同意\"即表示您已阅读并接受以上条款。")
                 .setNegativeButton("取消", null)
@@ -252,7 +252,7 @@ public class CacheSelectDialog extends BottomPopupView {
             Hawk.put(HawkConfig.DOWNLOAD_BATTERY_PROMPTED, true);
             new MaterialAlertDialogBuilder(context)
                     .setTitle("下载保活提示")
-                    .setMessage("锁屏或长时间缓存时,系统休眠/省电冻结可能中断下载任务。\n\n建议把 TVBox 加入电池优化白名单:系统 设置→电池→启动管理 中允许后台运行、保持关联启动。\n\n现在打开电池优化设置吗?")
+                    .setMessage("锁屏或长时间下载时,系统休眠/省电冻结可能中断下载任务。\n\n建议把 TVBox 加入电池优化白名单:系统 设置→电池→启动管理 中允许后台运行、保持关联启动。\n\n现在打开电池优化设置吗?")
                     .setNegativeButton("下次再说", null)
                     .setPositiveButton("去设置", (dialog, which) -> {
                                 try {

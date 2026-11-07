@@ -65,7 +65,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 缓存详情页(Compose): 某剧的集数列表, 离线播放/暂停/继续/重试/删除。
- * 裸进入(无 groupKey)时转跳"我的缓存" tab。业务逻辑(实时进度/后台加载)原样保留。
+ * 裸进入(无 groupKey)时转跳"我的下载" tab。业务逻辑(实时进度/后台加载)原样保留。
  */
 class DownloadActivity : BaseActivity() {
 
@@ -95,7 +95,7 @@ class DownloadActivity : BaseActivity() {
 
     private val epRows = mutableStateOf<List<EpRow>>(emptyList())
     private val header = mutableStateOf<HeaderData?>(null)
-    private var titleState = mutableStateOf("缓存详情")
+    private var titleState = mutableStateOf("下载详情")
 
     private var detailGroupKey: String? = null
     private var detailSeriesName: String? = null
@@ -150,13 +150,13 @@ class DownloadActivity : BaseActivity() {
                 return
             }
         }
-        ToastUtils.showShort("还没有缓存完成的剧集")
+        ToastUtils.showShort("还没有下载完成的剧集")
     }
 
     private fun confirmDeleteSeries(groupKey: String?, seriesName: String?) {
         MaterialAlertDialogBuilder(this)
-            .setTitle("删除缓存")
-            .setMessage("确定删除《" + (seriesName ?: "") + "》的全部缓存文件吗?")
+            .setTitle("删除下载")
+            .setMessage("确定删除《" + (seriesName ?: "") + "》的全部下载文件吗?")
             .setNegativeButton("取消", null)
             .setPositiveButton("确定") { _, _ ->
                 loadExecutor.execute {
@@ -184,8 +184,8 @@ class DownloadActivity : BaseActivity() {
 
     private fun confirmDelete(ep: DownloadEpisode) {
         MaterialAlertDialogBuilder(this)
-            .setTitle("删除缓存")
-            .setMessage("确定删除 " + ep.displayTitle() + " 的缓存文件吗?")
+            .setTitle("删除下载")
+            .setMessage("确定删除 " + ep.displayTitle() + " 的下载文件吗?")
             .setNegativeButton("取消", null)
             .setPositiveButton("确定") { _, _ ->
                 loadExecutor.execute {
@@ -224,7 +224,7 @@ class DownloadActivity : BaseActivity() {
             }
         }
         if (clicked == null || doneList.isEmpty()) {
-            ToastUtils.showShort("缓存文件不存在")
+            ToastUtils.showShort("下载文件不存在")
             loadData()
             return
         }
@@ -337,7 +337,7 @@ class DownloadActivity : BaseActivity() {
             size += episodeSize(ep)
         }
         runOnUiThread {
-            titleState.value = detailSeriesName ?: "缓存详情"
+            titleState.value = detailSeriesName ?: "下载详情"
             header.value = HeaderData(
                 seriesName = (com.github.tvbox.osc.ui.fragment.CacheFragment.displayNameOf(first)
                     + " · " + first.flag),
@@ -396,12 +396,12 @@ class DownloadActivity : BaseActivity() {
             }
             DownloadEpisode.STATUS_FAILED -> return EpRow(
                 ep.getId(), ep.episodeName,
-                if (TextUtils.isEmpty(ep.errMsg)) "缓存失败" else ep.errMsg!!,
+                if (TextUtils.isEmpty(ep.errMsg)) "下载失败" else ep.errMsg!!,
                 "重试", true, -1
             )
             else -> return EpRow(
                 ep.getId(), ep.episodeName,
-                "已缓存 · " + DownloadStorage.formatSize(ep.totalBytes)
+                "已下载 · " + DownloadStorage.formatSize(ep.totalBytes)
                     + (if (ep.localFilePath != null && ep.localFilePath.endsWith(".m3u8")) " (分片模式)" else ""),
                 "删除", true, -1
             )
@@ -438,7 +438,7 @@ class DownloadActivity : BaseActivity() {
                         IconButton(onClick = { confirmDeleteSeries(detailGroupKey, detailSeriesName) }) {
                             Icon(
                                 painterResource(R.drawable.ic_clear),
-                                contentDescription = "删除全剧缓存",
+                                contentDescription = "删除全剧下载",
                                 tint = colorScheme.onSurface
                             )
                         }
@@ -474,7 +474,7 @@ class DownloadActivity : BaseActivity() {
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    "已缓存 ${hd.doneCount}/${hd.totalCount} 集 · " + hd.sizeText,
+                                    "已下载 ${hd.doneCount}/${hd.totalCount} 集 · " + hd.sizeText,
                                     color = colorScheme.onSurfaceVariant,
                                     fontSize = 12.sp,
                                     modifier = Modifier.padding(top = 4.dp)

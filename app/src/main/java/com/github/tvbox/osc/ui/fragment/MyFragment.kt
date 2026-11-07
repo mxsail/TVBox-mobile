@@ -368,7 +368,7 @@ class MyFragment : Fragment() {
     private fun FunctionsCard(currentActivity: android.app.Activity?, onGoToTab: ((Int) -> Unit)?) {
         val funcs = listOf(
             FuncEntry(R.drawable.ic_collect_48, "我的收藏") { jumpActivity(currentActivity, CollectActivity::class.java) },
-            FuncEntry(R.drawable.ic_download_nav, "我的缓存") { onGoToTab?.invoke(2) ?: goMainTab(currentActivity, 2) },
+            FuncEntry(R.drawable.ic_download_nav, "我的下载") { onGoToTab?.invoke(2) ?: goMainTab(currentActivity, 2) },
             FuncEntry(R.drawable.ic_database_48, "订阅源") { jumpActivity(currentActivity, SubscriptionActivity::class.java) },
             FuncEntry(R.drawable.ic_live_tv_48, "直播源") { jumpActivity(currentActivity, LiveSourceActivity::class.java) },
             FuncEntry(R.drawable.ic_settings, "设置") { jumpActivity(currentActivity, SettingActivity::class.java) },
