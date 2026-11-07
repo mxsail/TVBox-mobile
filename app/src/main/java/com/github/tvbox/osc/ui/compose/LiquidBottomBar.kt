@@ -141,7 +141,8 @@ object LiquidBarSpec {
     const val InsetDp: Int = 4            // 外壳内边距 / 采样层与滑块的水平 padding (4dp)
     const val TopInsetDp: Int = 6         // 顶部预留 6dp, 供水滴膨胀突破边界
     const val ContentHeightDp: Int = HeightDp - InsetDp * 2 // Layer 2 / Layer 3 实际内容高度 (48dp)
-    const val PressedHeightDp: Int = 66   // 按下膨胀目标高 66dp (66/48 黄金比例膨胀 1.375x)
+    const val PressedHeightDp: Int = 68   // 按下膨胀目标高 68dp (官方 64/56/78 链 x0.875, 68/48 ≈ 1.417x, 保证两端同心包络)
+    const val HorizontalMarginDp: Int = 24 // 悬浮底栏左右外边距
     const val OccupiedHeightDp: Int = HeightDp + TopInsetDp // View 侧底部避让
     const val IconTextGapDp: Int = 1     // 图标与文字间距 1dp
 }
@@ -541,12 +542,16 @@ fun LiquidBottomTabs(
                 visibilityThreshold = 0.001f,
                 initialScale = 1f,
                 pressedScale = LiquidBarSpec.PressedHeightDp.toFloat() / LiquidBarSpec.ContentHeightDp.toFloat(),
-                onDragStarted = {
+                onDragStarted = { position ->
                     isDraggingSlider = true
                     pendingDragTargetTab = -1
-                    val snapped = targetValue.fastRoundToInt().coerceIn(0, tabsCount - 1).toFloat()
-                    if (abs(targetValue - snapped) > 0.001f) {
-                        updateValue(snapped)
+                    // 全域手势: 按下位置所在 Tab 即为目标, 非激活 Tab 按下即弹射飞渡
+                    val insetPx = with(density) { 4f.dp.toPx() }
+                    val touchX = (position.x - insetPx).coerceIn(0f, constraints.maxWidth.toFloat() - insetPx * 2)
+                    val rawTab = (touchX / currentTabWidth).toInt().coerceIn(0, tabsCount - 1)
+                    val touchedTab = if (isLtr) rawTab else (tabsCount - 1 - rawTab)
+                    if (abs(targetValue - touchedTab) > 0.001f) {
+                        updateValue(touchedTab.toFloat())
                     }
                 },
                 onDragStopped = {
@@ -685,15 +690,17 @@ fun LiquidBottomTabs(
                                 val progress = dampedDragAnimation.pressProgress
                                 Highlight.Default.copy(alpha = progress)
                             },
-                            layerBlock = {
-                                val progress = dampedDragAnimation.pressProgress
-                                val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
-                                scaleX = scale
-                                scaleY = scale
-                            },
+                            // 官方: 采样层胶囊本身不缩放, 使液滴内可见等比缩小的内凹边缘
                             onDrawSurface = { drawRect(containerColor) }
                         )
                         .then(interactiveHighlight.modifier)
+                        // 仅缩放图标内容层 (位于 drawBackdrop 之后), 与 Layer 1 外壳的缩放保持一致, 防止高亮图标偏移
+                        .graphicsLayer {
+                            val progress = dampedDragAnimation.pressProgress
+                            val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
+                            scaleX = scale
+                            scaleY = scale
+                        }
                         .height(LiquidBarSpec.ContentHeightDp.dp)
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp),
@@ -711,8 +718,6 @@ fun LiquidBottomTabs(
                             if (isLtr) dampedDragAnimation.value * tabWidth + panelOffset
                             else size.width - (dampedDragAnimation.value + 1f) * tabWidth + panelOffset
                     }
-                    .then(interactiveHighlight.gestureModifier)
-                    .then(dampedDragAnimation.modifier)
                     .drawBackdrop(
                         backdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop),
                         shape = { Capsule },
@@ -790,8 +795,6 @@ fun LiquidBottomTabs(
                         }
                         translationX = startX + panelOffset
                     }
-                    .then(interactiveHighlight.gestureModifier)
-                    .then(dampedDragAnimation.modifier)
                     .size(indicatorWidth, indicatorHeight)
                     .clip(Capsule)
                     .background(MaterialTheme.colorScheme.primaryContainer)
@@ -810,6 +813,15 @@ fun LiquidBottomTabs(
                 content = content
             )
         }
+
+        // 全局手势交互层: 覆盖底栏全域 (任意 Tab 按下即刻水滴膨胀与弹射飞渡)
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(barHeight)
+                .then(interactiveHighlight.gestureModifier)
+                .then(dampedDragAnimation.modifier)
+        )
     }
 }
 
@@ -836,8 +848,8 @@ fun LiquidBottomBar(
         modifier = modifier
             .fillMaxWidth()
             .padding(
-                start = if (floating) 16.dp else 0.dp,
-                end = if (floating) 16.dp else 0.dp,
+                start = if (floating) LiquidBarSpec.HorizontalMarginDp.dp else 0.dp,
+                end = if (floating) LiquidBarSpec.HorizontalMarginDp.dp else 0.dp,
                 top = if (floating) LiquidBarSpec.TopInsetDp.dp else 0.dp,
                 bottom = if (floating) (navInsetBottom + 10.dp) else 0.dp
             )
