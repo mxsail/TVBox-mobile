@@ -215,6 +215,7 @@ class MyFragment : Fragment() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(colorScheme.background)
                 .verticalScroll(scrollState)
                 .padding(bottom = bottomPadding)
         ) {

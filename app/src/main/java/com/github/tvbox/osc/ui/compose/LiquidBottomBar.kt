@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -142,7 +143,7 @@ object LiquidBarSpec {
     const val ContentHeightDp: Int = HeightDp - InsetDp * 2 // Layer 2 / Layer 3 实际内容高度 (48dp)
     const val PressedHeightDp: Int = 66   // 按下膨胀目标高 66dp (66/48 黄金比例膨胀 1.375x)
     const val OccupiedHeightDp: Int = HeightDp + TopInsetDp // View 侧底部避让
-    const val IconTextGapDp: Int = 2     // 图标与文字间距 2dp
+    const val IconTextGapDp: Int = 1     // 图标与文字间距 1dp
 }
 
 data class BottomBarTabItem(
@@ -338,7 +339,7 @@ class DampedDragAnimation(
     private val scaleYAnimationSpec = spring(0.7f, 250f, 0.001f)
 
     private val valueAnimation = Animatable(initialValue, visibilityThreshold)
-    private val velocityAnimation = Animatable(0f, 5f)
+    private val velocityAnimation = Animatable(0f, 0.001f)
     private val pressProgressAnimation = Animatable(0f, 0.001f)
     private val scaleXAnimation = Animatable(initialScale, 0.001f)
     private val scaleYAnimation = Animatable(initialScale, 0.001f)
@@ -394,13 +395,21 @@ class DampedDragAnimation(
             launch { pressProgressAnimation.animateTo(0f, pressProgressAnimationSpec) }
             launch { scaleXAnimation.animateTo(initialScale, scaleXAnimationSpec) }
             launch { scaleYAnimation.animateTo(initialScale, scaleYAnimationSpec) }
+            if (velocity != 0f) {
+                launch { velocityAnimation.animateTo(0f, velocityAnimationSpec) }
+            }
         }
     }
 
     fun updateValue(value: Float) {
         val target = value.coerceIn(valueRange)
         animationScope.launch {
-            launch { valueAnimation.animateTo(target, valueAnimationSpec) { updateVelocity() } }
+            launch {
+                valueAnimation.animateTo(target, valueAnimationSpec) { updateVelocity() }
+                if (velocity != 0f) {
+                    velocityAnimation.animateTo(0f, velocityAnimationSpec)
+                }
+            }
         }
     }
 
@@ -520,9 +529,10 @@ fun LiquidBottomTabs(
 
         val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
         val animationScope = rememberCoroutineScope()
-        var currentIndex by remember(selectedTabIndex) {
-            mutableIntStateOf(selectedTabIndex())
-        }
+        val currentSelectedTabIndex by rememberUpdatedState(selectedTabIndex)
+        val currentOnTabSelected by rememberUpdatedState(onTabSelected)
+        var isDraggingSlider by remember { mutableStateOf(false) }
+        var pendingDragTargetTab by remember { mutableIntStateOf(-1) }
         val dampedDragAnimation = remember(animationScope) {
             DampedDragAnimation(
                 animationScope = animationScope,
@@ -531,11 +541,20 @@ fun LiquidBottomTabs(
                 visibilityThreshold = 0.001f,
                 initialScale = 1f,
                 pressedScale = LiquidBarSpec.PressedHeightDp.toFloat() / LiquidBarSpec.ContentHeightDp.toFloat(),
-                onDragStarted = {},
+                onDragStarted = {
+                    isDraggingSlider = true
+                    pendingDragTargetTab = -1
+                    val snapped = targetValue.fastRoundToInt().coerceIn(0, tabsCount - 1).toFloat()
+                    if (abs(targetValue - snapped) > 0.001f) {
+                        updateValue(snapped)
+                    }
+                },
                 onDragStopped = {
                     val targetIndex = targetValue.fastRoundToInt().coerceIn(0, tabsCount - 1)
-                    currentIndex = targetIndex
-                    animateToValue(targetIndex.toFloat())
+                    isDraggingSlider = false
+                    pendingDragTargetTab = targetIndex
+                    updateValue(targetIndex.toFloat())
+                    currentOnTabSelected(targetIndex)
                     animationScope.launch {
                         offsetAnimation.animateTo(
                             0f,
@@ -544,33 +563,34 @@ fun LiquidBottomTabs(
                     }
                 },
                 onDrag = { _, dragAmount ->
-                    updateValue(
-                        (targetValue + dragAmount.x / currentTabWidth * if (isLtr) 1f else -1f)
-                            .fastCoerceIn(0f, (tabsCount - 1).toFloat())
-                    )
-                    animationScope.launch {
-                        offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x)
+                    if (dragAmount.x != 0f) {
+                        updateValue(
+                            (targetValue + dragAmount.x / currentTabWidth * if (isLtr) 1f else -1f)
+                                .fastCoerceIn(0f, (tabsCount - 1).toFloat())
+                        )
+                        animationScope.launch {
+                            offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x)
+                        }
                     }
                 }
             )
         }
         LaunchedEffect(selectedTabIndex) {
-            snapshotFlow { selectedTabIndex() }
+            snapshotFlow { currentSelectedTabIndex() }
                 .collectLatest { index ->
-                    currentIndex = index
-                }
-        }
-        LaunchedEffect(dampedDragAnimation) {
-            snapshotFlow { currentIndex }
-                .drop(1)
-                .collectLatest { index ->
-                    dampedDragAnimation.animateToValue(index.toFloat())
-                    onTabSelected(index)
+                    if (pendingDragTargetTab != -1 && index != pendingDragTargetTab) {
+                        pendingDragTargetTab = -1
+                    }
                 }
         }
         LaunchedEffect(pageScrollFraction) {
-            if (pageScrollFraction != null && pageScrollFraction >= 0f && dampedDragAnimation.pressProgress == 0f) {
-                dampedDragAnimation.updateValue(pageScrollFraction)
+            if (pageScrollFraction != null && pageScrollFraction >= 0f) {
+                if (pendingDragTargetTab != -1 && abs(pageScrollFraction - pendingDragTargetTab) < 0.01f) {
+                    pendingDragTargetTab = -1
+                }
+                if (!isDraggingSlider && pendingDragTargetTab == -1 && dampedDragAnimation.pressProgress == 0f) {
+                    dampedDragAnimation.updateValue(pageScrollFraction)
+                }
             }
         }
 
@@ -665,6 +685,12 @@ fun LiquidBottomTabs(
                                 val progress = dampedDragAnimation.pressProgress
                                 Highlight.Default.copy(alpha = progress)
                             },
+                            layerBlock = {
+                                val progress = dampedDragAnimation.pressProgress
+                                val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
+                                scaleX = scale
+                                scaleY = scale
+                            },
                             onDrawSurface = { drawRect(containerColor) }
                         )
                         .then(interactiveHighlight.modifier)
@@ -719,6 +745,10 @@ fun LiquidBottomTabs(
                             val velocity = dampedDragAnimation.velocity / 10f
                             scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
                             scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
+                        },
+                        onDrawBackdrop = { drawBackdrop ->
+                            val _pos = dampedDragAnimation.value + panelOffset
+                            drawBackdrop()
                         },
                         onDrawSurface = {
                             val progress = dampedDragAnimation.pressProgress

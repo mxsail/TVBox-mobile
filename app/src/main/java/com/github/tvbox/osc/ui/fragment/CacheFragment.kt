@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -125,6 +126,7 @@ class CacheFragment : Fragment() {
         Column(
             Modifier
                 .fillMaxSize()
+                .background(colorScheme.background)
                 .statusBarsPadding()
         ) {
             Row(
