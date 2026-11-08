@@ -49,6 +49,14 @@ public class PlayService extends Service {
 
     public static void start(VideoView controller, String currentVideoInfo) {
         videoInfo = currentVideoInfo;
+        // 点播/直播互斥: 服务切绑到新播放器时停掉旧播放器的声音,
+        // 保证任一时刻只有一个播放进程出声
+        if (videoView != null && videoView != controller) {
+            try {
+                videoView.pause();
+            } catch (Throwable ignored) {
+            }
+        }
         PlayService.videoView = controller;
         ContextCompat.startForegroundService(App.getInstance(), new Intent(App.getInstance(), PlayService.class));
     }
@@ -145,7 +153,13 @@ public class PlayService extends Service {
             startForeground(NOTIFICATION_ID, buildNotification());
         }
         if (videoView != null) {
-            videoView.start();
+            // 服务只是媒体通知载体,起播/续播由页面驱动,这里不再盲目 start():
+            // 已 release 的播放器(STATE_IDLE)被 start 会走 startPlay 用旧 mUrl
+            // 重建播放器——返回退出后打开直播时,之前的点播就这样在后台复活。
+            // 仅恢复暂停态(若存在该场景),空闲态绝不触碰
+            if (videoView.getCurrentPlayState() == VideoView.STATE_PAUSED) {
+                videoView.start();
+            }
             lastNotifyPlaying = videoView.isPlaying();
             updateMediaSession();
             progressHandler.removeCallbacks(progressUpdater);
