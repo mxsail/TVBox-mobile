@@ -10,7 +10,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
@@ -130,7 +129,6 @@ public class LiveFragment extends BaseLazyFragment {
 //EPG   by 龍
     private LiveChannelItem channel_Name = null;
     private Hashtable hsEpg = new Hashtable();
-    private CountDownTimer countDownTimer;
     TextView tv_channelnum;
     TextView tip_chname;
 
@@ -141,7 +139,6 @@ public class LiveFragment extends BaseLazyFragment {
     private boolean isBack = false;
     private ImageView imgLiveIcon;
     SimpleDateFormat timeFormat = new SimpleDateFormat("yyyy-MM-dd");
-    private CountDownTimer countDownTimer3;
     private int videoWidth = 1920;
     private int videoHeight = 1080;
     private boolean show = false;
@@ -316,16 +313,14 @@ public class LiveFragment extends BaseLazyFragment {
     private void showBottomEpg() {
         if (isSHIYI)
             return;
-        if (channel_Name.getChannelName() != null) {
+        // 判空先行: 旧实现先解引用 getChannelName 再判 channel_Name == null, 判空是死代码
+        if (channel_Name != null && channel_Name.getChannelName() != null) {
             mPlayerTitleView.setTitle(channel_Name.getChannelName());
             tip_chname.setText(channel_Name.getChannelName());
             tv_channelnum.setText("" + channel_Name.getChannelNum());
             //todo 上一/下一/当前节目信息
-            if (countDownTimer != null) {
-                countDownTimer.cancel();
-            }
 
-            if (channel_Name == null || channel_Name.getSourceNum() <= 0) {
+            if (channel_Name.getSourceNum() <= 0) {
                 tv_srcinfo.setText("1/1");
             } else {
                 tv_srcinfo.setText("线路" + (channel_Name.getSourceIndex() + 1) + "/" + channel_Name.getSourceNum());
@@ -589,7 +584,8 @@ public class LiveFragment extends BaseLazyFragment {
     private boolean playChannel(int channelGroupIndex, int liveChannelIndex, boolean changeSource) {
         if ((channelGroupIndex == currentChannelGroupIndex && liveChannelIndex == currentLiveChannelIndex && !changeSource)
                 || (changeSource && currentLiveChannelItem.getSourceNum() == 1)) {
-            // showChannelInfo();
+            // 同频道同线路重入: 也给一次频道信息反馈, 不再静默
+            showChannelInfo();
             return true;
         }
         mVideoView.release();
@@ -612,7 +608,7 @@ public class LiveFragment extends BaseLazyFragment {
         showBottomEpg();
 
         mVideoView.setUrl(currentLiveChannelItem.getUrl());
-        // showChannelInfo();
+        showChannelInfo();
         // 用户手动选台/换线路视为重新开始, 清空连续自动换源失败计数
         autoSwitchFailStreak = 0;
         mVideoView.start();
