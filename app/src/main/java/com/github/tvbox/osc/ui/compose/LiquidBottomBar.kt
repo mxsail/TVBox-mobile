@@ -487,6 +487,7 @@ fun LiquidBottomTabs(
     navInsetBottom: Dp = 0.dp,
     pageScrollFraction: Float? = null,
     material: String = ThemeManager.MATERIAL_LIQUID,
+    showLabels: Boolean = false,
     content: @Composable RowScope.() -> Unit
 ) {
     val isLightTheme = !isSystemInDarkTheme()
@@ -780,8 +781,9 @@ fun LiquidBottomTabs(
             )
 
             // 2. M3 胶囊指示器 (位于内容下方，跟随滚动滑动)
-            val indicatorWidth = 56.dp
-            val indicatorHeight = 32.dp
+            // 显示文字时内容高约 34dp, 固定 32dp 会与图标/文字相交 → 胶囊随 showLabels 放大到完整包住图文
+            val indicatorWidth = if (showLabels) 64.dp else 56.dp
+            val indicatorHeight = if (showLabels) 40.dp else 32.dp
             Box(
                 Modifier
                     .padding(horizontal = LiquidBarSpec.InsetDp.dp)
@@ -865,7 +867,8 @@ fun LiquidBottomBar(
             floating = floating,
             navInsetBottom = if (floating) 0.dp else navInsetBottom,
             pageScrollFraction = pageScrollFraction,
-            material = material
+            material = material,
+            showLabels = showLabels
         ) {
             tabs.forEachIndexed { index, item ->
                 val selected = index == selectedIndex
