@@ -224,11 +224,9 @@ public class PlayFragment extends BaseLazyFragment {
             }
         });
         mVideoView = findViewById(R.id.mVideoView);
-        // 预览小窗强制 TextureView 渲染: SurfaceView 尺寸变化会销毁重建 surface,
-        // 而预览窗在 PREPARED/PLAYING 时会按视频比例调整容器高度(updatePreviewWindowHeight),
-        // SurfaceView 上该操作使解码器失联(MediaCodec -19 dec surface not connected)→
-        // 起播即视频失败循环重试: 有声无画持续加载、20s 一轮嗅探错误。
-        // TextureView 是普通 View, resize 平滑; 预览小窗体积下性能无差。
+        // 预览小窗强制 TextureView 渲染: SurfaceView 尺寸变化/全屏切换会销毁重建 surface,
+        // 解码器可能失联(MediaCodec -19 dec surface not connected)→ 有声无画持续加载。
+        // TextureView 是普通 View, 生命周期平滑; 预览小窗体积下性能无差。
         mVideoView.setRenderViewFactory(xyz.doikki.videoplayer.render.TextureRenderViewFactory.create());
         mPlayLoadTip = findViewById(R.id.play_load_tip);
         mPlayLoading = findViewById(R.id.play_loading);
@@ -389,12 +387,9 @@ public class PlayFragment extends BaseLazyFragment {
                     } else {
                         ((DetailActivity) mActivity).updatePipParams();
                     }
-                    if (playState == VideoView.STATE_PREPARED || playState == VideoView.STATE_PLAYING) {
-                        // 视频尺寸就绪后自适应预览窗高度去黑边(个别流尺寸上报偏晚, 延迟复查一次)
-                        final DetailActivity activity = (DetailActivity) mActivity;
-                        activity.updatePreviewWindowHeight();
-                        mVideoView.postDelayed(activity::updatePreviewWindowHeight, 1200);
-                    }
+                    // 预览窗固定 16:9(宽=屏宽), 不随视频比例动态调整:
+                    // 主流播放应用的标准做法(YT/B站/长视频 App), 非 16:9 内容在容器内
+                    // 等比 letterbox; 动态 resize 对 SurfaceView 有撕 surface 风险
                 }
             }
         });

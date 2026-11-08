@@ -303,17 +303,8 @@ public class LiveFragment extends BaseLazyFragment {
         controller.setDoubleTapTogglePlayEnabled(false);
         mVideoView.setVideoController(controller);
         mVideoView.setProgressManager(null);
-        // 视频区高度自适应宽高比: 起播后按实际比例微调(初始 16:9 在 onCreateView 设置)
-        mVideoView.addOnStateChangeListener(new VideoView.SimpleOnStateChangeListener() {
-            @Override
-            public void onPlayStateChanged(int playState) {
-                if (playState == VideoView.STATE_PREPARED || playState == VideoView.STATE_PLAYING) {
-                    adaptVideoAspectRatio();
-                    // 个别流尺寸上报偏晚, 延迟复查一次
-                    mHandler.postDelayed(mAdaptAspectRatioRun, 1200);
-                }
-            }
-        });
+        // 视频区固定 16:9(初始已在 onCreateView 设置), 与主流播放应用一致:
+        // 非 16:9 内容等比 letterbox 在容器内, 不做动态高度调整(SurfaceView resize 撕 surface 风险)
         registerNetworkCallback();
     }
 
@@ -496,8 +487,6 @@ public class LiveFragment extends BaseLazyFragment {
         return getActivity() != null && getActivity().getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED);
     }
 
-    private final Runnable mAdaptAspectRatioRun = this::adaptVideoAspectRatio;
-
     /** 连接超时/错误自动换源任务 */
     private Runnable mConnectTimeoutChangeSourceRun = new Runnable() {
         @Override
@@ -522,18 +511,7 @@ public class LiveFragment extends BaseLazyFragment {
         }
     };
 
-    /** 视频区高度自适应视频宽高比(全屏时跳过, doikki 全屏会把播放容器挪到 decor) */
-    private void adaptVideoAspectRatio() {
-        if (mVideoView == null || mVideoView.isFullScreen()) return;
-        int[] size = mVideoView.getVideoSize();
-        if (size == null || size[0] <= 0 || size[1] <= 0) return;
-        int width = mVideoView.getWidth();
-        if (width <= 0) return;
-        int targetH = (int) ((long) width * size[1] / size[0]);
-        targetH = Math.max(ConvertUtils.dp2px(140),
-                Math.min(targetH, (int) (ScreenUtils.getScreenHeight() * 0.55f)));
-        uiState.setVideoHeightPx(targetH);
-    }
+    /** 视频区高度固定 16:9(宽=屏宽, onCreateView 初始化), 非 16:9 内容等比 letterbox 在容器内 */
 
     /** 直播后台播放: 复用 PlayService 媒体通知(标题=频道名, 副标题=线路名), 通知按钮走 VOD_CONTROL 广播 */
     private void startBackgroundPlayNotification() {

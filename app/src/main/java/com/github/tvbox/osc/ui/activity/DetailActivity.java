@@ -652,27 +652,11 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
      * fragment 事务可能尚未跑完,post 一帧兜底(网络路径本来就是异步,不受影响)。
      */
     /**
-     * 竖屏预览窗高度自适应视频宽高比(去上下黑边): 固定 250dp 窗放 16:9 内容上下各留 ~24dp 黑边,
-     * 控制浮层也悬在黑边区。按内容宽度 x 高/宽 重设容器高, 竖版视频按屏高钳制。
-     * windowsPreview 与容器 LayoutParams 是同一对象, 画中画退出恢复时沿用自适应后的高度。
+     * 预览窗固定 16:9(宽=屏宽, 高=宽x9/16, initView 设置), 与主流播放应用一致:
+     * 非 16:9 内容由 doikki 等比 letterbox 在容器内, 不做动态高度调整
+     * (动态 resize 对 SurfaceView 有撕 surface 风险, 且比例跳变体验差)。
+     * windowsPreview 与容器 LayoutParams 是同一对象, 画中画退出恢复沿用同一高度。
      */
-    public void updatePreviewWindowHeight() {
-        if (fullWindows || playFragment == null || playFragment.getPlayer() == null) return;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) return;
-        int[] size = playFragment.getPlayer().getVideoSize();
-        if (size == null || size[0] <= 0 || size[1] <= 0) return;
-        int contentWidth = mBinding.previewPlayer.getWidth();
-        if (contentWidth <= 0) return;
-        int targetH = (int) ((long) contentWidth * size[1] / size[0]);
-        targetH = Math.max(ConvertUtils.dp2px(140),
-                Math.min(targetH, (int) (ScreenUtils.getScreenHeight() * 0.55f)));
-        ViewGroup.LayoutParams lp = mBinding.previewPlayer.getLayoutParams();
-        if (lp != null && Math.abs(lp.height - targetH) > 8) {
-            lp.height = targetH;
-            mBinding.previewPlayer.setLayoutParams(lp);
-            syncPreviewPlaceHeight();
-        }
-    }
 
     /** 占位坑位与预览窗同高: 坑位不跟着缩, 播放器下方的详情内容(标题/简介/选集)不会贴上来 */
     private void syncPreviewPlaceHeight() {
