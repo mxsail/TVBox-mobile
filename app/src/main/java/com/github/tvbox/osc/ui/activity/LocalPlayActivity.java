@@ -98,17 +98,6 @@ public class LocalPlayActivity extends BaseVbActivity<ActivityLocalPlayBinding> 
         initPlayerCfg();
         mVideoView.setVideoController(mController); //设置控制器
         play(false);
-
-        new Handler()
-                .postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (mVideoView.getCurrentPlayState() == VideoView.STATE_PREPARED){//不知道为啥部分长视频(不确定是不是因为时长/大小)会卡在准备完成状态,所以延迟重置下状态
-                            mVideoView.pause();
-                            mVideoView.resume();
-                        }
-                    }
-                },500);
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -127,11 +116,14 @@ public class LocalPlayActivity extends BaseVbActivity<ActivityLocalPlayBinding> 
 
         String path = videoInfo.getPath();
 
-        String uri = "";
         File file = new File(path);
-        if(file.exists()){
-            uri = Uri.parse("file://"+file.getAbsolutePath()).toString();
+        if (!file.exists()) {
+            // 旧实现 uri 留空仍 setUrl(""), 黑屏+错误态且本页无任何提示
+            ToastUtils.showShort("视频文件不存在或已被移动: " + file.getName());
+            finish();
+            return;
         }
+        String uri = Uri.parse("file://" + file.getAbsolutePath()).toString();
         mController.setTitle(videoInfo.getDisplayName());
         mBinding.tvLocalTitle.setText(videoInfo.getDisplayName());
         mVideoView.setUrl(uri); //设置视频地址
@@ -251,22 +243,32 @@ public class LocalPlayActivity extends BaseVbActivity<ActivityLocalPlayBinding> 
 
             @Override
             public void changeParse(ParseBean pb) {
-
+                // 本地文件无解析链路
             }
 
             @Override
             public void updatePlayerCfg() {
-
+                // 控制层切换播放器/解码后重新应用配置并重播当前文件
+                if (mVideoView != null) {
+                    PlayerHelper.updateCfg(mVideoView, mVodPlayerCfg);
+                    mVideoView.replay(true);
+                }
             }
 
             @Override
             public void replay(boolean replay) {
-
+                // 控制层"重播"按钮: 从头重播当前文件
+                if (mVideoView != null) {
+                    mVideoView.replay(true);
+                }
             }
 
             @Override
             public void errReplay() {
-
+                // 播放出错重试: 重新起播当前文件(控制层错误态此前无任何恢复手段)
+                if (mVideoView != null) {
+                    mVideoView.replay(true);
+                }
             }
 
             @Override
@@ -400,6 +402,11 @@ public class LocalPlayActivity extends BaseVbActivity<ActivityLocalPlayBinding> 
 
     @Override
     protected void onBackHandled() {
+        // 右侧选集弹窗(view 模式)不自动响应返回键, 需手动关闭, 否则返回穿透弹窗直接退出页面
+        if (mAllSeriesRightDialog != null && mAllSeriesRightDialog.isShow()) {
+            mAllSeriesRightDialog.dismiss();
+            return;
+        }
         if (mIsFullScreen) {
             setFullScreen(false);
             return;

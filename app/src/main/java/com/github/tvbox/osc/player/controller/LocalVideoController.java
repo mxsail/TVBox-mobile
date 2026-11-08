@@ -200,6 +200,9 @@ public class LocalVideoController extends BaseController {
         mVideoSize = findViewById(R.id.tv_videosize);
         mSubtitleView = findViewById(R.id.subtitle_view);
         mZimuBtn = findViewById(R.id.zimu_select);
+        // 本地视频无外挂字幕选择能力(listener.selectSubtitle 为空实现), 隐藏死按钮;
+        // 长按清字幕视图的逻辑保留在按钮长按上, 但按钮隐藏后不可达
+        mZimuBtn.setVisibility(GONE);
         mAudioTrackBtn = findViewById(R.id.audio_track_select);
         mLandscapePortraitBtn = findViewById(R.id.landscape_portrait);
         mIvPlayStatus = findViewById(R.id.play_status);
@@ -332,42 +335,42 @@ public class LocalVideoController extends BaseController {
                 }
             }
         });
-//        mPlayerSpeedBtn.setOnClickListener(new OnClickListener() {
-//            @Override
-//            public void onClick(View view) {
-//                myHandle.removeCallbacks(myRunnable);
-//                myHandle.postDelayed(myRunnable, myHandleSeconds);
-//                try {
-//                    float speed = (float) mPlayerConfig.getDouble("sp");
-//                    speed += 0.25f;
-//                    if (speed > 3)
-//                        speed = 0.5f;
-//                    mPlayerConfig.put("sp", speed);
-//                    updatePlayerCfgView();
-//                    listener.updatePlayerCfg();
-//                    speed_old = speed;
-//                    mControlWrapper.setSpeed(speed);
-//                } catch (JSONException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        });
+        mPlayerSpeedBtn.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                myHandle.removeCallbacks(myRunnable);
+                myHandle.postDelayed(myRunnable, myHandleSeconds);
+                try {
+                    float speed = (float) mPlayerConfig.getDouble("sp");
+                    speed += 0.25f;
+                    if (speed > 3)
+                        speed = 0.5f;
+                    mPlayerConfig.put("sp", speed);
+                    updatePlayerCfgView();
+                    listener.updatePlayerCfg();
+                    speed_old = speed;
+                    mControlWrapper.setSpeed(speed);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
 
-//        mPlayerSpeedBtn.setOnLongClickListener(new OnLongClickListener() {
-//            @Override
-//            public boolean onLongClick(View view) {
-//                try {
-//                    mPlayerConfig.put("sp", 1.0f);
-//                    updatePlayerCfgView();
-//                    listener.updatePlayerCfg();
-//                    speed_old = 1.0f;
-//                    mControlWrapper.setSpeed(1.0f);
-//                } catch (JSONException e) {
-//                    e.printStackTrace();
-//                }
-//                return true;
-//            }
-//        });
+        mPlayerSpeedBtn.setOnLongClickListener(new OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View view) {
+                try {
+                    mPlayerConfig.put("sp", 1.0f);
+                    updatePlayerCfgView();
+                    listener.updatePlayerCfg();
+                    speed_old = 1.0f;
+                    mControlWrapper.setSpeed(1.0f);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                return true;
+            }
+        });
         mPlayerBtn.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -609,21 +612,13 @@ public class LocalVideoController extends BaseController {
     }
 
     private void hideLiveAboutBtn() {
-        if (mControlWrapper != null && mControlWrapper.getDuration() == 0) {
-            mPlayerSpeedBtn.setVisibility(GONE);
-            mPlayerTimeStartEndText.setVisibility(GONE);
-            mPlayerTimeStartBtn.setVisibility(GONE);
-            mPlayerTimeSkipBtn.setVisibility(GONE);
-            mPlayerTimeResetBtn.setVisibility(GONE);
-            mNextBtn.setNextFocusLeftId(R.id.zimu_select);
-        } else {
-            mPlayerSpeedBtn.setVisibility(View.VISIBLE);
-            mPlayerTimeStartEndText.setVisibility(View.VISIBLE);
-            mPlayerTimeStartBtn.setVisibility(View.VISIBLE);
-            mPlayerTimeSkipBtn.setVisibility(View.VISIBLE);
-            mPlayerTimeResetBtn.setVisibility(View.VISIBLE);
-            mNextBtn.setNextFocusLeftId(R.id.play_time_start);
-        }
+        // 本控制器只服务本地视频(无直播态), 固定显示, 不再按 duration==0 闪隐
+        mPlayerSpeedBtn.setVisibility(View.VISIBLE);
+        mPlayerTimeStartEndText.setVisibility(View.VISIBLE);
+        mPlayerTimeStartBtn.setVisibility(View.VISIBLE);
+        mPlayerTimeSkipBtn.setVisibility(View.VISIBLE);
+        mPlayerTimeResetBtn.setVisibility(View.VISIBLE);
+        mNextBtn.setNextFocusLeftId(R.id.play_time_start);
     }
 
     public void initLandscapePortraitBtnInfo() {
@@ -914,15 +909,26 @@ public class LocalVideoController extends BaseController {
 
 
     private boolean fromLongPress;
+    /** 长按倍速前的原速, 松手恢复 */
+    private float speed_old = 1.0f;
 
     @Override
     public void onLongPress(MotionEvent e) {
         if (videoPlayState != VideoView.STATE_PAUSED) {
             fromLongPress = true;
-            float speed = Hawk.get(HawkConfig.VIDEO_SPEED, 2.0f);
-            mControlWrapper.setSpeed(speed);
-            mLlSpeed.setVisibility(VISIBLE);
-            mTvSpeedTip.setText(speed + "x");
+            try {
+                // 与点播页(VodController)一致: 记住长按前的原速并写入倍速配置, 松手恢复原速
+                speed_old = (float) mPlayerConfig.getDouble("sp");
+                float speed = Hawk.get(HawkConfig.VIDEO_SPEED, 2.0f);
+                mPlayerConfig.put("sp", speed);
+                updatePlayerCfgView();
+                listener.updatePlayerCfg();
+                mControlWrapper.setSpeed(speed);
+                mLlSpeed.setVisibility(VISIBLE);
+                mTvSpeedTip.setText(speed + "x");
+            } catch (Exception f) {
+                f.printStackTrace();
+            }
         }
     }
 
@@ -934,7 +940,10 @@ public class LocalVideoController extends BaseController {
                 fromLongPress = false;
                 mLlSpeed.setVisibility(GONE);
                 try {
-                    mControlWrapper.setSpeed(1.0f);
+                    float speed = speed_old;
+                    mPlayerConfig.put("sp", speed);
+                    updatePlayerCfgView();
+                    mControlWrapper.setSpeed(speed);
                 } catch (Exception f) {
                     f.printStackTrace();
                 }
