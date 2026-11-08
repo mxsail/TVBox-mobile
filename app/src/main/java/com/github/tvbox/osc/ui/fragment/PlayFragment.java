@@ -144,9 +144,10 @@ public class PlayFragment extends BaseLazyFragment {
      */
     private BasePopupView mPlayingControlRightDialog;
     /**
-     * 视频播放出错时,自动切换另一个播放器,这个开关避免多次切换
+     * 视频播放出错时,自动切换另一个播放器;按"当前集进度键"记录,
+     * 换集后重新允许自动切换(旧的全局布尔导致首集切换过后续集永不切换)
      */
-    boolean retriedSwitchPlayer = false;
+    String retriedSwitchPlayerKey = "";
     @Override
     protected int getLayoutResID() {
         return R.layout.activity_play;
@@ -668,22 +669,41 @@ public class PlayFragment extends BaseLazyFragment {
             mPlayLoadTip.setVisibility(View.VISIBLE);
             mPlayLoading.setVisibility(loading ? View.VISIBLE : View.GONE);
             mPlayLoadErr.setVisibility(err ? View.VISIBLE : View.GONE);
+            if (!err || loading) return;
 
-            if ("视频播放出错".equals(msg)){
-                if (!retriedSwitchPlayer){
+            // 所有错误态统一带"点击重试"入口(旧版只有"视频播放出错"文案有切换入口,
+            // 嗅探错误/解析失败等二次失败后错误页干等无任何动作)
+            if ("视频播放出错".equals(msg)) {
+                if (!progressKey.equals(retriedSwitchPlayerKey)) {
                     ToastUtils.showShort("播放出错,正在尝试切换播放器");
-                    retriedSwitchPlayer = true;
+                    retriedSwitchPlayerKey = progressKey == null ? "" : progressKey;
                     mController.mPlayerBtn.performClick();
-                }else {
-                    SpanUtils.with(mPlayLoadTip)
-                            .append("视频播放出错，")
-                            .append("切换播放器")
-                            .setClickSpan(ColorUtils.getColor(R.color.orange), false, view -> {
-                                mController.mPlayerBtn.performClick();
-                            }).create();
+                    return;
                 }
+                SpanUtils.with(mPlayLoadTip)
+                        .append("视频播放出错，")
+                        .append("切换播放器")
+                        .setClickSpan(ColorUtils.getColor(R.color.orange), false, view -> {
+                            mController.mPlayerBtn.performClick();
+                        })
+                        .append("，或")
+                        .append("点击重试")
+                        .setClickSpan(ColorUtils.getColor(R.color.orange), false, view -> retryCurrentPlay())
+                        .create();
+            } else {
+                SpanUtils.with(mPlayLoadTip)
+                        .append(msg + "，")
+                        .append("点击重试")
+                        .setClickSpan(ColorUtils.getColor(R.color.orange), false, view -> retryCurrentPlay())
+                        .create();
             }
         });
+    }
+
+    /** 错误页重试入口: 重新走一遍当前集的完整播放链路(重解析/重嗅探) */
+    private void retryCurrentPlay() {
+        if (!isAdded() || mVodInfo == null) return;
+        play(false);
     }
 
     void hideTip() {
@@ -698,6 +718,8 @@ public class PlayFragment extends BaseLazyFragment {
                 @Override
                 public void run() {
                     if (finish) {
+                        // play() 设置的"正在获取播放信息"加载态必须清掉, 否则 Toast 消失后界面残留转圈
+                        hideTip();
                         Toast.makeText(mContext, err, Toast.LENGTH_SHORT).show();
                     } else {
                         setTip(err, false, true);
@@ -1074,12 +1096,11 @@ public class PlayFragment extends BaseLazyFragment {
                     }
                 } catch (Throwable th) {
                     LogUtils.e(th.toString());
-//                        errorWithRetry("获取播放信息错误", true);
-//                        Toast.makeText(mContext, "获取播放信息错误1", Toast.LENGTH_SHORT).show();
+                    // 解析异常不能吞掉: 吞了界面永远停在"正在获取播放信息"转圈
+                    errorWithRetry("获取播放信息错误", true);
                 }
             } else {
                 errorWithRetry("获取播放信息错误", true);
-//                    Toast.makeText(mContext, "获取播放信息错误", Toast.LENGTH_SHORT).show();
             }
         }
     };
