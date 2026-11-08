@@ -246,6 +246,8 @@ public class LiveFragment extends BaseLazyFragment {
 
         setLoadSir(findViewById(R.id.live_root));
         mVideoView = findViewById(R.id.mVideoView);
+        // 视频区初始即按标准 16:9(屏宽x9/16)占位, 起播后仅按实际比例微调, 不再从固定 300dp 跳变
+        resizeLiveVideoArea((int) ((long) ScreenUtils.getScreenWidth() * 9 / 16));
         // 视频区高度自适应宽高比(去上下黑边): 布局固定 300dp, 16:9 内容上下黑边明显
         mVideoView.addOnStateChangeListener(new VideoView.SimpleOnStateChangeListener() {
             @Override
@@ -446,10 +448,24 @@ public class LiveFragment extends BaseLazyFragment {
         int targetH = (int) ((long) width * size[1] / size[0]);
         targetH = Math.max(ConvertUtils.dp2px(140),
                 Math.min(targetH, (int) (ScreenUtils.getScreenHeight() * 0.55f)));
+        resizeLiveVideoArea(targetH);
+    }
+
+    /** 视频区(VideoView)与父占位容器同高收缩: 父容器不缩, 视频下方的频道信息不会上移 */
+    private void resizeLiveVideoArea(int targetH) {
+        if (mVideoView == null) return;
         android.view.ViewGroup.LayoutParams lp = mVideoView.getLayoutParams();
         if (lp != null && Math.abs(lp.height - targetH) > 8) {
             lp.height = targetH;
             mVideoView.setLayoutParams(lp);
+        }
+        if (mVideoView.getParent() instanceof android.view.ViewGroup) {
+            android.view.ViewGroup wrapper = (android.view.ViewGroup) mVideoView.getParent();
+            android.view.ViewGroup.LayoutParams wlp = wrapper.getLayoutParams();
+            if (wlp != null && Math.abs(wlp.height - targetH) > 8) {
+                wlp.height = targetH;
+                wrapper.setLayoutParams(wlp);
+            }
         }
     }
 

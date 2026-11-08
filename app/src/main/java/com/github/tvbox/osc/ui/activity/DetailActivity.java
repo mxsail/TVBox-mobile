@@ -138,10 +138,6 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     private BasePopupView mAllSeriesRightDialog;
     private BasePopupView mAllSeriesBottomDialog;
     private DetailComposeBridge composeBridge;
-    /**
-     * 是否开启后台播放标记,在切后台/onPause中变动,强制开关
-     */
-    boolean openBackgroundPlay;
     private BroadcastReceiver mRemoteActionReceiver;
 
     /**
@@ -173,10 +169,6 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     @Override
     protected void onResume() {
         super.onResume();
-        if (openBackgroundPlay) {
-            openBackgroundPlay = false;
-            // 媒体通知在播放期间常驻(前台/后台同一服务), 回前台不再停服务/清通知
-        }
         if (playFragment != null && playFragment.getController() != null) {
             playFragment.getController().setInPipMode(false);
         }
@@ -187,6 +179,12 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         mBinding.previewPlayerPlace.setVisibility(showPreview ? View.VISIBLE : View.GONE);
         windowsPreview = mBinding.previewPlayer.getLayoutParams();
         windowsFull = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        // 预览窗与占位坑位初始即按标准 16:9(屏宽x9/16)布局: 起播后仅按实际比例微调,
+        // 不再从固定 250dp 跳变, 播放器下方的详情内容从首帧起就贴住视频底部
+        int initPreviewH = (int) ((long) ScreenUtils.getScreenWidth() * 9 / 16);
+        windowsPreview.height = initPreviewH;
+        mBinding.previewPlayer.setLayoutParams(windowsPreview);
+        syncPreviewPlaceHeight();
         mBinding.previewPlayer.post(this::updatePipParams);
 
         seriesAdapter = new SeriesAdapter(false);
@@ -296,20 +294,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         setLoadSir(mBinding.llLayout);
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) {
-            return;
-        }
-        int bgType = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0);
-        if (bgType == 2 && playFragment != null && playFragment.getPlayer() != null && playFragment.getPlayer().isPlaying()) {
-            prepareForPip();
-        } else if (bgType == 1 && playFragment != null && playFragment.getPlayer() != null && playFragment.getPlayer().isPlaying()) {
-            openBackgroundPlay = true;
-            playServerSwitch(true);
-        }
-    }
+    // 后台播放/画中画只由 onUserLeaveHint(应用切后台)触发:
+    // onPause 在打开其他页面与返回退出时同样回调, 在这里起服务会导致
+    // 返回退出时 startForegroundService 已排队、onDestroy 的 stop 拦不住 → 后台继续播
 
     @Override
     protected void onUserLeaveHint() {
@@ -325,7 +312,6 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                 enterPip();
             }
         } else if (bgType == 1 && isPlaying) {
-            openBackgroundPlay = true;
             playServerSwitch(true);
         }
     }
@@ -673,6 +659,17 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         if (lp != null && Math.abs(lp.height - targetH) > 8) {
             lp.height = targetH;
             mBinding.previewPlayer.setLayoutParams(lp);
+            syncPreviewPlaceHeight();
+        }
+    }
+
+    /** 占位坑位与预览窗同高: 坑位不跟着缩, 播放器下方的详情内容(标题/简介/选集)不会贴上来 */
+    private void syncPreviewPlaceHeight() {
+        if (windowsPreview == null) return;
+        ViewGroup.LayoutParams lp = mBinding.previewPlayerPlace.getLayoutParams();
+        if (lp != null && lp.height != windowsPreview.height) {
+            lp.height = windowsPreview.height;
+            mBinding.previewPlayerPlace.setLayoutParams(lp);
         }
     }
 
@@ -1044,6 +1041,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         playFragment.changedLandscape(fullWindows);
         //activity处理预览尺寸(全屏/非全屏预览)
         mBinding.previewPlayer.setLayoutParams(fullWindows ? windowsFull : windowsPreview);
+        if (!fullWindows) {
+            syncPreviewPlaceHeight();
+        }
         mBinding.llLayout.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
         toggleSubtitleTextSize();
         updatePipParams();
@@ -1430,6 +1430,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             }
             fullWindows = wasFullscreenBeforePip;
             mBinding.previewPlayer.setLayoutParams(fullWindows ? windowsFull : windowsPreview);
+            if (!fullWindows) {
+                syncPreviewPlaceHeight();
+            }
             mBinding.llLayout.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
             if (playFragment != null) {
                 playFragment.changedLandscape(fullWindows);
