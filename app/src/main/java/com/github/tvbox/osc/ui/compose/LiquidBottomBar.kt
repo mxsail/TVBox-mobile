@@ -894,7 +894,19 @@ fun LiquidBottomBar(
                             fontSize = 11.sp,
                             fontWeight = if (material == ThemeManager.MATERIAL_YOU && selected) FontWeight.Bold else FontWeight.Medium,
                             color = labelColor,
-                            maxLines = 1
+                            maxLines = 1,
+                            // 行框收紧到字形实际高度: 默认字体盒底部留有 descent/fontPadding 空隙,
+                            // 盒模型垂直居中后整组视觉偏上(图标贴顶、文字下方空一截)
+                            style = androidx.compose.ui.text.TextStyle(
+                                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                                    includeFontPadding = false
+                                ),
+                                lineHeight = 13.sp,
+                                lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+                                    alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+                                    trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both
+                                )
+                            )
                         )
                     }
                 }
