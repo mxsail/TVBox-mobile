@@ -8,6 +8,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -253,6 +256,7 @@ public class LiveFragment extends BaseLazyFragment {
         mVideoView = findViewById(R.id.mVideoView);
         // 视频区初始即按标准 16:9(屏宽x9/16)占位, 起播后仅按实际比例微调, 不再从固定 300dp 跳变
         resizeLiveVideoArea((int) ((long) ScreenUtils.getScreenWidth() * 9 / 16));
+        registerNetworkCallback();
         // 视频区高度自适应宽高比(去上下黑边): 布局固定 300dp, 16:9 内容上下黑边明显
         mVideoView.addOnStateChangeListener(new VideoView.SimpleOnStateChangeListener() {
             @Override
@@ -398,12 +402,59 @@ public class LiveFragment extends BaseLazyFragment {
         }
     }
 
+    /** 网络恢复监听: 断网导致自动换源停摆/错误态时, 网络恢复自动重试当前频道 */
+    private ConnectivityManager.NetworkCallback mNetworkCallback;
+
+    private void registerNetworkCallback() {
+        try {
+            if (mNetworkCallback != null || getContext() == null) return;
+            ConnectivityManager cm = (ConnectivityManager) getContext().getApplicationContext()
+                    .getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return;
+            mNetworkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(@NonNull Network network) {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(LiveFragment.this::onNetworkRestored);
+                    }
+                }
+            };
+            cm.registerNetworkCallback(new NetworkRequest.Builder()
+                    .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), mNetworkCallback);
+        } catch (Throwable th) {
+            th.printStackTrace();
+        }
+    }
+
+    private void unregisterNetworkCallback() {
+        try {
+            if (mNetworkCallback != null && getContext() != null) {
+                ConnectivityManager cm = (ConnectivityManager) getContext().getApplicationContext()
+                        .getSystemService(Context.CONNECTIVITY_SERVICE);
+                if (cm != null) cm.unregisterNetworkCallback(mNetworkCallback);
+            }
+        } catch (Throwable ignored) {
+        }
+        mNetworkCallback = null;
+    }
+
+    private void onNetworkRestored() {
+        if (mVideoView == null || !isAdded() || currentLiveChannelItem == null) return;
+        int st = mVideoView.getCurrentPlayState();
+        if (st == VideoView.STATE_ERROR || st == VideoView.STATE_IDLE) {
+            // 网络恢复, 重置连续失败计数并重试当前频道
+            autoSwitchFailStreak = 0;
+            mVideoView.replay(true);
+        }
+    }
+
     @Override
     public void onDestroy() {
         if (EventBus.getDefault().isRegistered(this)) {
             EventBus.getDefault().unregister(this);
         }
         stopBackgroundPlayNotification();
+        unregisterNetworkCallback();
         mHandler.removeCallbacksAndMessages(null);
         if (mVideoView != null) {
             mVideoView.release();

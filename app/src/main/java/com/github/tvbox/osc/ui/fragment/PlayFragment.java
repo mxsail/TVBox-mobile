@@ -4,6 +4,9 @@ import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkRequest;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -167,6 +170,7 @@ public class PlayFragment extends BaseLazyFragment {
         initView();
         initViewModel();
         initData();
+        registerNetworkCallback();
     }
 
     public long getSavedProgress(String url) {
@@ -1212,6 +1216,53 @@ public class PlayFragment extends BaseLazyFragment {
         super.onHiddenChanged(hidden);
     }
 
+    /** 网络恢复监听: 错误态/卡加载态时自动重试当前集, 断网期间用户无需手动点重试 */
+    private ConnectivityManager.NetworkCallback mNetworkCallback;
+
+    private void registerNetworkCallback() {
+        try {
+            if (mNetworkCallback != null || getActivity() == null) return;
+            ConnectivityManager cm = (ConnectivityManager) requireActivity().getApplicationContext()
+                    .getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return;
+            mNetworkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(@NonNull Network network) {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(PlayFragment.this::onNetworkRestored);
+                    }
+                }
+            };
+            cm.registerNetworkCallback(new NetworkRequest.Builder()
+                    .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), mNetworkCallback);
+        } catch (Throwable th) {
+            th.printStackTrace();
+        }
+    }
+
+    private void unregisterNetworkCallback() {
+        try {
+            if (mNetworkCallback != null && getActivity() != null) {
+                ConnectivityManager cm = (ConnectivityManager) getActivity().getApplicationContext()
+                        .getSystemService(Context.CONNECTIVITY_SERVICE);
+                if (cm != null) cm.unregisterNetworkCallback(mNetworkCallback);
+            }
+        } catch (Throwable ignored) {
+        }
+        mNetworkCallback = null;
+    }
+
+    /** 网络恢复: 明确错误态或错误 tip 还挂着(卡加载)时重试; 手动暂停态不受打扰 */
+    private void onNetworkRestored() {
+        if (mVideoView == null || !isAdded() || mVodInfo == null) return;
+        int st = mVideoView.getCurrentPlayState();
+        boolean stuckOnError = st == VideoView.STATE_ERROR
+                || (st == VideoView.STATE_IDLE && mPlayLoadTip.getVisibility() == View.VISIBLE);
+        if (stuckOnError) {
+            mHandler.post(this::retryCurrentPlay);
+        }
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -1219,6 +1270,7 @@ public class PlayFragment extends BaseLazyFragment {
         sourceViewModel.playResult.removeObserver(mObserverPlayResult);
 
         EventBus.getDefault().unregister(this);
+        unregisterNetworkCallback();
         if (mVideoView != null) {
             mVideoView.release();
             mVideoView = null;
