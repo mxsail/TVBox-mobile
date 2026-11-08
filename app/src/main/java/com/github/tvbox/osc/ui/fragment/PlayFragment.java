@@ -367,6 +367,9 @@ public class PlayFragment extends BaseLazyFragment {
                 if (mVideoView == null || !isAdded()) return;
                 if (mActivity instanceof DetailActivity) {
                     if (playState == VideoView.STATE_PLAYING) {
+                        // 真正出画面/出声时强制清掉残留的加载提示
+                        // (起播链路的 hideTip 若被后续 setTip 覆盖, 声音已响而 UI 停在"加载")
+                        hideTip();
                         ((DetailActivity) mActivity).onPlaybackStarted();
                     } else {
                         ((DetailActivity) mActivity).updatePipParams();

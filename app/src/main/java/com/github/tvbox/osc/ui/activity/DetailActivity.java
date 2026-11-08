@@ -153,6 +153,10 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
 
     @Override
     protected void init() {
+        // 进入播放详情页即停掉遗留的后台播放服务: 上会话"后台播放开启"时划掉任务
+        // 不会杀前台服务, 服务携带的旧视频会继续出声, 而新页面播放器还在加载,
+        // 观感就是"加载中但后台已有声音"; 用户进入新播放页, 旧的后台播放理应让位
+        PlayService.stop();
         initView();
         initViewModel();
         initData();
