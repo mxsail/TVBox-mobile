@@ -446,82 +446,81 @@ class DownloadActivity : BaseActivity() {
             ) {
                 header.value?.let { hd ->
                     item {
-                        // 剧集信息卡: 海报 + 名称/进度统计 + 操作按钮(M3)
+                        // 剧集信息卡: 左侧大海报定高撑起卡片, 右侧文字列与播放按钮同列左对齐
                         Card(
                             colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
                             shape = RoundedCornerShape(16.dp)
                         ) {
-                            Column(Modifier.padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    PosterImage(
-                                        hd.pic,
-                                        Modifier
-                                            .width(62.dp)
-                                            .height(86.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(colorScheme.surfaceContainerHigh)
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                PosterImage(
+                                    hd.pic,
+                                    Modifier
+                                        .width(96.dp)
+                                        .height(120.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(colorScheme.surfaceContainerHigh)
+                                )
+                                Column(Modifier.weight(1f).padding(start = 16.dp)) {
+                                    Text(
+                                        hd.seriesName,
+                                        color = colorScheme.onSurface,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
-                                    Column(Modifier.padding(start = 14.dp).weight(1f)) {
-                                        Text(
-                                            hd.seriesName,
-                                            color = colorScheme.onSurface,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(top = 5.dp)
+                                    ) {
+                                        Icon(
+                                            painterResource(R.drawable.ic_check_circle),
+                                            contentDescription = null,
+                                            tint = colorScheme.primary,
+                                            modifier = Modifier.size(14.dp)
                                         )
+                                        Text(
+                                            " ${hd.doneCount}/${hd.totalCount} 集 · " + hd.sizeText,
+                                            color = colorScheme.onSurfaceVariant,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                    if (hd.failedCount > 0) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(top = 5.dp)
+                                            modifier = Modifier.padding(top = 3.dp)
                                         ) {
                                             Icon(
-                                                painterResource(R.drawable.ic_check_circle),
+                                                painterResource(R.drawable.icon_error),
                                                 contentDescription = null,
-                                                tint = colorScheme.primary,
+                                                tint = colorScheme.error,
                                                 modifier = Modifier.size(14.dp)
                                             )
                                             Text(
-                                                " ${hd.doneCount}/${hd.totalCount} 集 · " + hd.sizeText,
-                                                color = colorScheme.onSurfaceVariant,
+                                                " $hd.failedCount 集失败",
+                                                color = colorScheme.error,
                                                 fontSize = 12.sp
                                             )
                                         }
-                                        if (hd.failedCount > 0) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                modifier = Modifier.padding(top = 3.dp)
-                                            ) {
-                                                Icon(
-                                                    painterResource(R.drawable.icon_error),
-                                                    contentDescription = null,
-                                                    tint = colorScheme.error,
-                                                    modifier = Modifier.size(14.dp)
-                                                )
-                                                Text(
-                                                    " $hd.failedCount 集失败",
-                                                    color = colorScheme.error,
-                                                    fontSize = 12.sp
-                                                )
-                                            }
+                                    }
+                                    Row(
+                                        modifier = Modifier.padding(top = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        FilledTonalButton(onClick = { playFirstOfGroup(detailGroupKey ?: return@FilledTonalButton) }) {
+                                            Text("播放全部")
                                         }
-                                    }
-                                }
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 12.dp),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    FilledTonalButton(onClick = { playFirstOfGroup(detailGroupKey ?: return@FilledTonalButton) }) {
-                                        Text("播放全部")
-                                    }
-                                    if (hd.failedCount > 0) {
-                                        Spacer(Modifier.width(8.dp))
-                                        TextButton(onClick = {
-                                            val n = DownloadTaskManager.get().retryAllFailed()
-                                            if (n > 0) ToastUtils.showShort("已重新排队 $n 个失败集")
-                                        }) {
-                                            Text("重试失败(${hd.failedCount})", color = colorScheme.primary)
+                                        if (hd.failedCount > 0) {
+                                            Spacer(Modifier.width(8.dp))
+                                            TextButton(onClick = {
+                                                val n = DownloadTaskManager.get().retryAllFailed()
+                                                if (n > 0) ToastUtils.showShort("已重新排队 $n 个失败集")
+                                            }) {
+                                                Text("重试失败(${hd.failedCount})", color = colorScheme.primary)
+                                            }
                                         }
                                     }
                                 }
