@@ -280,7 +280,9 @@ class FastSearchActivity : BaseActivity() {
                 LogUtils.d("搜索:$text")
                 mSearchSuggestionsDialog!!.dismissWith { search(text) }
             }
-            XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
+            XPopup.Builder(this)
+                // 联想弹窗不带遮罩/模糊: 旧实现全屏遮罩把输入框也盖住, 输入时看不到正在打的词
+                .hasShadowBg(false)
                 .atView(anchor)
                 .notDismissWhenTouchInView(anchor)
                 .isViewMode(true)

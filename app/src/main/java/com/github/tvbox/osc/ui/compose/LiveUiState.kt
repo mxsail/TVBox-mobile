@@ -40,17 +40,13 @@ class LiveUiState {
     var settingItemSelectedIdx by mutableStateOf(-1)
     var settingGroups by mutableStateOf<List<com.github.tvbox.osc.bean.LiveSettingGroup>>(emptyList())
 
-    /** 频道号浮层 */
-    var channelInfoVisible by mutableStateOf(false)
-    var channelInfoText by mutableStateOf("")
-
     /** 视频区高度(px), 初始按屏宽 16:9, 起播后按实际比例微调 */
     var videoHeightPx by mutableStateOf(0)
 
-    /** 底部 EPG 卡 */
+    /** 底部 EPG 卡: 频道名 + 源切换 chips */
     var epgName by mutableStateOf("")
-    var epgNum by mutableStateOf("")
-    var epgSource by mutableStateOf("源 1/1")
+    var sourceNames by mutableStateOf<List<String>>(emptyList())
+    var sourceIdx by mutableStateOf(0)
 
     var groupListState = LazyListState()
     var channelListState = LazyListState()

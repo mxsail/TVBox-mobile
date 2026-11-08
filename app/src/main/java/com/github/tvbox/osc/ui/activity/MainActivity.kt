@@ -294,7 +294,12 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
             recreate()
             return
         }
-        goToTab(intent.getIntExtra(EXTRA_TAB, 0))
+        // 仅显式携带 EXTRA_TAB 的意图(下载完成通知等)才切 tab;
+        // 桌面图标/最近任务的 launcher 意图不带 EXTRA_TAB, 保持当前页面
+        // (旧实现无条件 goToTab(0), 直播页切后台再回来会被跳回首页)
+        if (intent.hasExtra(EXTRA_TAB)) {
+            goToTab(intent.getIntExtra(EXTRA_TAB, 0))
+        }
     }
 
     /** 切换底部 tab(直播标题栏返回/我的页入口/通知点击等统一入口) */

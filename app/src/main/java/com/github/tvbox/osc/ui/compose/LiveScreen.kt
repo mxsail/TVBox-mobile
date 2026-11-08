@@ -8,6 +8,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -91,7 +93,6 @@ fun LiveScreen(fragment: LiveFragment, uiState: LiveUiState) {
                 LiveEpgBar(fragment, uiState)
                 LiveChannelBrowser(fragment, uiState, Modifier.weight(1f))
             }
-            LiveChannelInfoOverlay(uiState, Modifier.align(Alignment.TopEnd))
         }
     }
 }
@@ -156,22 +157,17 @@ private fun LiveSettingsPanel(fragment: LiveFragment, uiState: LiveUiState, modi
     }
 }
 
-/** EPG 信息卡: 频道名/台号 + 线路切换 + 投屏/设置入口 */
+/** EPG 信息卡: 频道名 + 投屏/设置入口 + 横向源切换 chips(高亮当前源) */
 @Composable
 private fun LiveEpgBar(fragment: LiveFragment, uiState: LiveUiState) {
-    Box(
+    Column(
         Modifier
             .padding(10.dp)
             .fillMaxWidth()
-            .height(96.dp)
             .background(colorScheme.surfaceContainerLow, RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-        Column(
-            Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 uiState.epgName,
                 color = colorScheme.onSurface,
@@ -179,77 +175,54 @@ private fun LiveEpgBar(fragment: LiveFragment, uiState: LiveUiState) {
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 modifier = Modifier
-                    .width(132.dp)
+                    .weight(1f)
                     .basicMarquee()
                     .clickable { fragment.scrollChannelListToSelection() }
             )
-            if (uiState.epgNum.isNotEmpty()) {
-                Text(
-                    uiState.epgNum,
-                    color = colorScheme.onSurface,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 6.dp)
-                )
-            }
-        }
-        Row(
-            Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 14.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                painterResource(R.drawable.icon_pre),
-                contentDescription = "上一线路",
-                tint = colorScheme.onSurface,
-                modifier = Modifier
-                    .size(30.dp)
-                    .padding(4.dp)
-                    .clickable { fragment.playPreSource() }
-            )
-            Text(
-                uiState.epgSource,
-                color = colorScheme.onSurface,
-                fontSize = 16.sp,
-                modifier = Modifier
-                    .padding(horizontal = 14.dp)
-                    .clickable { fragment.playNextSource() }
-            )
-            Icon(
-                painterResource(R.drawable.icon_pre),
-                contentDescription = "下一线路",
-                tint = colorScheme.onSurface,
-                modifier = Modifier
-                    .size(30.dp)
-                    .padding(4.dp)
-                    .clickable { fragment.playNextSource() }
-            )
-        }
-        Row(
-            Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 10.dp, end = 14.dp)
-        ) {
             Icon(
                 painterResource(R.drawable.ic_cast),
                 contentDescription = "投屏",
                 tint = colorScheme.onSurface,
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(32.dp)
                     .padding(4.dp)
                     .clickable { fragment.showCastDialog() }
             )
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(10.dp))
             Icon(
                 painterResource(R.drawable.ic_player_setting),
                 contentDescription = "设置",
                 tint = colorScheme.onSurface,
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(32.dp)
                     .padding(4.dp)
                     .clickable { fragment.showSettingDialog(false) }
             )
+        }
+        // 源切换 chips: 直观横向列出全部线路, 高亮当前源; 源多时横向滚动
+        if (uiState.sourceNames.size > 0) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 10.dp)
+            ) {
+                itemsIndexed(uiState.sourceNames) { index, name ->
+                    val selected = index == uiState.sourceIdx
+                    Text(
+                        name,
+                        color = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .clickable { fragment.switchingLine2Replay(index) }
+                            .background(
+                                if (selected) colorScheme.primaryContainer else colorScheme.surfaceContainerHighest,
+                                RoundedCornerShape(20.dp)
+                            )
+                            .padding(horizontal = 14.dp, vertical = 7.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -328,26 +301,5 @@ private fun LiveChannelBrowser(fragment: LiveFragment, uiState: LiveUiState, mod
                 )
             }
         }
-    }
-}
-
-/** 频道号浮层: 换台/换线路后显示 3 秒 */
-@Composable
-private fun LiveChannelInfoOverlay(uiState: LiveUiState, modifier: Modifier) {
-    AnimatedVisibility(
-        visible = uiState.channelInfoVisible,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = modifier.padding(top = 48.dp, end = 24.dp)
-    ) {
-        Text(
-            uiState.channelInfoText,
-            color = colorScheme.onSurface,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .background(colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        )
     }
 }

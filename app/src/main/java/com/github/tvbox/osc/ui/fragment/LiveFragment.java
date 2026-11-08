@@ -74,7 +74,6 @@ import java.util.Arrays;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 
 import xyz.doikki.videoplayer.player.VideoView;
 
@@ -323,14 +322,10 @@ public class LiveFragment extends BaseLazyFragment {
         if (channel_Name != null && channel_Name.getChannelName() != null) {
             mPlayerTitleView.setTitle(channel_Name.getChannelName());
             uiState.setEpgName(channel_Name.getChannelName());
-            uiState.setEpgNum("" + channel_Name.getChannelNum());
-            //todo 上一/下一/当前节目信息
-
-            if (channel_Name.getSourceNum() <= 0) {
-                uiState.setEpgSource("源 1/1");
-            } else {
-                uiState.setEpgSource("源 " + (channel_Name.getSourceIndex() + 1) + "/" + channel_Name.getSourceNum());
-            }
+            // 源切换 chips 数据(横向列出全部线路, 高亮当前源)
+            uiState.setSourceNames(channel_Name.getChannelSourceNames() != null
+                    ? channel_Name.getChannelSourceNames() : new ArrayList<>());
+            uiState.setSourceIdx(channel_Name.getSourceIndex());
         }
     }
 
@@ -608,28 +603,9 @@ public class LiveFragment extends BaseLazyFragment {
         scrollChannelListToSelection();
     }
 
-    private void showChannelInfo() {
-        if (currentLiveChannelItem == null) return;
-        uiState.setChannelInfoText(String.format(Locale.getDefault(), "%d %s %s(%d/%d)", currentLiveChannelItem.getChannelNum(),
-                currentLiveChannelItem.getChannelName(), currentLiveChannelItem.getSourceName(),
-                currentLiveChannelItem.getSourceIndex() + 1, currentLiveChannelItem.getSourceNum()));
-        uiState.setChannelInfoVisible(true);
-        mHandler.removeCallbacks(mHideChannelInfoRun);
-        mHandler.postDelayed(mHideChannelInfoRun, 3000);
-    }
-
-    private Runnable mHideChannelInfoRun = new Runnable() {
-        @Override
-        public void run() {
-            uiState.setChannelInfoVisible(false);
-        }
-    };
-
     private boolean playChannel(int channelGroupIndex, int liveChannelIndex, boolean changeSource) {
         if ((channelGroupIndex == currentChannelGroupIndex && liveChannelIndex == currentLiveChannelIndex && !changeSource)
                 || (changeSource && currentLiveChannelItem != null && currentLiveChannelItem.getSourceNum() == 1)) {
-            // 同频道同线路重入: 也给一次频道信息反馈, 不再静默
-            showChannelInfo();
             return true;
         }
         mVideoView.release();
@@ -652,7 +628,6 @@ public class LiveFragment extends BaseLazyFragment {
         showBottomEpg();
 
         mVideoView.setUrl(currentLiveChannelItem.getUrl());
-        showChannelInfo();
         // 用户手动选台/换线路视为重新开始, 清空连续自动换源失败计数
         autoSwitchFailStreak = 0;
         mVideoView.start();
