@@ -560,7 +560,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             if (autoPlayFromCache) {
                 // 下载页直达: 直接跳指定集,不再先起播历史集(避免二次起播)
                 handleAutoPlayFromCache();
-            } else if (showPreview) {
+            } else if (showPreview && !autoJumpDone) {
+                // 详情异步刷新到达时快照路径已起播过, 不得重新 jumpToPlay——
+                // 否则播放器 release 重载, 可见地"刷新"一次且打断续播
                 jumpWhenPlayerReady();
             }
             // startQuickSearch();
@@ -675,15 +677,22 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     }
 
     private void jumpWhenPlayerReady() {
+        // autoJumpDone: 已起播过; jumpPending: post 在途——防快照/网络两条路径各入队一个跳转
+        if (autoJumpDone || jumpPending) return;
         if (playFragment != null && playFragment.getView() != null) {
             doPreviewJump();
         } else if (mBinding != null) {
-            mBinding.getRoot().post(this::doPreviewJump);
+            jumpPending = true;
+            mBinding.getRoot().post(() -> {
+                jumpPending = false;
+                doPreviewJump();
+            });
         }
     }
 
     private void doPreviewJump() {
         if (isFinishing() || isDestroyed()) return;
+        autoJumpDone = true;
         jumpToPlay();
         mBinding.previewPlayer.setVisibility(View.VISIBLE);
         toggleSubtitleTextSize();
@@ -720,6 +729,8 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         if (vid != null) {
             vodId = vid;
             sourceKey = key;
+            // 每次 loadDetail(进页/换源)重新允许一次自动起播; 详情异步刷新不重跳
+            autoJumpDone = false;
             // 快照秒开: 本地有详情快照(含老下载兜底)先渲染界面,详情接口异步刷新覆盖
             if (!tryHydrateFromSnapshot()) {
                 showLoading();
@@ -737,6 +748,10 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     /** 下载页直达: 快照渲染后定位到指定集并起播 */
     private boolean autoPlayFromCache = false;
     private String autoPlayUrl = null;
+    /** 本次加载是否已自动起播过(快照秒开/在线详情只跳一次, 异步刷新不重跳) */
+    private boolean autoJumpDone = false;
+    /** jumpWhenPlayerReady 的 post 是否在途(防快照/网络两条路径各入队一个跳转) */
+    private boolean jumpPending = false;
 
     /**
      * 离线秒开: 从详情快照或下载任务兜底数据渲染详情页。
