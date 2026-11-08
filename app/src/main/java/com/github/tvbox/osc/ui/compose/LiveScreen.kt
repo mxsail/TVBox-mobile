@@ -217,7 +217,7 @@ private fun LiveEpgBar(fragment: LiveFragment, uiState: LiveUiState) {
                             .clickable { fragment.switchingLine2Replay(index) }
                             .background(
                                 if (selected) colorScheme.primaryContainer else colorScheme.surfaceContainerHighest,
-                                RoundedCornerShape(20.dp)
+                                RoundedCornerShape(8.dp)
                             )
                             .padding(horizontal = 14.dp, vertical = 7.dp)
                     )

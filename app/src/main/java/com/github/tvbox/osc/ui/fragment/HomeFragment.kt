@@ -73,6 +73,7 @@ import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.event.AppearanceChangedEvent
 import com.github.tvbox.osc.server.ControlManager
 import com.github.tvbox.osc.ui.activity.FastSearchActivity
+import com.github.tvbox.osc.ui.activity.HistoryActivity
 import com.github.tvbox.osc.ui.activity.MainActivity
 import com.github.tvbox.osc.ui.activity.SubscriptionActivity
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
@@ -601,6 +602,29 @@ class HomeFragment : Fragment() {
                                 modifier = Modifier.size(18.dp)
                             )
                         }
+                    }
+                    // 观看历史入口
+                    Box(
+                        Modifier
+                            .padding(start = 10.dp)
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(colorScheme.surfaceContainerHigh)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                val act = activity ?: return@clickable
+                                act.startActivity(Intent(act, HistoryActivity::class.java))
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_history_18),
+                            contentDescription = "观看历史",
+                            tint = colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                     }
                 }

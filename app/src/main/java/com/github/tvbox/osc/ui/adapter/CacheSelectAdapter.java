@@ -27,15 +27,11 @@ public class CacheSelectAdapter extends BaseQuickAdapter<CacheSelectAdapter.Item
     @Override
     protected void convert(BaseViewHolder helper, Item item) {
         android.widget.TextView tv = helper.getView(R.id.tvEp);
-        tv.setSelected(item.checked);
-        String text = item.name;
-        if (item.cached) {
-            text = "✓ " + text;
-            tv.setAlpha(0.55f);
-        } else {
-            tv.setAlpha(1f);
-        }
-        tv.setText(text);
+        // 已下载集显示为选中态填充样式(FilterChip checked 观感), 不再用"✓ "前缀
+        // (前缀会撑爆 chip 文字); 已下载项点击只会提示, 不可取消勾选
+        tv.setSelected(item.checked || item.cached);
+        tv.setAlpha(1f);
+        tv.setText(item.name);
     }
 
     public void setCheckedSilently(int position, boolean checked) {

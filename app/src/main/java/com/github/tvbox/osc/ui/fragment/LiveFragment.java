@@ -604,8 +604,17 @@ public class LiveFragment extends BaseLazyFragment {
     }
 
     private boolean playChannel(int channelGroupIndex, int liveChannelIndex, boolean changeSource) {
-        if ((channelGroupIndex == currentChannelGroupIndex && liveChannelIndex == currentLiveChannelIndex && !changeSource)
-                || (changeSource && currentLiveChannelItem != null && currentLiveChannelItem.getSourceNum() == 1)) {
+        // 同频道同线路且播放器实际持有该频道时才短路; 进入直播页(播放器 IDLE)或
+        // 上一次起播失败(ERROR)时不能被守卫拦下, 否则首频道不自动播、重复点击也不起播
+        int playerState = mVideoView.getCurrentPlayState();
+        boolean playerHasChannel = playerState == VideoView.STATE_PLAYING
+                || playerState == VideoView.STATE_PAUSED
+                || playerState == VideoView.STATE_BUFFERING
+                || playerState == VideoView.STATE_BUFFERED
+                || playerState == VideoView.STATE_PREPARED
+                || playerState == VideoView.STATE_PREPARING;
+        if ((channelGroupIndex == currentChannelGroupIndex && liveChannelIndex == currentLiveChannelIndex && !changeSource && playerHasChannel)
+                || (changeSource && currentLiveChannelItem != null && currentLiveChannelItem.getSourceNum() == 1 && playerHasChannel)) {
             return true;
         }
         mVideoView.release();
