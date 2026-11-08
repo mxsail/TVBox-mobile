@@ -1060,10 +1060,12 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     }
 
     private HashSet<String> getCachedUrls() {
+        // "已占用"口径: 除失败外全部状态(下载中/等待/暂停)都算, 否则选集弹窗把下载中的集
+        // 显示为可选, 重复入队产生重复任务
         HashSet<String> cachedUrls = new HashSet<>();
         try {
             for (DownloadEpisode ep : RoomDataManger.getDownloadEpisodes(sourceKey, vodInfo.id, vodInfo.playFlag)) {
-                if (ep.status == DownloadEpisode.STATUS_DONE && ep.rawUrl != null) {
+                if (ep.status != DownloadEpisode.STATUS_FAILED && ep.rawUrl != null) {
                     cachedUrls.add(ep.rawUrl);
                 }
             }
@@ -1085,6 +1087,8 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     public void queueDownloadAfterPlay(List<DownloadEpisode> tasks) {
         if (playbackStarted || playFragment == null) {
             DownloadTaskManager.get().enqueue(tasks);
+            // 立即刷新选集"已下载"角标与弹窗可选态, 否则重开弹窗仍显示未下载
+            refreshCachedBadge();
             ToastUtils.showShort("已加入下载队列,可在通知栏查看进度");
             return;
         }
@@ -1107,6 +1111,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         List<DownloadEpisode> tasks = new ArrayList<>(pendingDownloadTasks);
         pendingDownloadTasks.clear();
         DownloadTaskManager.get().enqueue(tasks);
+        refreshCachedBadge();
         ToastUtils.showShort(String.format("已开始播放,自动开始下载(%d集)", tasks.size()));
     }
 

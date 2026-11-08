@@ -211,10 +211,27 @@ public class DownloadTaskManager {
 
     public void enqueue(List<DownloadEpisode> tasks) {
         long now = System.currentTimeMillis();
+        // 防重复入队: 同一集(源+影片+线路+集号)已有非失败任务(等待/解析/下载中/暂停/完成)时跳过。
+        // 选集弹窗缓存了打开瞬间的快照, 期间新入队的集仍显示可选, 双保险防重复下载任务
+        java.util.HashSet<String> existingKeys = new java.util.HashSet<>();
+        for (DownloadEpisode e : RoomDataManger.getAllDownloadEpisodes()) {
+            if (e.status == DownloadEpisode.STATUS_FAILED) continue;
+            existingKeys.add(e.sourceKey + "|" + e.vodId + "|" + e.flag + "|" + e.episodeIndex);
+        }
+        List<DownloadEpisode> accepted = new java.util.ArrayList<>();
+        for (DownloadEpisode t : tasks) {
+            if (!existingKeys.add(t.sourceKey + "|" + t.vodId + "|" + t.flag + "|" + t.episodeIndex)) {
+                continue;
+            }
+            accepted.add(t);
+        }
+        if (accepted.isEmpty()) {
+            return;
+        }
         // 入队是明确的下载意图:清掉全局暂停,否则清空缓存等路径遗留的
         // pausedAll 会让新队列永远停在"等待中"且界面无恢复入口
         pausedAll = false;
-        for (DownloadEpisode t : tasks) {
+        for (DownloadEpisode t : accepted) {
             pauseIds.remove(t.getId());
             cancelIds.remove(t.getId());
             clearRetryState(t.getId());
