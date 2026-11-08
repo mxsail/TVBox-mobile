@@ -1344,6 +1344,8 @@ public class PlayFragment extends BaseLazyFragment {
         loadFoundCount.set(0);
         loadFoundVideoUrls = new LinkedList<String>();
         loadFoundVideoUrlsHeader = new HashMap<String, HashMap<String, String>>();
+        // 广告判定缓存跨播放/换源从不清理: 陈旧标记失效且 map 持续增长
+        loadedUrls.clear();
     }
 
     public void play(boolean reset) {
