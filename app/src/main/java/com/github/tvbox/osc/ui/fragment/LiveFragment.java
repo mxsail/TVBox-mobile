@@ -1127,7 +1127,9 @@ public class LiveFragment extends BaseLazyFragment {
     }
 
     private boolean isListOrSettingLayoutVisible() {
-        return tvLeftChannelListLayout.getVisibility() == View.VISIBLE || tvRightSettingLayout.getVisibility() == View.VISIBLE;
+        // 只看右侧滑入设置面板: 左侧频道浏览区是常驻布局(XML 默认 VISIBLE 且从不切换),
+        // 旧守卫把它当模态面板, 导致遥控器上下键换台/左右键换线路整组按键永远不可达
+        return tvRightSettingLayout.getVisibility() == View.VISIBLE;
     }
 
     private void initLiveSettingGroupList() {
