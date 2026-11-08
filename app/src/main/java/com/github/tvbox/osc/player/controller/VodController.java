@@ -340,10 +340,10 @@ public class VodController extends BaseController {
         });
         mIvPlayStatus.setOnClickListener(view -> {
             togglePlay();
-            if (videoPlayState == VideoView.STATE_PLAYING) {
-                myHandle.removeCallbacks(myRunnable);
-                myHandle.postDelayed(myRunnable, 300);
-            }
+            // 统一停留时长: 旧代码按点击前的旧状态判断, 点"暂停"300ms 就收起、
+            // 点"继续播放"反而停留 5 秒, 两个方向行为不对称
+            myHandle.removeCallbacks(myRunnable);
+            myHandle.postDelayed(myRunnable, dismissTimeOperationBar);
         });
         mNextBtn.setOnClickListener(view -> {
             listener.playNext(false);
@@ -494,7 +494,9 @@ public class VodController extends BaseController {
             myHandle.removeCallbacks(myRunnable);
             myHandle.postDelayed(myRunnable, dismissTimeOperationBar);
             try {
-                String ijk = mPlayerConfig.getString("ijk");
+                // 兜底解析解码名: 配置名为空串/与解码列表对不上时旧循环不匹配,
+                // 按钮显示空白且点击无效, 这里归一到列表首项保证一定有下一个
+                String ijk = resolveIjkName(mPlayerConfig.getString("ijk"));
                 List<IJKCode> codecs = ApiConfig.get().getIjkCodes();
                 for (int i = 0; i < codecs.size(); i++) {
                     if (ijk.equals(codecs.get(i).getName())) {
@@ -653,21 +655,27 @@ public class VodController extends BaseController {
     }
 
     private void hideLiveAboutBtn() {
-        if (mControlWrapper != null && mControlWrapper.getDuration() == 0) {
-            mPlayerSpeedBtn.setVisibility(GONE);
-            mPlayerTimeStartEndText.setVisibility(GONE);
-            mPlayerTimeStartBtn.setVisibility(GONE);
-            mPlayerTimeSkipBtn.setVisibility(GONE);
-            mPlayerTimeResetBtn.setVisibility(GONE);
-            mNextBtn.setNextFocusLeftId(R.id.zimu_select);
-        } else {
-            mPlayerSpeedBtn.setVisibility(View.VISIBLE);
-            mPlayerTimeStartEndText.setVisibility(View.VISIBLE);
-            mPlayerTimeStartBtn.setVisibility(View.VISIBLE);
-            mPlayerTimeSkipBtn.setVisibility(View.VISIBLE);
-            mPlayerTimeResetBtn.setVisibility(View.VISIBLE);
-            mNextBtn.setNextFocusLeftId(R.id.play_time_start);
+        // 旧实现按 duration==0 判定直播隐藏倍速/片头片尾按钮——但本控制器只服务点播
+        // (直播用 LiveNewController), 起播初期 duration 未就绪会被误判, 按钮闪隐后闪现;
+        // 固定显示, 焦点链固定
+        mPlayerSpeedBtn.setVisibility(View.VISIBLE);
+        mPlayerTimeStartEndText.setVisibility(View.VISIBLE);
+        mPlayerTimeStartBtn.setVisibility(View.VISIBLE);
+        mPlayerTimeSkipBtn.setVisibility(View.VISIBLE);
+        mPlayerTimeResetBtn.setVisibility(View.VISIBLE);
+        mNextBtn.setNextFocusLeftId(R.id.play_time_start);
+    }
+
+    /** 解码名兜底: 配置名为空或与解码列表对不上时归一到列表首项, 避免按钮空白且切换失效 */
+    private String resolveIjkName(String name) {
+        List<IJKCode> codecs = ApiConfig.get().getIjkCodes();
+        if (codecs != null) {
+            for (IJKCode codec : codecs) {
+                if (codec.getName().equals(name)) return name;
+            }
+            if (!codecs.isEmpty()) return codecs.get(0).getName();
         }
+        return name;
     }
 
     public void initLandscapePortraitBtnInfo() {
@@ -717,13 +725,17 @@ public class VodController extends BaseController {
         updatePlayerCfgView();
     }
 
-    void updatePlayerCfgView() {
-        try {
-            int playerType = mPlayerConfig.getInt("pl");
-            mPlayerBtn.setText(PlayerHelper.getPlayerName(playerType));
-            mPlayerScaleBtn.setText(PlayerHelper.getScaleName(mPlayerConfig.getInt("sc")));
-            mPlayerIJKBtn.setText(mPlayerConfig.getString("ijk"));
-            mPlayerIJKBtn.setVisibility(playerType == 1 ? VISIBLE : GONE);
+     void updatePlayerCfgView() {
+         try {
+             int playerType = mPlayerConfig.getInt("pl");
+             mPlayerBtn.setText(PlayerHelper.getPlayerName(playerType));
+             mPlayerScaleBtn.setText(PlayerHelper.getScaleName(mPlayerConfig.getInt("sc")));
+             String ijkName = resolveIjkName(mPlayerConfig.getString("ijk"));
+             if (!ijkName.equals(mPlayerConfig.optString("ijk"))) {
+                 mPlayerConfig.put("ijk", ijkName);
+             }
+             mPlayerIJKBtn.setText(ijkName);
+             mPlayerIJKBtn.setVisibility(playerType == 1 ? VISIBLE : GONE);
             mPlayerScaleBtn.setText(PlayerHelper.getScaleName(mPlayerConfig.getInt("sc")));
             mPlayerSpeedBtn.setText("x" + mPlayerConfig.getDouble("sp"));
             mPlayerTimeStartBtn.setText(PlayerUtils.stringForTime(mPlayerConfig.getInt("st") * 1000));
