@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -52,6 +54,17 @@ fun attachLiveScreen(fragment: LiveFragment, composeView: androidx.compose.ui.pl
  */
 @Composable
 fun LiveScreen(fragment: LiveFragment, uiState: LiveUiState) {
+    // 状态栏避让双保险: 先取 Compose insets, 为 0(嵌套组合/桥接吞掉)时回退
+    // 根 View insets(旧 View 版验证过的读取路径)
+    val statusBarPad = with(LocalDensity.current) {
+        val viaCompose = androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(this)
+        val fallback = if (viaCompose > 0) 0 else {
+            val root = (androidx.compose.ui.platform.LocalContext.current as? android.app.Activity)?.window?.decorView
+            androidx.core.view.ViewCompat.getRootWindowInsets(root ?: return@with 0.toDp())
+                ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())?.top ?: 0
+        }
+        (viaCompose + fallback).toDp()
+    }
     Box(
         Modifier
             .fillMaxSize()
@@ -61,7 +74,7 @@ fun LiveScreen(fragment: LiveFragment, uiState: LiveUiState) {
             Column(
                 Modifier
                     .fillMaxSize()
-                    .statusBarsPadding()
+                    .padding(top = statusBarPad)
             ) {
                 // 视频区: 高度由 uiState 驱动(初始 16:9, 起播后按实际比例)
                 Box(
