@@ -782,8 +782,12 @@ fun LiquidBottomTabs(
 
             // 2. M3 胶囊指示器 (位于内容下方，跟随滚动滑动)
             // 显示文字时内容高约 34dp, 固定 32dp 会与图标/文字相交 → 胶囊随 showLabels 放大到完整包住图文
-            val indicatorWidth = if (showLabels) 64.dp else 56.dp
             val indicatorHeight = if (showLabels) 40.dp else 32.dp
+            // 胶囊宽度自适应: 筛选钮出现使 bar 收窄后 tabWidth 变小, 固定 64dp 会贴近底栏左端圆帽
+            // 与外壳不同心(液态玻璃的滑块是 fillMaxWidth(1/n) 自适应所以无此问题), 两端各留 8dp 钳制
+            val maxPillWidthPx = with(density) { (if (showLabels) 64f else 56f).dp.toPx() }
+            val pillWidthPx = with(density) { (tabWidth - 16f.dp.toPx()).coerceIn(0f, maxPillWidthPx) }
+            val indicatorWidth = with(density) { pillWidthPx.toDp() }
             Box(
                 Modifier
                     .padding(horizontal = LiquidBarSpec.InsetDp.dp)
@@ -916,7 +920,7 @@ fun LiquidBottomBar(
             }
         }
 
-        // 分类筛选玻璃圆钮: 与底栏并排
+        // 分类筛选玻璃圆钮: 与底栏并排; 停靠模式下融入底栏(撑满高度/方角/贴边), 悬浮模式保持独立圆钮
         AnimatedVisibility(
             visible = filterVisible,
             enter = expandHorizontally(
@@ -930,17 +934,19 @@ fun LiquidBottomBar(
             val isLiquid = material == ThemeManager.MATERIAL_LIQUID
             val containerColor = if (isLightTheme) Color(0xFFFAFAFA).copy(0.4f) else Color(0xFF121212).copy(0.4f)
             val solidCircle = if (isLightTheme) Color(0xFFF7F7F9) else Color(0xFF202024)
+            val buttonShape = if (floating) CircleShape else RoundedCornerShape(0.dp)
+            val buttonHeight = if (floating) LiquidBarSpec.HeightDp.dp else (LiquidBarSpec.HeightDp.dp + navInsetBottom)
             Box(
                 modifier = Modifier
-                    .padding(start = 10.dp)
-                    .size(LiquidBarSpec.HeightDp.dp)
+                    .padding(start = if (floating) 10.dp else 0.dp)
+                    .size(width = LiquidBarSpec.HeightDp.dp, height = buttonHeight)
                     .then(
                         if (material == ThemeManager.MATERIAL_YOU || !isLiquidGlassSupported) {
-                            Modifier.background(solidCircle, CircleShape)
+                            Modifier.background(solidCircle, buttonShape)
                         } else {
                             Modifier.drawBackdrop(
                                 backdrop = backdrop,
-                                shape = { CircleShape },
+                                shape = { buttonShape },
                                 effects = {
                                     vibrancy()
                                     blur(8f.dp.toPx())
