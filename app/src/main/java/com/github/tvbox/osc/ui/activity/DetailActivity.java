@@ -157,19 +157,26 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         initViewModel();
         initData();
         registerReceiver(mBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        applySystemBarStyle();
+        toggleScreenShotListen(true);
+    }
+
+    /** 系统栏样式(透明状态栏/暗色字体/透明导航栏+避让), init 与退出画中画共用 */
+    private void applySystemBarStyle() {
         ImmersionBar.with(this)
                 .transparentStatusBar()
                 .statusBarDarkFont(!com.github.tvbox.osc.util.Utils.isDarkTheme())
                 .navigationBarColor(android.R.color.transparent)
                 .fitsSystemWindows(true)
                 .init();
-        toggleScreenShotListen(true);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (playFragment != null && playFragment.getController() != null) {
+        if (playFragment != null && playFragment.getController() != null
+                && !(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode())) {
+            // 确实不在画中画才清标记, 避免与进入回调顺序耦合导致 InPipMode 被误翻
             playFragment.getController().setInPipMode(false);
         }
         updatePipParams();
@@ -1011,8 +1018,15 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (event != null && playFragment != null && fullWindows) {
-            if (playFragment.dispatchKeyEvent(event)) {
+        if (event != null && playFragment != null) {
+            // 媒体键(蓝牙耳机/键盘)任何布局形态都转发给播放器;
+            // 方向键/OK 仅全屏转发, 竖屏预览下保留详情页自身的焦点导航
+            int keyCode = event.getKeyCode();
+            boolean mediaKey = keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                    || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE
+                    || keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS
+                    || keyCode == KeyEvent.KEYCODE_MEDIA_STOP;
+            if ((fullWindows || mediaKey) && playFragment.dispatchKeyEvent(event)) {
                 return true;
             }
         }
@@ -1416,6 +1430,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             registerActionReceiver(true);
         } else {
+            applySystemBarStyle();
             if (playFragment != null && playFragment.getController() != null) {
                 playFragment.getController().setInPipMode(false);
             }
