@@ -920,11 +920,13 @@ fun LiquidBottomBar(
             }
         }
 
-        // 分类筛选玻璃圆钮: 与底栏并排; 停靠模式下融入底栏(撑满高度/方角/贴边), 悬浮模式保持独立圆钮
+        // 分类筛选玻璃圆钮: 与底栏并排; 停靠模式下融入底栏(撑满高度/方角/贴边), 悬浮模式保持独立圆钮。
+        // 展开动画必须临界阻尼(dampingRatio=1): 欠阻尼 spring 宽度过冲期间按钮内容 End 对齐,
+        // 会在与底栏之间露出一段空隙, 落定才消失——停靠模式要求严丝合缝
         AnimatedVisibility(
             visible = filterVisible,
             enter = expandHorizontally(
-                animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+                animationSpec = spring(dampingRatio = 1f, stiffness = 380f),
                 expandFrom = Alignment.End
             ) + fadeIn(tween(180)),
             exit = shrinkHorizontally(tween(180), shrinkTowards = Alignment.End) +
