@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 投屏弹窗(Material 3): 与其他 M3 弹窗(dialog_cache_select)同构 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:layout_gravity="center"
-    android:background="@drawable/bg_large_round_popup"
+    android:background="@drawable/bg_m3_surface_card"
     android:orientation="vertical"
     android:paddingHorizontal="20dp"
     android:paddingTop="20dp"
-    android:paddingBottom="30dp">
+    android:paddingBottom="16dp">
 
     <TextView
         android:id="@+id/title"
@@ -17,43 +18,50 @@
         android:layout_height="wrap_content"
         android:text="投屏"
         android:textColor="?attr/colorOnSurface"
-        android:textStyle="bold"
-        android:textSize="18sp"/>
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="搜索同一 Wi-Fi 下的 DLNA 设备"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="13sp" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        tools:listitem="@layout/item_title"
-        android:layout_marginTop="10dp"
-        />
+        android:minHeight="120dp"
+        android:layout_marginTop="12dp"
+        tools:listitem="@layout/item_cast_device" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp">
+        android:layout_marginTop="16dp"
+        android:gravity="end">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_cancel"
-            android:layout_width="0dp"
-            android:layout_weight="1"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:layout_height="33dp"
-            android:layout_marginRight="20dp"
-            android:text="关 闭"
-            android:textColor="?attr/colorOnSurface"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+            android:text="关闭"
+            android:textColor="?attr/colorOnSurface" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_confirm"
-            android:layout_width="0dp"
-            android:layout_weight="1"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="10dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:layout_height="33dp"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            app:strokeColor="?attr/colorPrimary"
-            android:text="刷 新"/>
+            android:text="刷新设备" />
 
     </LinearLayout>
 

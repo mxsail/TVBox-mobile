@@ -21,7 +21,7 @@ import java.util.List;
 public class CastDevicesAdapter extends BaseQuickAdapter<Device, BaseViewHolder> implements OnDeviceRegistryListener {
 
     public CastDevicesAdapter() {
-        super(R.layout.item_title);
+        super(R.layout.item_cast_device);
     }
 
     @Override
