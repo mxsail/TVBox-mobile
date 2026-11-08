@@ -246,6 +246,17 @@ public class LiveFragment extends BaseLazyFragment {
 
         setLoadSir(findViewById(R.id.live_root));
         mVideoView = findViewById(R.id.mVideoView);
+        // 视频区高度自适应宽高比(去上下黑边): 布局固定 300dp, 16:9 内容上下黑边明显
+        mVideoView.addOnStateChangeListener(new VideoView.SimpleOnStateChangeListener() {
+            @Override
+            public void onPlayStateChanged(int playState) {
+                if (playState == VideoView.STATE_PREPARED || playState == VideoView.STATE_PLAYING) {
+                    adaptVideoAspectRatio();
+                    // 个别流尺寸上报偏晚, 延迟复查一次
+                    mHandler.postDelayed(mAdaptAspectRatioRun, 1200);
+                }
+            }
+        });
 
         tvLeftChannelListLayout = findViewById(R.id.tvLeftChannnelListLayout);
 
@@ -421,6 +432,25 @@ public class LiveFragment extends BaseLazyFragment {
     /** 宿主 Activity 是否处于 RESUMED(fragment.onPause 晚于 activity.onPause, 退后台时已非 RESUMED) */
     private boolean isHostResumed() {
         return getActivity() != null && getActivity().getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED);
+    }
+
+    private final Runnable mAdaptAspectRatioRun = this::adaptVideoAspectRatio;
+
+    /** 视频区高度自适应视频宽高比(全屏时跳过, doikki 全屏会把播放容器挪到 decor) */
+    private void adaptVideoAspectRatio() {
+        if (mVideoView == null || mVideoView.isFullScreen()) return;
+        int[] size = mVideoView.getVideoSize();
+        if (size == null || size[0] <= 0 || size[1] <= 0) return;
+        int width = mVideoView.getWidth();
+        if (width <= 0) return;
+        int targetH = (int) ((long) width * size[1] / size[0]);
+        targetH = Math.max(ConvertUtils.dp2px(140),
+                Math.min(targetH, (int) (ScreenUtils.getScreenHeight() * 0.55f)));
+        android.view.ViewGroup.LayoutParams lp = mVideoView.getLayoutParams();
+        if (lp != null && Math.abs(lp.height - targetH) > 8) {
+            lp.height = targetH;
+            mVideoView.setLayoutParams(lp);
+        }
     }
 
     /** 直播后台播放: 复用 PlayService 媒体通知(标题=频道名, 副标题=线路名), 通知按钮走 VOD_CONTROL 广播 */

@@ -652,6 +652,28 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
      * 预览起播需 PlayFragment 视图就绪: 快照路径在 init() 内同步执行,
      * fragment 事务可能尚未跑完,post 一帧兜底(网络路径本来就是异步,不受影响)。
      */
+    /**
+     * 竖屏预览窗高度自适应视频宽高比(去上下黑边): 固定 250dp 窗放 16:9 内容上下各留 ~24dp 黑边,
+     * 控制浮层也悬在黑边区。按内容宽度 x 高/宽 重设容器高, 竖版视频按屏高钳制。
+     * windowsPreview 与容器 LayoutParams 是同一对象, 画中画退出恢复时沿用自适应后的高度。
+     */
+    public void updatePreviewWindowHeight() {
+        if (fullWindows || playFragment == null || playFragment.getPlayer() == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) return;
+        int[] size = playFragment.getPlayer().getVideoSize();
+        if (size == null || size[0] <= 0 || size[1] <= 0) return;
+        int contentWidth = mBinding.previewPlayer.getWidth();
+        if (contentWidth <= 0) return;
+        int targetH = (int) ((long) contentWidth * size[1] / size[0]);
+        targetH = Math.max(ConvertUtils.dp2px(140),
+                Math.min(targetH, (int) (ScreenUtils.getScreenHeight() * 0.55f)));
+        ViewGroup.LayoutParams lp = mBinding.previewPlayer.getLayoutParams();
+        if (lp != null && Math.abs(lp.height - targetH) > 8) {
+            lp.height = targetH;
+            mBinding.previewPlayer.setLayoutParams(lp);
+        }
+    }
+
     private void jumpWhenPlayerReady() {
         if (playFragment != null && playFragment.getView() != null) {
             doPreviewJump();

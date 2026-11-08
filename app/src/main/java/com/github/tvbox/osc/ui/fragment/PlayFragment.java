@@ -363,6 +363,12 @@ public class PlayFragment extends BaseLazyFragment {
                     } else {
                         ((DetailActivity) mActivity).updatePipParams();
                     }
+                    if (playState == VideoView.STATE_PREPARED || playState == VideoView.STATE_PLAYING) {
+                        // 视频尺寸就绪后自适应预览窗高度去黑边(个别流尺寸上报偏晚, 延迟复查一次)
+                        final DetailActivity activity = (DetailActivity) mActivity;
+                        activity.updatePreviewWindowHeight();
+                        mVideoView.postDelayed(activity::updatePreviewWindowHeight, 1200);
+                    }
                 }
             }
         });
