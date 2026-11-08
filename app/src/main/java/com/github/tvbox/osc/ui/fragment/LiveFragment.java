@@ -117,6 +117,9 @@ public class LiveFragment extends BaseLazyFragment {
     private List<LiveChannelGroup> liveChannelGroupList = new ArrayList<>();
     private int currentLiveChannelIndex = -1;
     private int currentLiveChangeSourceTimes = 0;
+    /** 连续自动换源失败计数(只有真正 STATE_PLAYING 才清零), 超上限停止自动换源避免断网时无限跳台 */
+    private int autoSwitchFailStreak = 0;
+    private static final int AUTO_SWITCH_FAIL_CAP = 10;
     private LiveChannelItem currentLiveChannelItem = null;
     /** 后台播放媒体通知: VOD_CONTROL 广播接收器 + 服务归属标记(只有自己起的服务才停) */
     private BroadcastReceiver controlReceiver = null;
@@ -179,6 +182,11 @@ public class LiveFragment extends BaseLazyFragment {
             if (mVideoView != null) {
                 mVideoView.release();
             }
+            // 清空列表后旧频道下标已失效, 必须撤销挂起的自动换源定时器, 否则触发时
+            // getLiveChannels(旧下标) 对空列表取值直接数组越界
+            mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
+            currentLiveChangeSourceTimes = 0;
+            autoSwitchFailStreak = 0;
             liveChannelGroupList.clear();
             if (liveChannelGroupAdapter != null) {
                 liveChannelGroupAdapter.setNewData(new ArrayList<>());
@@ -605,6 +613,8 @@ public class LiveFragment extends BaseLazyFragment {
 
         mVideoView.setUrl(currentLiveChannelItem.getUrl());
         // showChannelInfo();
+        // 用户手动选台/换线路视为重新开始, 清空连续自动换源失败计数
+        autoSwitchFailStreak = 0;
         mVideoView.start();
         // 后台播放服务在跑时同步通知元数据(换台/换线路); 服务未运行时投递无副作用
         EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_REFRESH_NOTIFY,
@@ -737,6 +747,10 @@ public class LiveFragment extends BaseLazyFragment {
                     case VideoView.STATE_BUFFERED:
                     case VideoView.STATE_PLAYING:
                         currentLiveChangeSourceTimes = 0;
+                        if (playState == VideoView.STATE_PLAYING) {
+                            // 只有真正出画面才算成功, 连续失败计数清零
+                            autoSwitchFailStreak = 0;
+                        }
                         mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
                         break;
                     case VideoView.STATE_ERROR:
@@ -796,6 +810,13 @@ public class LiveFragment extends BaseLazyFragment {
         public void run() {
             //已切走 tab(或退后台)时不再自动换源续播
             if (!currentVisibleState || !getUserVisibleHint()) return;
+            if (currentLiveChannelItem == null) return;
+            // 断网时全部线路/频道轮换也无济于事: 连续自动换源超上限即停止并提示, 避免无限跳台
+            if (autoSwitchFailStreak >= AUTO_SWITCH_FAIL_CAP) {
+                ToastUtils.showShort("多次自动换源失败已停止,请检查网络后重新选择频道");
+                return;
+            }
+            autoSwitchFailStreak++;
             currentLiveChangeSourceTimes++;
             if (currentLiveChannelItem.getSourceNum() == currentLiveChangeSourceTimes) {
                 currentLiveChangeSourceTimes = 0;
