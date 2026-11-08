@@ -331,11 +331,19 @@ public class VideoView<P extends AbstractPlayer> extends FrameLayout
      */
     @Override
     public void pause() {
+        pause(true);
+    }
+
+    /**
+     * 暂停播放; abandonFocus=false 用于音频焦点短暂丢失(来电/导航播报):
+     * 保留焦点监听, GAIN 后自动恢复播放; 用户主动暂停走默认 true 释放焦点
+     */
+    protected void pause(boolean abandonFocus) {
         if (isInPlaybackState()
                 && mMediaPlayer.isPlaying()) {
             mMediaPlayer.pause();
             setPlayState(STATE_PAUSED);
-            if (mAudioFocusHelper != null && !isMute()) {
+            if (mAudioFocusHelper != null && !isMute() && abandonFocus) {
                 mAudioFocusHelper.abandonFocus();
             }
             mPlayerContainer.setKeepScreenOn(false);
