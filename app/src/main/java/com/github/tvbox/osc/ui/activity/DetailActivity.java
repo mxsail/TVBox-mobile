@@ -1483,7 +1483,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                 currentIndex = 0;
             }
             chooseFlag(currentIndex);
-            mBinding.composeDetail.postDelayed(() -> chooseSeries(vodInfo.playIndex, true), 300);
+            // chooseFlag 尾部已同步 chooseSeries(vodInfo.playIndex, true) 起播,
+            // 固定 300ms 延时的重复 chooseSeries 在换线路慢于 300ms 时会把选集
+            // 落到旧线路数据上, 删除
         }
     }
 

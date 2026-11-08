@@ -63,6 +63,17 @@ public class SourceViewModel extends ViewModel {
     public MutableLiveData<AbsXml> detailResult;
     public MutableLiveData<JSONObject> playResult;
 
+    /** 取播放信息请求序号: 快速连续换集/换线路时, 旧请求的迟到结果按序号丢弃 */
+    private final java.util.concurrent.atomic.AtomicInteger playRequestSeq = new java.util.concurrent.atomic.AtomicInteger(0);
+    private void postPlayResult(int seq, JSONObject result) {
+        // 换集/换线路竞态守卫: 请求序号已过期(期间发起了更新的播放请求)的结果直接丢弃,
+        // 否则旧集迟到响应会用旧集上下文起播, 覆盖新集
+        if (seq == playRequestSeq.get()) {
+            playResult.postValue(result);
+        }
+    }
+
+
     public SourceViewModel() {
         sortResult = new MutableLiveData<>();
         listResult = new MutableLiveData<>();
@@ -641,6 +652,7 @@ public class SourceViewModel extends ViewModel {
     }
     // playerContent
     public void getPlay(String sourceKey, String playFlag, String progressKey, String url, String subtitleKey) {
+        final int seq = playRequestSeq.incrementAndGet();
         SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
         int type = sourceBean.getType();
         if (type == 3) {
@@ -656,10 +668,10 @@ public class SourceViewModel extends ViewModel {
                         result.put("subtKey", subtitleKey);
                         if (!result.has("flag"))
                             result.put("flag", playFlag);
-                        playResult.postValue(result);
+                        postPlayResult(seq, result);
                     } catch (Throwable th) {
                         th.printStackTrace();
-                        playResult.postValue(null);
+                        postPlayResult(seq, null);
                     }
                 }
             });
@@ -679,10 +691,10 @@ public class SourceViewModel extends ViewModel {
                 result.put("subtKey", subtitleKey);
                 result.put("playUrl", playUrl);
                 result.put("flag", playFlag);
-                playResult.postValue(result);
+                postPlayResult(seq, result);
             } catch (Throwable th) {
                 th.printStackTrace();
-                playResult.postValue(null);
+                postPlayResult(seq, null);
             }
         } else if (type == 4) {
             OkGo.<String>get(sourceBean.getApi())
@@ -710,21 +722,21 @@ public class SourceViewModel extends ViewModel {
                             result.put("subtKey", subtitleKey);
                             if (!result.has("flag"))
                                 result.put("flag", playFlag);
-                            playResult.postValue(result);
+                            postPlayResult(seq, result);
                         } catch (Throwable th) {
                             th.printStackTrace();
-                            playResult.postValue(null);
+                            postPlayResult(seq, null);
                         }
                     }
 
                     @Override
                     public void onError(Response<String> response) {
                         super.onError(response);
-                        playResult.postValue(null);
+                        postPlayResult(seq, null);
                     }
                 });
         }else {
-            playResult.postValue(null);
+            postPlayResult(seq, null);
         }
     }
 
