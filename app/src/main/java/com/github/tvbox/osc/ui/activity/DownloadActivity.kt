@@ -413,7 +413,7 @@ class DownloadActivity : BaseActivity() {
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(titleState.value, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(titleState.value, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
@@ -427,7 +427,7 @@ class DownloadActivity : BaseActivity() {
                     actions = {
                         IconButton(onClick = { confirmDeleteSeries(detailGroupKey, detailSeriesName) }) {
                             Icon(
-                                painterResource(R.drawable.ic_clear),
+                                painterResource(R.drawable.ic_delete_outline_24),
                                 contentDescription = "删除全剧下载",
                                 tint = colorScheme.onSurface
                             )

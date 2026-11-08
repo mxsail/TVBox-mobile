@@ -118,6 +118,7 @@ public class HawkConfig {
     public static final String SYNC_ENABLED = "sync_enabled";
     public static final String SYNC_BACKEND = "sync_backend";
     public static final String SYNC_URL = "sync_url";
+    public static final String SYNC_DIR = "sync_dir";
     public static final String SYNC_USER = "sync_user";
     public static final String SYNC_PASSWORD = "sync_password";
     public static final String SYNC_SPACE_ID = "sync_space_id";

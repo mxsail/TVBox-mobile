@@ -91,7 +91,7 @@ class MovieFoldersActivity : BaseActivity() {
             containerColor = colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text("本地视频", fontWeight = FontWeight.Bold) },
+                    title = { Text("本地视频", fontSize = 16.sp) },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
                             Icon(

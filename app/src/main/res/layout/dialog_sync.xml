@@ -12,7 +12,7 @@
         android:id="@+id/tvTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="WebDAV 多设备数据同步"
+        android:text="WebDAV 数据同步"
         android:textColor="?attr/colorOnSurface"
         android:textSize="18sp"
         android:textStyle="bold" />
@@ -57,6 +57,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:hint="WebDAV 服务器地址"
+                app:placeholderText="例: https://dav.jianguoyun.com/dav/"
                 android:textColorHint="?attr/colorOnSurfaceVariant">
 
                 <EditText
@@ -64,60 +65,70 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="@null"
-                    android:hint="例: https://dav.jianguoyun.com/dav/tvbox/"
                     android:inputType="textUri"
                     android:singleLine="true"
                     android:textColor="?attr/colorOnSurface"
                     android:textSize="13sp" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <LinearLayout
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:orientation="horizontal">
+                android:hint="备份目录"
+                app:placeholderText="默认: tvbox"
+                android:textColorHint="?attr/colorOnSurfaceVariant">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
-                    android:layout_width="0dp"
+                <EditText
+                    android:id="@+id/etSyncDir"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:hint="用户名"
-                    android:textColorHint="?attr/colorOnSurfaceVariant">
+                    android:background="@null"
+                    android:inputType="text"
+                    android:singleLine="true"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="13sp" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-                    <EditText
-                        android:id="@+id/etSyncUser"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="@null"
-                        android:inputType="textEmailAddress"
-                        android:singleLine="true"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="13sp" />
-                </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:hint="用户名"
+                android:textColorHint="?attr/colorOnSurfaceVariant">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
-                    android:layout_width="0dp"
+                <EditText
+                    android:id="@+id/etSyncUser"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:hint="应用密码 / Token"
-                    app:passwordToggleEnabled="true"
-                    android:textColorHint="?attr/colorOnSurfaceVariant">
+                    android:background="@null"
+                    android:inputType="textEmailAddress"
+                    android:singleLine="true"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="13sp" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-                    <EditText
-                        android:id="@+id/etSyncPassword"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="@null"
-                        android:inputType="textPassword"
-                        android:singleLine="true"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="13sp" />
-                </com.google.android.material.textfield.TextInputLayout>
-            </LinearLayout>
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:hint="密码"
+                app:passwordToggleEnabled="true"
+                android:textColorHint="?attr/colorOnSurfaceVariant">
+
+                <EditText
+                    android:id="@+id/etSyncPassword"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@null"
+                    android:inputType="textPassword"
+                    android:singleLine="true"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="13sp" />
+            </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
@@ -125,6 +136,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:hint="空间 ID (不同设备填相同值即可互通)"
+                app:placeholderText="默认: default"
                 android:textColorHint="?attr/colorOnSurfaceVariant">
 
                 <EditText
@@ -132,7 +144,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="@null"
-                    android:hint="默认: default"
                     android:inputType="text"
                     android:singleLine="true"
                     android:textColor="?attr/colorOnSurface"

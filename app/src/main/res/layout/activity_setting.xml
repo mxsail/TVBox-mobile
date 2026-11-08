@@ -381,7 +381,7 @@
 
                     <TextView
                         style="@style/M3MenuText"
-                        android:text="数据备份还原" />
+                        android:text="备份与恢复" />
 
                     <Space
                         android:layout_width="0dp"
@@ -402,7 +402,7 @@
 
                     <TextView
                         style="@style/M3MenuText"
-                        android:text="多设备数据同步" />
+                        android:text="数据同步" />
 
                     <Space
                         android:layout_width="0dp"

@@ -32,6 +32,8 @@ public class SyncTrigger {
     private final Runnable debounceRunnable = new Runnable() {
         @Override
         public void run() {
+            // 触发前先落盘操作日志: 若 30s 去抖窗口内进程被杀, 重启后这些变更仍能随下次同步上行
+            store.saveOpLog(opLog);
             performSync(SyncEngine.SyncMode.BIDIRECTIONAL, null);
         }
     };
@@ -73,7 +75,8 @@ public class SyncTrigger {
     }
 
     public synchronized SyncEngine getOrCreateEngine() {
-        String url = Hawk.get(HawkConfig.SYNC_URL, "");
+        String url = SyncProtocol.buildSyncUrl(
+                Hawk.get(HawkConfig.SYNC_URL, ""), Hawk.get(HawkConfig.SYNC_DIR, ""));
         String user = Hawk.get(HawkConfig.SYNC_USER, "");
         String pwd = Hawk.get(HawkConfig.SYNC_PASSWORD, "");
         String spaceId = Hawk.get(HawkConfig.SYNC_SPACE_ID, SyncProtocol.DEFAULT_SPACE_ID);

@@ -42,6 +42,7 @@ public class SyncDialog extends BaseDialog {
 
     private SwitchMaterial switchSync;
     private EditText etSyncUrl;
+    private EditText etSyncDir;
     private EditText etSyncUser;
     private EditText etSyncPassword;
     private EditText etSyncSpaceId;
@@ -66,6 +67,7 @@ public class SyncDialog extends BaseDialog {
     private void initViews() {
         switchSync = findViewById(R.id.switchSync);
         etSyncUrl = findViewById(R.id.etSyncUrl);
+        etSyncDir = findViewById(R.id.etSyncDir);
         etSyncUser = findViewById(R.id.etSyncUser);
         etSyncPassword = findViewById(R.id.etSyncPassword);
         etSyncSpaceId = findViewById(R.id.etSyncSpaceId);
@@ -105,7 +107,8 @@ public class SyncDialog extends BaseDialog {
 
     private void loadData() {
         switchSync.setChecked(Hawk.get(HawkConfig.SYNC_ENABLED, false));
-        etSyncUrl.setText(Hawk.get(HawkConfig.SYNC_URL, ""));
+        etSyncUrl.setText(migrateBackupDir());
+        etSyncDir.setText(Hawk.get(HawkConfig.SYNC_DIR, "tvbox"));
         etSyncUser.setText(Hawk.get(HawkConfig.SYNC_USER, ""));
         etSyncPassword.setText(Hawk.get(HawkConfig.SYNC_PASSWORD, ""));
         etSyncSpaceId.setText(Hawk.get(HawkConfig.SYNC_SPACE_ID, SyncProtocol.DEFAULT_SPACE_ID));
@@ -133,9 +136,11 @@ public class SyncDialog extends BaseDialog {
         String pass = etSyncPassword.getText().toString().trim();
         String spaceId = etSyncSpaceId.getText().toString().trim();
         if (TextUtils.isEmpty(spaceId)) spaceId = SyncProtocol.DEFAULT_SPACE_ID;
+        String backupDir = etSyncDir.getText().toString().trim();
 
         Hawk.put(HawkConfig.SYNC_ENABLED, enabled);
         Hawk.put(HawkConfig.SYNC_URL, url);
+        Hawk.put(HawkConfig.SYNC_DIR, backupDir);
         Hawk.put(HawkConfig.SYNC_USER, user);
         Hawk.put(HawkConfig.SYNC_PASSWORD, pass);
         Hawk.put(HawkConfig.SYNC_SPACE_ID, spaceId);
@@ -155,8 +160,32 @@ public class SyncDialog extends BaseDialog {
         Toast.makeText(getContext(), "同步设置已保存", Toast.LENGTH_SHORT).show();
     }
 
+    /**
+     * 旧版本把备份目录直接拼在服务器地址尾部(如 https://dav.host/dav/tvbox/), 新版本拆成
+     * "服务器地址 + 备份目录" 两个输入。首次进入新版弹窗(SYNC_DIR 尚未落盘)时做一次迁移:
+     * 地址以 /tvbox 结尾则拆出目录; 其余老配置保持地址原样(备份目录留空=不加后缀), 不改动可用性。
+     */
+    private String migrateBackupDir() {
+        String url = Hawk.get(HawkConfig.SYNC_URL, "");
+        if (Hawk.contains(HawkConfig.SYNC_DIR)) return url;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("/tvbox/?$").matcher(url);
+        String dir;
+        if (m.find()) {
+            dir = "tvbox";
+            url = url.substring(0, m.start());
+            Hawk.put(HawkConfig.SYNC_URL, url);
+        } else if (TextUtils.isEmpty(url)) {
+            dir = "tvbox";
+        } else {
+            dir = "";
+        }
+        Hawk.put(HawkConfig.SYNC_DIR, dir);
+        return url;
+    }
+
     private void testConnection() {
-        final String url = etSyncUrl.getText().toString().trim();
+        final String url = SyncProtocol.buildSyncUrl(
+                etSyncUrl.getText().toString().trim(), etSyncDir.getText().toString().trim());
         final String user = etSyncUser.getText().toString().trim();
         final String pass = etSyncPassword.getText().toString().trim();
         String tempSpace = etSyncSpaceId.getText().toString().trim();

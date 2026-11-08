@@ -259,7 +259,7 @@ class LiveSourceActivity : BaseActivity() {
             containerColor = colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text("直播源", fontWeight = FontWeight.Bold) },
+                    title = { Text("直播源", fontSize = 16.sp) },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
                             Icon(

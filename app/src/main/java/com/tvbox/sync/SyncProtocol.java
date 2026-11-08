@@ -64,6 +64,21 @@ public class SyncProtocol {
         }
     }
 
+    /**
+     * 拼接 WebDAV 实际同步地址 = 服务器地址 + 备份目录(可空)。
+     * 目录两端多余的"/"都会归一, 目录为空时按原地址使用(兼容老配置)。
+     */
+    public static String buildSyncUrl(String baseUrl, String backupDir) {
+        String base = baseUrl == null ? "" : baseUrl.trim();
+        if (base.isEmpty()) return base;
+        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        String dir = backupDir == null ? "" : backupDir.trim();
+        while (dir.startsWith("/")) dir = dir.substring(1);
+        while (dir.endsWith("/")) dir = dir.substring(0, dir.length() - 1);
+        if (dir.isEmpty()) return base;
+        return base + "/" + dir;
+    }
+
     public static String configHash(String apiUrl) {
         String normalized = normalize(apiUrl);
         String fullMd5 = md5(normalized);

@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.recyclerview.widget.DiffUtil
@@ -235,7 +236,7 @@ class SettingActivity : BaseActivity() {
             containerColor = colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text("设置", fontWeight = FontWeight.Bold) },
+                    title = { Text("设置", fontSize = 16.sp) },
                     navigationIcon = {
                         IconButton(onClick = { onBackPressedDispatcher.onBackPressed() }) {
                             Icon(
@@ -316,6 +317,7 @@ class SettingActivity : BaseActivity() {
                         showSelect("后台播放", types, Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0)) { pos ->
                             Hawk.put(HawkConfig.BACKGROUND_PLAY_TYPE, pos)
                             bgPlayValue = types[pos]
+                            com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
                         }
                     }
                     MenuRow(R.drawable.ic_memory_48, "IJK解码方式", ijkCodecValue) {
@@ -353,6 +355,7 @@ class SettingActivity : BaseActivity() {
                             Hawk.put(HawkConfig.PLAY_RENDER, selectedType)
                             renderValue = PlayerHelper.getRenderName(selectedType)
                             PlayerHelper.init()
+                            com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
                         }
                     }
                     MenuRow(R.drawable.ic_scale_48, "画面缩放", scaleValue) {
@@ -364,6 +367,7 @@ class SettingActivity : BaseActivity() {
                         ) { pos ->
                             Hawk.put(HawkConfig.PLAY_SCALE, pos)
                             scaleValue = PlayerHelper.getScaleName(pos)
+                            com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
                         }
                     }
                     SwitchRow(R.drawable.ic_cache_48, "IJK缓存", ijkCache) { newValue ->
@@ -374,8 +378,8 @@ class SettingActivity : BaseActivity() {
 
                 SectionTitle("数据")
                 GroupCard {
-                    MenuRow(R.drawable.ic_backup_48, "数据备份还原", null) { openBackup() }
-                    MenuRow(R.drawable.ic_sync_48, "多设备数据同步", syncValue) {
+                    MenuRow(R.drawable.ic_backup_48, "备份与恢复", null) { openBackup() }
+                    MenuRow(R.drawable.ic_sync_48, "数据同步", syncValue) {
                         val dialog = com.github.tvbox.osc.ui.dialog.SyncDialog(this@SettingActivity)
                         dialog.setOnDismissListener {
                             syncValue = if (Hawk.get(HawkConfig.SYNC_ENABLED, false)) "已启用" else "未启用"

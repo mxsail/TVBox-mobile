@@ -2,6 +2,7 @@ package com.tvbox.sync.adapter;
 
 import android.text.TextUtils;
 
+import com.github.tvbox.osc.bean.Subscription;
 import com.github.tvbox.osc.cache.Cache;
 import com.github.tvbox.osc.cache.CacheDao;
 import com.github.tvbox.osc.cache.CacheManager;
@@ -44,6 +45,7 @@ public class AppRoomSyncAdapter {
         contentGroup.liveUrl = Hawk.get(HawkConfig.LIVE_URL, "");
         contentGroup.epgUrl = Hawk.get(HawkConfig.EPG_URL, "");
         contentGroup.defaultParse = Hawk.get(HawkConfig.DEFAULT_PARSE, "");
+        contentGroup.subscriptions = readSubscriptions();
         opLog.record(new SyncOpLog.SyncOp(0, spaceId, "config.content", null, "upsert", GSON.toJson(contentGroup), System.currentTimeMillis()));
 
         // 2. Export History records
@@ -78,6 +80,43 @@ public class AppRoomSyncAdapter {
                 opLog.record(new SyncOpLog.SyncOp(0, spaceId, "collect", sc.id, "upsert", GSON.toJson(sc), c.updateTime));
             }
         }
+    }
+
+    /** 读取本地订阅源列表(与订阅源页的 Hawk 存储互通) */
+    private static List<SyncConfigGroup.SubscriptionItem> readSubscriptions() {
+        List<SyncConfigGroup.SubscriptionItem> items = new ArrayList<>();
+        try {
+            List<Subscription> subs = Hawk.get(HawkConfig.SUBSCRIPTIONS, new ArrayList<Subscription>());
+            if (subs != null) {
+                for (Subscription sub : subs) {
+                    if (sub == null) continue;
+                    items.add(new SyncConfigGroup.SubscriptionItem(
+                            sub.getName(), sub.getUrl(), sub.isChecked(), sub.isTop(), false));
+                }
+            }
+        } catch (Exception ignored) {}
+        return items;
+    }
+
+    /**
+     * 播放器配置上行(渲染/缩放/字幕大小/快进步长/后台播放)。
+     * 此前只有下行 apply 没有 record, 本机改动永远到不了云端; 在设置页各项变更时调用。
+     */
+    public static void recordPlayerSettingsUpsert() {
+        if (!Hawk.get(HawkConfig.SYNC_SCOPE_PLAYER_SETTINGS, false)) return;
+        try {
+            String spaceId = Hawk.get(HawkConfig.SYNC_SPACE_ID, SyncProtocol.DEFAULT_SPACE_ID);
+            SyncPlayer sp = new SyncPlayer();
+            sp.render = Hawk.get(HawkConfig.PLAY_RENDER, 0);
+            sp.scale = Hawk.get(HawkConfig.PLAY_SCALE, 0);
+            sp.subtitleSize = Hawk.get(HawkConfig.SUBTITLE_TEXT_SIZE, 24);
+            sp.timeStep = Hawk.get(HawkConfig.PLAY_TIME_STEP, 1);
+            sp.background = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0);
+            SyncTrigger.get().getOpLog().record(new SyncOpLog.SyncOp(
+                    0, spaceId, "config.player", null, "upsert", GSON.toJson(sp), System.currentTimeMillis()
+            ));
+            SyncTrigger.get().triggerDebouncedSync();
+        } catch (Exception ignored) {}
     }
 
     public static void recordHistoryUpsert(String sourceKey, VodRecord record) {
@@ -204,6 +243,7 @@ public class AppRoomSyncAdapter {
             contentGroup.liveUrl = Hawk.get(HawkConfig.LIVE_URL, "");
             contentGroup.epgUrl = Hawk.get(HawkConfig.EPG_URL, "");
             contentGroup.defaultParse = Hawk.get(HawkConfig.DEFAULT_PARSE, "");
+            contentGroup.subscriptions = readSubscriptions();
             SyncTrigger.get().getOpLog().record(new SyncOpLog.SyncOp(
                     0, spaceId, "config.content", null, "upsert", GSON.toJson(contentGroup), System.currentTimeMillis()
             ));
@@ -356,6 +396,24 @@ public class AppRoomSyncAdapter {
                     }
                     if (!TextUtils.isEmpty(cg.liveUrl)) {
                         Hawk.put(HawkConfig.LIVE_URL, cg.liveUrl);
+                    }
+                    if (!TextUtils.isEmpty(cg.epgUrl)) {
+                        Hawk.put(HawkConfig.EPG_URL, cg.epgUrl);
+                    }
+                    if (!TextUtils.isEmpty(cg.defaultParse)) {
+                        Hawk.put(HawkConfig.DEFAULT_PARSE, cg.defaultParse);
+                    }
+                    // 订阅源列表(勾选状态以本机为准, 同步只补条目)
+                    if (cg.subscriptions != null && !cg.subscriptions.isEmpty()) {
+                        List<Subscription> merged = new ArrayList<>();
+                        for (SyncConfigGroup.SubscriptionItem item : cg.subscriptions) {
+                            if (item == null || TextUtils.isEmpty(item.url)) continue;
+                            Subscription sub = new Subscription(item.name, item.url);
+                            sub.setChecked(false);
+                            sub.setTop(item.top);
+                            merged.add(sub);
+                        }
+                        Hawk.put(HawkConfig.SUBSCRIPTIONS, merged);
                     }
                 }
             }

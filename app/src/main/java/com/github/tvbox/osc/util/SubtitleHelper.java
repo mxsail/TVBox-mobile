@@ -27,6 +27,8 @@ public class SubtitleHelper {
 
     public static void setTextSize(int size) {
         Hawk.put(HawkConfig.SUBTITLE_TEXT_SIZE, size);
+        // 字幕大小参与"播放器配置"同步上行
+        com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert();
     }
 
     public static int getTimeDelay() {

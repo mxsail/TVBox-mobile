@@ -1,0 +1,33 @@
+<vector android:height="24dp" android:tint="?attr/colorOnSurface"
+    android:viewportHeight="24" android:viewportWidth="24"
+    android:width="24dp" xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 换源(参考附图样式): 左上/右下两个圆角方块 + 两条弧形交换箭头, 180° 旋转对称 -->
+    <path
+        android:fillColor="@android:color/white"
+        android:fillType="evenOdd"
+        android:pathData="M5.1,3.3L7.9,3.3C8.9,3.3 9.7,4.1 9.7,5.1L9.7,7.9C9.7,8.9 8.9,9.7 7.9,9.7L5.1,9.7C4.1,9.7 3.3,8.9 3.3,7.9L3.3,5.1C3.3,4.1 4.1,3.3 5.1,3.3ZM5.9,5.1L7.1,5.1C7.55,5.1 7.9,5.45 7.9,5.9L7.9,7.1C7.9,7.55 7.55,7.9 7.1,7.9L5.9,7.9C5.45,7.9 5.1,7.55 5.1,7.1L5.1,5.9C5.1,5.45 5.45,5.1 5.9,5.1Z" />
+    <path
+        android:fillColor="@android:color/white"
+        android:fillType="evenOdd"
+        android:pathData="M16.1,14.3L18.9,14.3C19.9,14.3 20.7,15.1 20.7,16.1L20.7,18.9C20.7,19.9 19.9,20.7 18.9,20.7L16.1,20.7C15.1,20.7 14.3,19.9 14.3,18.9L14.3,16.1C14.3,15.1 15.1,14.3 16.1,14.3ZM16.9,16.1L18.1,16.1C18.55,16.1 18.9,16.45 18.9,16.9L18.9,18.1C18.9,18.55 18.55,18.9 18.1,18.9L16.9,18.9C16.45,18.9 16.1,18.55 16.1,18.1L16.1,16.9C16.1,16.45 16.45,16.1 16.9,16.1Z" />
+    <!-- 上弧线: 从左上方块右侧起, 向右上弯再落到右侧, 箭头指向右下方块方向 -->
+    <path
+        android:strokeColor="@android:color/white"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M11.7,5.1C13.9,3.1 16.9,3.3 19,5" />
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M20.6,6.3L18.3,5.9L19.7,4.1Z" />
+    <!-- 下弧线: 上弧线绕中心 180° 对称, 箭头指向左上方块方向 -->
+    <path
+        android:strokeColor="@android:color/white"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M12.3,18.9C10.1,20.9 7.1,20.7 5,19" />
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M3.4,17.7L5.7,18.1L4.3,19.9Z" />
+</vector>

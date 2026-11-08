@@ -235,7 +235,7 @@ fun VodGridScreen(
         containerColor = colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(title, fontWeight = FontWeight.Bold) },
+                title = { Text(title, fontSize = 16.sp) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -249,7 +249,7 @@ fun VodGridScreen(
                     if (onClear != null && cards.isNotEmpty()) {
                         IconButton(onClick = onClear) {
                             Icon(
-                                painterResource(R.drawable.ic_clear),
+                                painterResource(R.drawable.ic_delete_outline_24),
                                 contentDescription = "清空",
                                 tint = colorScheme.onSurface
                             )

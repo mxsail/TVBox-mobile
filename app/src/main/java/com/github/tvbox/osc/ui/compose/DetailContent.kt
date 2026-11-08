@@ -307,7 +307,7 @@ fun DetailScreen(
         ) {
             ActionButton(
                 // 换源用双向交换箭头, 避免与"刷新/同步"的环形箭头混淆
-                iconRes = R.drawable.ic_swap_horiz_20,
+                iconRes = R.drawable.ic_swap_source_24,
                 label = "换源",
                 onClick = callbacks::onChangeSourceClick
             )

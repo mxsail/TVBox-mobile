@@ -137,7 +137,9 @@ class MyFragment : Fragment() {
             // 第一步: 立即装载记录(名称/集数/进度), 海报以占位图先行, 不阻塞任何元素
             val entries = withContext(Dispatchers.IO) {
                 try {
-                    RoomDataManger.getAllVodRecord(20).mapNotNull { vod ->
+                    // 首页墙最多展示最新 10 条: 列表与海报下载都只做 10 份,
+                    // 更多记录点卡片头部进观看历史页查看(避免全量拉取拖慢"我的"页)
+                    RoomDataManger.getAllVodRecord(10).mapNotNull { vod ->
                         vod ?: return@mapNotNull null
                         HistoryEntry(vod, null, currentProgressText(vod))
                     }

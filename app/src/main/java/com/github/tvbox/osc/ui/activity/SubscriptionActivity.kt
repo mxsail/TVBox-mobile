@@ -396,7 +396,7 @@ class SubscriptionActivity : BaseActivity() {
             containerColor = colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text("订阅源", fontWeight = FontWeight.Bold) },
+                    title = { Text("订阅源", fontSize = 16.sp) },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
                             Icon(
@@ -409,7 +409,7 @@ class SubscriptionActivity : BaseActivity() {
                     actions = {
                         IconButton(onClick = { showUseTip() }) {
                             Icon(
-                                painterResource(R.drawable.ic_copyright_48),
+                                painterResource(R.drawable.ic_info_outline_24),
                                 contentDescription = "使用说明",
                                 tint = colorScheme.onSurface
                             )

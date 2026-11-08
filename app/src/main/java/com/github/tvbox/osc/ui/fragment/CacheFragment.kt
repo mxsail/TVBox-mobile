@@ -151,7 +151,7 @@ class CacheFragment : Fragment() {
                 )
                 IconButton(onClick = { currentActivity?.let { confirmClearAll(it) } }) {
                     Icon(
-                        androidx.compose.ui.res.painterResource(R.drawable.ic_clear),
+                        androidx.compose.ui.res.painterResource(R.drawable.ic_delete_outline_24),
                         contentDescription = "清空下载",
                         tint = colorScheme.onSurface
                     )

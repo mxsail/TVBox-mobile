@@ -287,7 +287,7 @@ class AppearanceActivity : BaseActivity() {
             containerColor = colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text("外观设置", fontWeight = FontWeight.Bold) },
+                    title = { Text("外观设置", fontSize = 16.sp) },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
                             Icon(

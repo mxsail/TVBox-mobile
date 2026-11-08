@@ -180,7 +180,7 @@ class VideoListActivity : BaseActivity() {
             containerColor = colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text(mBucketDisplayName, fontWeight = FontWeight.Bold, maxLines = 1) },
+                    title = { Text(mBucketDisplayName, fontSize = 16.sp, maxLines = 1) },
                     navigationIcon = {
                         IconButton(onClick = { onBackPressedDispatcher.onBackPressed() }) {
                             Icon(
