@@ -227,9 +227,13 @@ class MyFragment : Fragment() {
                 modifier = Modifier
                     .padding(start = 20.dp, top = 40.dp, bottom = 12.dp)
             )
-            HistoryCard(currentActivity)
+            Box(Modifier.padding(horizontal = 16.dp)) {
+                HistoryCard(currentActivity)
+            }
             Spacer(Modifier.height(12.dp))
-            FunctionsCard(currentActivity, onGoToTab)
+            Box(Modifier.padding(horizontal = 16.dp)) {
+                FunctionsCard(currentActivity, onGoToTab)
+            }
         }
     }
 
