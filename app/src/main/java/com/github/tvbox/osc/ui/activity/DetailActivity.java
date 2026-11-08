@@ -175,8 +175,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         super.onResume();
         if (openBackgroundPlay) {
             openBackgroundPlay = false;
-            playServerSwitch(false);
-            mBinding.composeDetail.postDelayed(NotificationUtils::cancelAll, 800);
+            // 媒体通知在播放期间常驻(前台/后台同一服务), 回前台不再停服务/清通知
         }
         if (playFragment != null && playFragment.getController() != null) {
             playFragment.getController().setInPipMode(false);
@@ -925,6 +924,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
 
     @Override
     protected void onDestroy() {
+        // 播放页销毁即停媒体通知服务: 返回退出直接停; 系统后台回收时 Fragment 视图
+        // 已随之销毁、播放早已终止, 停服务避免僵尸"正在播放"通知
+        PlayService.stop();
         registerActionReceiver(false);
         super.onDestroy();
         unregisterReceiver(mBatteryReceiver);
@@ -1076,6 +1078,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     public void onPlaybackStarted() {
         playbackStarted = true;
         updatePipParams();
+        // 前台播放即常驻媒体通知(标题/进度/海报), 后台播放与画中画沿用同一服务;
+        // 每次首帧都重绑(服务可能被直播页占用, 静态 videoView 需切回本播放器)
+        playServerSwitch(true);
         if (pendingDownloadTasks.isEmpty()) return;
         List<DownloadEpisode> tasks = new ArrayList<>(pendingDownloadTasks);
         pendingDownloadTasks.clear();
@@ -1399,7 +1404,8 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     private void playServerSwitch(boolean open) {
         if (open) {
             VodInfo.VodSeries vod = vodInfo.seriesMap.get(vodInfo.playFlag).get(vodInfo.playIndex);
-            PlayService.start(playFragment.getPlayer(), vodInfo.name + "&&" + vod.name);
+            PlayService.start(playFragment.getPlayer(), vodInfo.name + "&&" + vod.name + "&&"
+                    + (vodInfo.pic == null ? "" : vodInfo.pic));
             registerActionReceiver(true);
         } else {
             if (ServiceUtils.isServiceRunning(PlayService.class)) {

@@ -25,6 +25,8 @@ import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.constant.IntentKey;
 import com.github.tvbox.osc.event.RefreshEvent;
+import com.github.tvbox.osc.util.DefaultConfig;
+import com.github.tvbox.osc.util.HeavyTaskUtil;
 import com.github.tvbox.osc.player.MyVideoView;
 import com.github.tvbox.osc.ui.activity.DetailActivity;
 
@@ -61,6 +63,9 @@ public class PlayService extends Service {
     private MediaSessionCompat mediaSession;
     private final Handler progressHandler = new Handler(Looper.getMainLooper());
     private boolean lastNotifyPlaying = false;
+    /** 播放内容海报(通知栏大图/媒体卡封面), 异步加载 */
+    private android.graphics.Bitmap albumArt;
+    private String loadedArtKey = "";
 
     private final Runnable progressUpdater = new Runnable() {
         @Override
@@ -159,12 +164,44 @@ public class PlayService extends Service {
         }
     }
 
-    /** 标题/集数,格式 "剧名&&集名" */
+    /** 标题/集数/海报,格式 "剧名&&集名&&海报URL"(海报段可选, 兼容旧两段格式) */
     private String[] videoTitleInfo() {
-        String[] parts = (videoInfo == null ? "" : videoInfo).split("&&");
+        String[] parts = (videoInfo == null ? "" : videoInfo).split("&&", 3);
         String title = parts.length > 0 ? parts[0] : "";
         String episode = parts.length > 1 ? parts[1] : "";
-        return new String[]{title, episode};
+        String pic = parts.length > 2 ? parts[2] : "";
+        return new String[]{title, episode, pic};
+    }
+
+    /** 海报异步加载→通知大图+媒体卡封面; 换集/换剧(URL变化)才重新拉取 */
+    private void loadAlbumArt(String pic) {
+        if (pic == null || pic.isEmpty()) {
+            if (albumArt != null) {
+                albumArt = null;
+                updateMediaSession();
+                notifyNotification();
+            }
+            return;
+        }
+        if (pic.equals(loadedArtKey) && albumArt != null) return;
+        loadedArtKey = pic;
+        final String url = pic;
+        HeavyTaskUtil.getBigTaskExecutorService().execute(() -> {
+            android.graphics.Bitmap bmp = null;
+            try {
+                bmp = com.squareup.picasso.Picasso.get().load(DefaultConfig.checkReplaceProxy(url)).get();
+            } catch (Throwable th) {
+                th.printStackTrace();
+            }
+            final android.graphics.Bitmap result = bmp;
+            progressHandler.post(() -> {
+                if (url.equals(loadedArtKey)) {
+                    albumArt = result;
+                    updateMediaSession();
+                    notifyNotification();
+                }
+            });
+        });
     }
 
     private void updateMediaSession() {
@@ -186,21 +223,26 @@ public class PlayService extends Service {
                         position, playing ? 1.0f : 0f)
                 .setBufferedPosition(position)
                 .build());
-        mediaSession.setMetadata(new MediaMetadataCompat.Builder()
+        MediaMetadataCompat.Builder metadata = new MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, info[0])
                 .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "正在播放: " + info[1])
-                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
-                .build());
+                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration);
+        if (albumArt != null) {
+            metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, albumArt);
+        }
+        mediaSession.setMetadata(metadata.build());
     }
 
     private Notification buildNotification() {
         String[] info = videoTitleInfo();
+        loadAlbumArt(info[2]);
         updateMediaSession();
         boolean playing = videoView != null && videoView.isPlaying();
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(info[0])
                 .setContentText("正在播放: " + info[1])
+                .setLargeIcon(albumArt)
                 .setContentIntent(getPendingIntentActivity())
                 .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
