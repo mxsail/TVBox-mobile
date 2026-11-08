@@ -1164,6 +1164,10 @@ public class PlayFragment extends BaseLazyFragment {
         return false;
     }
 
+    /** 生命周期引起的暂停(切后台/被遮挡且真的在播), 回前台按它决定是否恢复;
+     *  用户主动暂停不置位, 回前台保持暂停不被强制续播 */
+    private boolean mPausedByLifecycle = false;
+
     @Override
     public void onPause() {
         super.onPause();
@@ -1175,14 +1179,18 @@ public class PlayFragment extends BaseLazyFragment {
             return;
         }
         if (mVideoView != null) {
+            boolean wasPlaying = mVideoView.isPlaying();
             mVideoView.pause();
+            mPausedByLifecycle = wasPlaying;
         }
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        if (mVideoView != null) {
+        // 只恢复"因切后台/被遮挡而暂停"的播放; 用户手动暂停的回来保持暂停
+        if (mVideoView != null && mPausedByLifecycle) {
+            mPausedByLifecycle = false;
             mVideoView.resume();
         }
     }
@@ -1191,10 +1199,14 @@ public class PlayFragment extends BaseLazyFragment {
     public void onHiddenChanged(boolean hidden) {
         if (hidden) {
             if (mVideoView != null) {
+                boolean wasPlaying = mVideoView.isPlaying();
                 mVideoView.pause();
+                mPausedByLifecycle = wasPlaying;
             }
         } else {
-            if (mVideoView != null) {
+            // 同 onResume: 只恢复因被遮挡而暂停的播放, 用户手动暂停保持暂停
+            if (mVideoView != null && mPausedByLifecycle) {
+                mPausedByLifecycle = false;
                 mVideoView.resume();
             }
         }
