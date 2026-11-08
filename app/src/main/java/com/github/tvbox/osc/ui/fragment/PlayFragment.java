@@ -1284,11 +1284,15 @@ public class PlayFragment extends BaseLazyFragment {
             AppRoomSyncAdapter.recordProgressDelete(pKey);
         }
         //离线缓存命中:直接播放应用内已缓存的本地文件
-        String cachedPath = findCachedLocalPath(vs);
-        if (cachedPath != null) {
+        DownloadEpisode cachedEp = findCachedEpisode(vs);
+        if (cachedEp != null) {
             hideTip();
             mController.showParse(false);
-            startLocalUrl(cachedPath);
+            // 进度键改用下载任务的规范键(线路内集号+集名), 与 LocalPlayActivity/在线续播互通;
+            // 系列索引键受观看历史倒序(playIndex 翻转)影响会读不到旧进度
+            this.progressKey = cachedEp.sourceKey + cachedEp.vodId + cachedEp.flag
+                    + cachedEp.episodeIndex + cachedEp.episodeName;
+            startLocalUrl(cachedEp.localFilePath);
             return;
         }
         if (isUnsupportedMediaUrl(vs.url)) {//磁力/迅雷/ed2k/ftp 直链(迅雷 SDK 已移除)
@@ -1311,9 +1315,9 @@ public class PlayFragment extends BaseLazyFragment {
     }
 
     /**
-     * 查找当前集的应用内缓存(已完成),命中返回本地文件路径
+     * 查找当前集的应用内缓存(已完成),命中返回下载任务(带规范进度键字段),文件不存在返回 null
      */
-    private String findCachedLocalPath(VodInfo.VodSeries vs) {
+    private DownloadEpisode findCachedEpisode(VodInfo.VodSeries vs) {
         try {
             DownloadEpisode ep = RoomDataManger.getCompletedEpisode(mVodInfo.sourceKey, mVodInfo.id, mVodInfo.playFlag, mVodInfo.playIndex);
             if (ep == null && vs.url != null) {
@@ -1321,7 +1325,7 @@ public class PlayFragment extends BaseLazyFragment {
             }
             if (ep == null || ep.localFilePath == null) return null;
             File file = new File(ep.localFilePath);
-            return file.exists() && file.length() > 0 ? ep.localFilePath : null;
+            return file.exists() && file.length() > 0 ? ep : null;
         } catch (Throwable th) {
             return null;
         }
