@@ -937,6 +937,9 @@ public class PlayFragment extends BaseLazyFragment {
     }
 
     private void initSubtitleView() {
+        // 返回退出时 onDestroyView 已 release 并置空 mVideoView, ExoPlayer 已排队的
+        // PREPARED 事件仍会经 controller 派发到这里, 空引用直接 NPE
+        if (mVideoView == null || mVideoView.getMediaPlayer() == null || !isAdded()) return;
         TrackInfo trackInfo = null;
         if (mVideoView.getMediaPlayer() instanceof IjkMediaPlayer) {
             trackInfo = ((IjkMediaPlayer) (mVideoView.getMediaPlayer())).getTrackInfo();
