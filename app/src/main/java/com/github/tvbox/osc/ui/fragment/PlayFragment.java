@@ -224,6 +224,12 @@ public class PlayFragment extends BaseLazyFragment {
             }
         });
         mVideoView = findViewById(R.id.mVideoView);
+        // 预览小窗强制 TextureView 渲染: SurfaceView 尺寸变化会销毁重建 surface,
+        // 而预览窗在 PREPARED/PLAYING 时会按视频比例调整容器高度(updatePreviewWindowHeight),
+        // SurfaceView 上该操作使解码器失联(MediaCodec -19 dec surface not connected)→
+        // 起播即视频失败循环重试: 有声无画持续加载、20s 一轮嗅探错误。
+        // TextureView 是普通 View, resize 平滑; 预览小窗体积下性能无差。
+        mVideoView.setRenderViewFactory(xyz.doikki.videoplayer.render.TextureRenderViewFactory.create());
         mPlayLoadTip = findViewById(R.id.play_load_tip);
         mPlayLoading = findViewById(R.id.play_loading);
         mPlayLoadErr = findViewById(R.id.play_load_error);
