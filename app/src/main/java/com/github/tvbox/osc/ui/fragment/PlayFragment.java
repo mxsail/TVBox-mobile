@@ -208,7 +208,16 @@ public class PlayFragment extends BaseLazyFragment {
                 switch (msg.what) {
                     case 100:
                         stopParse();
-                        errorWithRetry("嗅探错误", false);
+                        // 嗅探已命中并起播后残留的过期定时器: 真正在播/已就绪时忽略,
+                        // 否则会误报"嗅探错误"并把正在播放的视频重新加载一遍
+                        int st100 = mVideoView != null ? mVideoView.getCurrentPlayState() : -1;
+                        boolean alreadyPlaying = st100 == VideoView.STATE_PLAYING
+                                || st100 == VideoView.STATE_PAUSED
+                                || st100 == VideoView.STATE_PREPARED
+                                || st100 == VideoView.STATE_BUFFERED;
+                        if (!alreadyPlaying) {
+                            errorWithRetry("嗅探错误", false);
+                        }
                         break;
                 }
                 return false;
@@ -1702,6 +1711,9 @@ public class PlayFragment extends BaseLazyFragment {
                             requireActivity().runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
+                                    // 本次播放已有嗅探命中并起播: 迟到的解析结果直接丢弃,
+                                    // 不再重启嗅探/重载播放器打断正在播放的声音
+                                    if (loadFoundCount.get() > 0) return;
                                     String mixParseUrl = DefaultConfig.checkReplaceProxy(rs.optString("url", ""));
                                     stopParse();
                                     setTip("正在嗅探播放地址", true, false);
@@ -1983,7 +1995,9 @@ public class PlayFragment extends BaseLazyFragment {
                         if (!TextUtils.isEmpty(cookie))
                             headers.put("Cookie", " " + cookie);//携带cookie
                         playUrl(url, headers);
-                        stopLoadWebView(false);
+                        // 嗅探已完成: 销毁 WebView, 防止其后续导航重新装填嗅探超时定时器
+                        // (旧实现只 stop 不 destroy, WebView 后续导航会再次 sendEmptyMessageDelayed(100))
+                        stopLoadWebView(true);
                     }
                 }
             }
