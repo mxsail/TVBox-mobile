@@ -103,7 +103,7 @@ class CacheFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        me.jessyan.autosize.AutoSize.autoConvertDensity(activity, 360f, true)
+        activity?.let { me.jessyan.autosize.AutoSize.autoConvertDensity(it, 360f, true) }
         val composeView = ComposeView(requireContext())
         composeView.setContent { TvBoxTheme { CacheScreen() } }
         return composeView
@@ -169,7 +169,7 @@ class CacheFragment : Fragment() {
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = bottomPadding),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottomPadding),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     state = listState,
                     modifier = Modifier
@@ -292,7 +292,7 @@ class CacheFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        me.jessyan.autosize.AutoSize.autoConvertDensity(activity, 360f, true)
+        activity?.let { me.jessyan.autosize.AutoSize.autoConvertDensity(it, 360f, true) }
         if (userVisible) {
             dataDirty.set(false)
             loadData()

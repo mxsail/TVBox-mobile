@@ -173,7 +173,10 @@ public class LiveFragment extends BaseLazyFragment {
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        me.jessyan.autosize.AutoSize.autoConvertDensity(getActivity(), getSizeInDp(), isBaseOnWidth());
+        // Compose 工厂可能在实例未 attach 时调用(恢复路径收养前的兜底), AutoSize 空引用直接抛 NPE
+        if (getActivity() != null) {
+            me.jessyan.autosize.AutoSize.autoConvertDensity(getActivity(), getSizeInDp(), isBaseOnWidth());
+        }
         // 视频视图按组合周期重建(旧实例随视图销毁一并释放)
         if (mVideoView != null) {
             mVideoView.release();

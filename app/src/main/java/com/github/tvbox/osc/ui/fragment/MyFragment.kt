@@ -116,7 +116,7 @@ class MyFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        AutoSize.autoConvertDensity(activity, 360f, true)
+        activity?.let { AutoSize.autoConvertDensity(it, 360f, true) }
         val composeView = androidx.compose.ui.platform.ComposeView(requireContext())
         composeView.setContent { TvBoxTheme { MyScreen() } }
         return composeView
@@ -289,7 +289,7 @@ class MyFragment : Fragment() {
                             .padding(vertical = 24.dp)
                     )
                     else -> LazyRow(
-                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(items) { entry ->

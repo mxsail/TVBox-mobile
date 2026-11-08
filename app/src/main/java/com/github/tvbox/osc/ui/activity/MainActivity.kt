@@ -70,10 +70,14 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         const val EXTRA_TAB = "extra_tab"
     }
 
-    val homeFragment = HomeFragment()
-    val liveFragment = LiveFragment()
-    val cacheFragment = CacheFragment()
-    val myFragment = MyFragment()
+    var homeFragment = HomeFragment()
+        private set
+    var liveFragment = LiveFragment()
+        private set
+    var cacheFragment = CacheFragment()
+        private set
+    var myFragment = MyFragment()
+        private set
 
     var useCacheConfig = false
     private var exitTime = 0L
@@ -125,16 +129,29 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
 
         val initialTab = intent.getIntExtra(EXTRA_TAB, 0)
         currentTabState.intValue = initialTab
-        liveFragment.userVisibleHint = (initialTab == 1)
 
-        if (supportFragmentManager.findFragmentByTag("live") == null) {
-            supportFragmentManager.beginTransaction()
+        // 收养 FragmentManager 恢复的实例(activity 重建场景):
+        // 旧实现只判断 findFragmentByTag 后跳过 add, 字段实例保持未 attach,
+        // Compose 渲染层调用其 onCreateView 时 getActivity()==null,
+        // AutoSize 直接抛 NPE(切换数据源 recreate 后切到直播必崩)。
+        // 收养后字段引用与 FM 一致且均已 attach。
+        val fm = supportFragmentManager
+        val byTag: (String) -> androidx.fragment.app.Fragment? = { fm.findFragmentByTag(it) }
+        homeFragment = byTag("home") as? HomeFragment ?: HomeFragment()
+        liveFragment = byTag("live") as? LiveFragment ?: LiveFragment()
+        cacheFragment = byTag("cache") as? CacheFragment ?: CacheFragment()
+        myFragment = byTag("my") as? MyFragment ?: MyFragment()
+
+        if (byTag("live") == null) {
+            fm.beginTransaction()
                 .add(homeFragment, "home")
                 .add(liveFragment, "live")
                 .add(cacheFragment, "cache")
                 .add(myFragment, "my")
                 .commitNowAllowingStateLoss()
         }
+
+        liveFragment.userVisibleHint = (initialTab == 1)
 
         mBinding.composeRoot.setContent {
             TvBoxTheme {

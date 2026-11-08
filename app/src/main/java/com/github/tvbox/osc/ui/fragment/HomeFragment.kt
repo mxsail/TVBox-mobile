@@ -207,7 +207,7 @@ class HomeFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        AutoSize.autoConvertDensity(activity, 360f, true)
+        activity?.let { AutoSize.autoConvertDensity(it, 360f, true) }
         sourceNameState.value = getString(R.string.app_name)
         return ComposeView(requireContext()).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
