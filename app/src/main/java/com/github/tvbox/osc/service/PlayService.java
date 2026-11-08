@@ -34,18 +34,20 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
+import xyz.doikki.videoplayer.player.VideoView;
+
 /**
  * 后台播放前台服务:挂 MediaSession + MediaStyle 通知,
  * 系统媒体卡片(通知栏/快捷设置)展示当前视频标题、集数与播放进度(可拖动)。
- * 控制按钮仍走 VOD_CONTROL 广播,由 DetailActivity 的接收器驱动播放器,
+ * 控制按钮仍走 VOD_CONTROL 广播,由 DetailActivity/LiveFragment 的接收器驱动播放器,
  * MediaSession.Callback 只是同一套广播的又一入口(蓝牙耳机/媒体按钮走这里)。
  */
 public class PlayService extends Service {
 
     static String videoInfo = "TVBox&&第一集";
-    private static MyVideoView videoView;
+    private static VideoView videoView;
 
-    public static void start(MyVideoView controller, String currentVideoInfo) {
+    public static void start(VideoView controller, String currentVideoInfo) {
         videoInfo = currentVideoInfo;
         PlayService.videoView = controller;
         ContextCompat.startForegroundService(App.getInstance(), new Intent(App.getInstance(), PlayService.class));

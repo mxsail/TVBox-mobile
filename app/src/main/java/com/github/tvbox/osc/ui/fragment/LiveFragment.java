@@ -4,6 +4,10 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.IntEvaluator;
 import android.animation.ObjectAnimator;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.CountDownTimer;
@@ -22,8 +26,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.lifecycle.Lifecycle;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.blankj.utilcode.util.ConvertUtils;
@@ -59,7 +65,10 @@ import com.github.tvbox.osc.ui.widget.PlayerTitleView;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.live.TxtSubscribe;
+import com.github.tvbox.osc.constant.IntentKey;
 import com.github.tvbox.osc.event.LiveSourceChangedEvent;
+import com.github.tvbox.osc.event.RefreshEvent;
+import com.github.tvbox.osc.service.PlayService;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
@@ -109,6 +118,9 @@ public class LiveFragment extends BaseLazyFragment {
     private int currentLiveChannelIndex = -1;
     private int currentLiveChangeSourceTimes = 0;
     private LiveChannelItem currentLiveChannelItem = null;
+    /** 后台播放媒体通知: VOD_CONTROL 广播接收器 + 服务归属标记(只有自己起的服务才停) */
+    private BroadcastReceiver controlReceiver = null;
+    private boolean serviceOwnedByMe = false;
     private LivePlayerManager livePlayerManager = new LivePlayerManager();
     private ArrayList<Integer> channelGroupPasswordConfirmed = new ArrayList<>();
 
@@ -375,6 +387,7 @@ public class LiveFragment extends BaseLazyFragment {
         if (EventBus.getDefault().isRegistered(this)) {
             EventBus.getDefault().unregister(this);
         }
+        stopBackgroundPlayNotification();
         mHandler.removeCallbacksAndMessages(null);
         if (mVideoView != null) {
             mVideoView.release();
@@ -386,15 +399,76 @@ public class LiveFragment extends BaseLazyFragment {
     @Override
     protected void onFragmentPause() {
         super.onFragmentPause();
-        // 切走 tab 或应用退后台: 暂停播放防止后台出声, 并停掉挂起的超时换源(否则2秒后会自动续播)
+        // 切走 tab 或应用退后台都会走到这里: 切 tab(activity 仍 RESUMED)暂停防后台出声;
+        // 后台播放开启且应用退后台(activity 已 PAUSED)保持播放并挂媒体通知
         if (mVideoView != null) {
             mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
             int playState = mVideoView.getCurrentPlayState();
-            if (mVideoView.isPlaying() || playState == VideoView.STATE_PLAYING || playState == VideoView.STATE_BUFFERING || playState == VideoView.STATE_PREPARING) {
+            boolean playing = mVideoView.isPlaying() || playState == VideoView.STATE_PLAYING || playState == VideoView.STATE_BUFFERING || playState == VideoView.STATE_PREPARING;
+            if (playing) {
                 resumeOnTabReenter = true;
-                mVideoView.pause();
+                int bgType = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0);
+                if (bgType == 1 && !isHostResumed()) {
+                    startBackgroundPlayNotification();
+                } else {
+                    mVideoView.pause();
+                    stopBackgroundPlayNotification();
+                }
             }
         }
+    }
+
+    /** 宿主 Activity 是否处于 RESUMED(fragment.onPause 晚于 activity.onPause, 退后台时已非 RESUMED) */
+    private boolean isHostResumed() {
+        return getActivity() != null && getActivity().getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED);
+    }
+
+    /** 直播后台播放: 复用 PlayService 媒体通知(标题=频道名, 副标题=线路名), 通知按钮走 VOD_CONTROL 广播 */
+    private void startBackgroundPlayNotification() {
+        if (!isCurrentLiveChannelValid()) return;
+        serviceOwnedByMe = true;
+        String sourceName = currentLiveChannelItem.getSourceName() == null ? "直播" : currentLiveChannelItem.getSourceName();
+        PlayService.start(mVideoView, currentLiveChannelItem.getChannelName() + "&&" + sourceName);
+        registerControlReceiver();
+    }
+
+    private void stopBackgroundPlayNotification() {
+        if (controlReceiver != null && getActivity() != null) {
+            try {
+                requireActivity().unregisterReceiver(controlReceiver);
+            } catch (Throwable ignored) {
+            }
+            controlReceiver = null;
+        }
+        if (serviceOwnedByMe) {
+            serviceOwnedByMe = false;
+            PlayService.stop();
+        }
+    }
+
+    private void registerControlReceiver() {
+        if (controlReceiver != null || getActivity() == null) return;
+        controlReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent == null || !IntentKey.BROADCAST_ACTION.equals(intent.getAction()) || mVideoView == null) return;
+                int action = intent.getIntExtra("action", -1);
+                if (action == IntentKey.BROADCAST_ACTION_PLAYPAUSE) {
+                    if (mVideoView.isPlaying()) mVideoView.pause();
+                    else mVideoView.resume();
+                } else if (action == IntentKey.BROADCAST_ACTION_PREV) {
+                    playPrevious();
+                } else if (action == IntentKey.BROADCAST_ACTION_NEXT) {
+                    playNext();
+                } else if (action == IntentKey.BROADCAST_ACTION_CLOSE) {
+                    mVideoView.pause();
+                    resumeOnTabReenter = false;
+                    stopBackgroundPlayNotification();
+                }
+            }
+        };
+        ContextCompat.registerReceiver(requireActivity(), controlReceiver,
+                new IntentFilter(IntentKey.BROADCAST_ACTION), ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     @Override
@@ -486,6 +560,10 @@ public class LiveFragment extends BaseLazyFragment {
         mVideoView.setUrl(currentLiveChannelItem.getUrl());
         // showChannelInfo();
         mVideoView.start();
+        // 后台播放服务在跑时同步通知元数据(换台/换线路); 服务未运行时投递无副作用
+        EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_REFRESH_NOTIFY,
+                currentLiveChannelItem.getChannelName() + "&&"
+                        + (currentLiveChannelItem.getSourceName() == null ? "直播" : currentLiveChannelItem.getSourceName())));
         return true;
     }
 
