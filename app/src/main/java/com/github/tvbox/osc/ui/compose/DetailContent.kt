@@ -39,6 +39,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -208,9 +209,12 @@ fun DetailScreen(
     val cardWidthPx = with(density) { 68.dp.roundToPx() }
     val horizontalCenterOffsetPx = -((screenWidthPx - cardWidthPx) / 2)
 
-    LaunchedEffect(state.currentEpisodeIndex, state.isReverseSort, state.episodes.size) {
-        if (state.episodes.isNotEmpty() && state.currentEpisodeIndex in state.episodes.indices) {
+    // 仅在选集首次加载完成时定位到当前集; 点击排序/切集后不再自动滚动, 避免打断用户浏览
+    var hasInitialEpisodeScroll by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.episodes.size, state.currentEpisodeIndex) {
+        if (!hasInitialEpisodeScroll && state.episodes.isNotEmpty() && state.currentEpisodeIndex in state.episodes.indices) {
             episodeListState.animateScrollToItem(state.currentEpisodeIndex, horizontalCenterOffsetPx)
+            hasInitialEpisodeScroll = true
         }
     }
 
@@ -302,17 +306,20 @@ fun DetailScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             ActionButton(
-                iconRes = R.drawable.ic_change_20,
+                // 换源用双向交换箭头, 避免与"刷新/同步"的环形箭头混淆
+                iconRes = R.drawable.ic_swap_horiz_20,
                 label = "换源",
                 onClick = callbacks::onChangeSourceClick
             )
             ActionButton(
-                iconRes = R.drawable.ic_download_18,
+                // 与底栏"下载"入口用同一枚图标, 保持图标语言一致
+                iconRes = R.drawable.ic_download_nav,
                 label = "下载",
                 onClick = callbacks::onDownloadClick
             )
             ActionButton(
-                iconRes = R.drawable.ic_colloct_18,
+                // 收藏: 未收藏沿用原心形+对勾图标; 已收藏换成"我的-我的收藏"同款心形并实心填充
+                iconRes = if (state.isCollected) R.drawable.ic_collect_filled else R.drawable.ic_colloct_18,
                 label = if (state.isCollected) "已收藏" else "收藏",
                 isHighlighted = state.isCollected,
                 onClick = callbacks::onCollectClick
@@ -484,7 +491,8 @@ fun DetailScreen(
         val sheetHeight = (configuration.screenHeightDp * 0.58f).dp
         val episodeGridState = rememberLazyGridState()
 
-        LaunchedEffect(state.showAllEpisodesSheet, state.currentEpisodeIndex, state.isReverseSort) {
+        // 每次打开半屏选集时定位一次当前集; 打开后切换排序不再跳转定位
+        LaunchedEffect(state.showAllEpisodesSheet) {
             if (state.showAllEpisodesSheet && state.episodes.isNotEmpty() && state.currentEpisodeIndex in state.episodes.indices) {
                 episodeGridState.scrollToItem(state.currentEpisodeIndex)
             }

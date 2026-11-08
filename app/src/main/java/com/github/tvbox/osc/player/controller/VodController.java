@@ -18,6 +18,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
 
+import com.blankj.utilcode.util.ConvertUtils;
 import com.blankj.utilcode.util.ToastUtils;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.api.ApiConfig;
@@ -138,7 +139,6 @@ public class VodController extends BaseController {
     public TextView mPlayerTimeResetBtn;
     TextView mPlayPauseTime;
     TextView mPlayLoadNetSpeed;
-    TextView mVideoSize;
     public SimpleSubtitleView mSubtitleView;
     public TextView mZimuBtn;
     public TextView mAudioTrackBtn;
@@ -170,10 +170,6 @@ public class VodController extends BaseController {
             if (topVisible) {
                 mPlayPauseTime.setText(mClockFormat.format(new Date()));
                 mPlayLoadNetSpeedRightTop.setText(speed);
-                int[] videoSize = mControlWrapper.getVideoSize();
-                if (videoSize[0] > 0 && videoSize[1] > 0) {
-                    mVideoSize.setText(videoSize[0] + " x " + videoSize[1]);
-                }
             }
             if (mPlayLoadNetSpeed.getVisibility() == VISIBLE) {
                 mPlayLoadNetSpeed.setText(speed);
@@ -225,7 +221,6 @@ public class VodController extends BaseController {
         mPlayerTimeResetBtn = findViewById(R.id.play_time_reset);
         mPlayPauseTime = findViewById(R.id.tv_sys_time);
         mPlayLoadNetSpeed = findViewById(R.id.tv_play_load_net_speed);
-        mVideoSize = findViewById(R.id.tv_videosize);
         mSubtitleView = findViewById(R.id.subtitle_view);
         mZimuBtn = findViewById(R.id.zimu_select);
         mAudioTrackBtn = findViewById(R.id.audio_track_select);
@@ -309,12 +304,16 @@ public class VodController extends BaseController {
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
                 mIsDragging = true;
+                // 按下态滑块变大(20dp), thumbOffset 切到半宽 10dp 保持圆点压住进度端点
+                seekBar.setThumbOffset(ConvertUtils.dp2px(10));
                 mControlWrapper.stopProgress();
                 mControlWrapper.stopFadeOut();
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
+                // 回到静止态 12dp 圆点, thumbOffset 切回半宽 6dp, 非触摸时圆点与进度条完全连续
+                seekBar.setThumbOffset(ConvertUtils.dp2px(6));
                 myHandle.removeCallbacks(myRunnable);
                 myHandle.postDelayed(myRunnable, dismissTimeOperationBar);
                 long duration = mControlWrapper.getDuration();
@@ -651,6 +650,35 @@ public class VodController extends BaseController {
             return (float) mPlayerConfig.getDouble("sp");
         } catch (Exception e) {
             return mControlWrapper != null ? mControlWrapper.getSpeed() : 1.0f;
+        }
+    }
+
+    /**
+     * 直接选中指定缩放档位(供设置弹窗横向档位按钮调用, 与 play_scale 点击循环等价)
+     */
+    public void selectScaleType(int scaleType) {
+        try {
+            mPlayerConfig.put("sc", scaleType);
+            updatePlayerCfgView();
+            listener.updatePlayerCfg();
+            mControlWrapper.setScreenScaleType(scaleType);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 直接选中指定播放器(供设置弹窗横向档位按钮调用, 与 play_player 点击切换等价: 切换后重放)
+     */
+    public void selectPlayerType(int playerType) {
+        try {
+            mPlayerConfig.put("pl", playerType);
+            updatePlayerCfgView();
+            listener.updatePlayerCfg();
+            listener.replay(false);
+            hideBottom();
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
     }
 

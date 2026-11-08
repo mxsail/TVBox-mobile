@@ -45,11 +45,12 @@ public class PlayingControlDialog extends BottomPopupView {
     }
 
     private void initView(){
-        mBinding.scale.setText(mController.mPlayerScaleBtn.getText());
+        //缩放/播放器为横向档位行(与倍速行同形制), 初始化即按当前配置标记选中态
+        PlayingControlRows.setupScaleRow(mBinding, mController);
         mBinding.playTimeStart.setText(mController.mPlayerTimeStartBtn.getText());
         mBinding.playTimeEnd.setText(mController.mPlayerTimeSkipBtn.getText());
-        mBinding.player.setText(mController.mPlayerBtn.getText());
         mBinding.decode.setText(mController.mPlayerIJKBtn.getText());
+        PlayingControlRows.setupPlayerRow(mBinding, mController, this::updateAboutIjkVisible);
         updateAboutIjkVisible();
         updateSpeedUi();
     }
@@ -64,8 +65,7 @@ public class PlayingControlDialog extends BottomPopupView {
         mBinding.speed4.setOnClickListener(view -> setSpeed(mBinding.speed4));
         mBinding.speed5.setOnClickListener(view -> setSpeed(mBinding.speed5));
 
-        //播放器
-        mBinding.scale.setOnClickListener(view -> changeAndUpdateText(mBinding.scale,mController.mPlayerScaleBtn));
+        //播放器(缩放/播放器档位点击已在 PlayingControlRows 内绑定)
         mBinding.playTimeStart.setOnClickListener(view -> changeAndUpdateText(mBinding.playTimeStart,mController.mPlayerTimeStartBtn));
         mBinding.playTimeEnd.setOnClickListener(view -> changeAndUpdateText(mBinding.playTimeEnd,mController.mPlayerTimeSkipBtn));
         mBinding.playTimeStart.setOnLongClickListener(view -> {
@@ -94,7 +94,6 @@ public class PlayingControlDialog extends BottomPopupView {
             mController.decreaseTime("et");
             updateSkipText(false);
         });
-        mBinding.player.setOnClickListener(view -> changeAndUpdateText(mBinding.player,mController.mPlayerBtn));
         mBinding.decode.setOnClickListener(view -> changeAndUpdateText(mBinding.decode,mController.mPlayerIJKBtn));
 
         //其他
@@ -115,16 +114,13 @@ public class PlayingControlDialog extends BottomPopupView {
     }
     /**
      * 点击直接调用controller里面声明好的点击事件,(不改动原逻辑,隐藏controller里的设置view,全由弹窗设置)
-     * @param view 不为空变更配置文字,如更换播放器/缩放, 为空只操作点击之间,不需改变文字,如刷新/重播
+     * @param view 不为空变更配置文字,如解码方式, 为空只操作点击之间,不需改变文字,如刷新/重播
      * @param targetView
      */
     private void changeAndUpdateText(TextView view,TextView targetView){
         targetView.performClick();
         if (view!=null){
             view.setText(targetView.getText());
-            if (view == mBinding.player){
-                updateAboutIjkVisible();
-            }
         }
     }
 

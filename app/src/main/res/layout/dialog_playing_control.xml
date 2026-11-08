@@ -108,16 +108,64 @@
                 android:textStyle="bold"
                 />
 
-            <com.github.tvbox.osc.ui.widget.FilterChip
-                android:id="@+id/scale"
-                style="@style/AppChip"
+            <HorizontalScrollView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:closeIcon="@drawable/ic_change_20"
-                app:closeIconVisible="true"
-                app:closeIconStartPadding="8dp"
-                tools:text="16:9"
-                />
+                android:scrollbars="none">
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.github.tvbox.osc.ui.widget.FilterChip
+                        android:id="@+id/scale0"
+                        style="@style/AppChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:text="默认" />
+
+                    <com.github.tvbox.osc.ui.widget.FilterChip
+                        android:id="@+id/scale1"
+                        style="@style/AppChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:text="16:9" />
+
+                    <com.github.tvbox.osc.ui.widget.FilterChip
+                        android:id="@+id/scale2"
+                        style="@style/AppChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:text="4:3" />
+
+                    <com.github.tvbox.osc.ui.widget.FilterChip
+                        android:id="@+id/scale3"
+                        style="@style/AppChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:text="填充" />
+
+                    <com.github.tvbox.osc.ui.widget.FilterChip
+                        android:id="@+id/scale4"
+                        style="@style/AppChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:text="原始" />
+
+                    <com.github.tvbox.osc.ui.widget.FilterChip
+                        android:id="@+id/scale5"
+                        style="@style/AppChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:text="裁剪" />
+                </LinearLayout>
+            </HorizontalScrollView>
 
 
             <TextView
@@ -207,16 +255,12 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <com.github.tvbox.osc.ui.widget.FilterChip
-                    android:id="@+id/player"
-                    style="@style/AppChip"
+                <!-- 播放器档位由 PlayingControlRows 按设备可用播放器代码生成 -->
+                <LinearLayout
+                    android:id="@+id/container_player"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    app:closeIcon="@drawable/ic_change_20"
-                    app:closeIconVisible="true"
-                    app:closeIconStartPadding="8dp"
-                    tools:text="EXO" />
+                    android:orientation="horizontal" />
 
                 <com.github.tvbox.osc.ui.widget.FilterChip
                     android:id="@+id/decode"
@@ -224,9 +268,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
-                    app:closeIcon="@drawable/ic_change_20"
-                    app:closeIconVisible="true"
-                    app:closeIconStartPadding="8dp"
                     tools:text="硬解" />
 
 

@@ -19,6 +19,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
 
+import com.blankj.utilcode.util.ConvertUtils;
 import com.blankj.utilcode.util.LogUtils;
 import com.blankj.utilcode.util.SPUtils;
 import com.chad.library.adapter.base.BaseQuickAdapter;
@@ -126,7 +127,6 @@ public class LocalVideoController extends BaseController {
     public TextView mPlayerTimeResetBtn;
     TextView mPlayPauseTime;
     TextView mPlayLoadNetSpeed;
-    TextView mVideoSize;
     public SimpleSubtitleView mSubtitleView;
     TextView mZimuBtn;
     TextView mAudioTrackBtn;
@@ -149,10 +149,6 @@ public class LocalVideoController extends BaseController {
             if (topVisible) {
                 mPlayPauseTime.setText(mClockFormat.format(new Date()));
                 mPlayLoadNetSpeedRightTop.setText(speed);
-                int[] videoSize = mControlWrapper.getVideoSize();
-                if (videoSize[0] > 0 && videoSize[1] > 0) {
-                    mVideoSize.setText(videoSize[0] + " x " + videoSize[1]);
-                }
             }
             if (mPlayLoadNetSpeed.getVisibility() == VISIBLE) {
                 mPlayLoadNetSpeed.setText(speed);
@@ -197,7 +193,6 @@ public class LocalVideoController extends BaseController {
         mPlayerTimeResetBtn = findViewById(R.id.play_time_reset);
         mPlayPauseTime = findViewById(R.id.tv_sys_time);
         mPlayLoadNetSpeed = findViewById(R.id.tv_play_load_net_speed);
-        mVideoSize = findViewById(R.id.tv_videosize);
         mSubtitleView = findViewById(R.id.subtitle_view);
         mZimuBtn = findViewById(R.id.zimu_select);
         // 本地视频无外挂字幕选择能力(listener.selectSubtitle 为空实现), 隐藏死按钮;
@@ -252,12 +247,16 @@ public class LocalVideoController extends BaseController {
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
                 mIsDragging = true;
+                // 按下态滑块变大(20dp), thumbOffset 切到半宽 10dp 保持圆点压住进度端点
+                seekBar.setThumbOffset(ConvertUtils.dp2px(10));
                 mControlWrapper.stopProgress();
                 mControlWrapper.stopFadeOut();
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
+                // 回到静止态 12dp 圆点, thumbOffset 切回半宽 6dp, 非触摸时圆点与进度条完全连续
+                seekBar.setThumbOffset(ConvertUtils.dp2px(6));
                 myHandle.removeCallbacks(myRunnable);
                 myHandle.postDelayed(myRunnable, myHandleSeconds);
                 long duration = mControlWrapper.getDuration();

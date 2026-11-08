@@ -245,10 +245,11 @@
     </style>
 
     <!-- 播放器图标按钮(视频上覆盖层专用,不随主题变色):
-         按 M3 官方 icon button 规格=48dp 触控目标 + 24dp 图标居中,无边框 state layer(波纹) -->
+         40dp 触控目标 + 24dp 图标居中(四周 8dp 留白),上下贴边时图标距屏幕边缘 8dp,
+         上下/顶部底部全部按钮统一该尺寸,无边框 state layer(波纹) -->
     <style name="PlayerIconButton">
-        <item name="android:layout_width">48dp</item>
-        <item name="android:layout_height">48dp</item>
+        <item name="android:layout_width">40dp</item>
+        <item name="android:layout_height">40dp</item>
         <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
         <item name="android:scaleType">center</item>
     </style>

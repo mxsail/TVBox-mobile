@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 播放器进度条圆点滑块(静止时 12dp 纯白圆点, 按压/拖动时放大至 16dp 并带半透明触控光晕) -->
+<!-- 播放器进度条圆点滑块(静止时 12dp 纯白圆点压在轨道末端, 保证进度条视觉连续;
+     按压/拖动时放大至 16dp 并带半透明触控光晕, 由 VodController 在
+     onStartTrackingTouch/onStopTrackingTouch 里把 thumbOffset 在 6dp/10dp 间切换, 两种状态都居中不跳位) -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 按下/拖动态: 16dp 白色圆点 + 20dp 半透明光晕 -->
     <item android:state_pressed="true">
@@ -26,21 +28,13 @@
             </item>
         </layer-list>
     </item>
-    <!-- 默认正常态: 12dp 纯白圆点(居中于 20dp 区域内, 保证切换状态时不跳动) -->
+    <!-- 默认正常态: 12dp 纯白圆点(不带透明留白, 半宽 6dp 即 thumbOffset, 圆点严格压住进度端点) -->
     <item>
-        <layer-list>
-            <item
-                android:bottom="4dp"
-                android:left="4dp"
-                android:right="4dp"
-                android:top="4dp">
-                <shape android:shape="oval">
-                    <size
-                        android:width="12dp"
-                        android:height="12dp" />
-                    <solid android:color="#FFFFFF" />
-                </shape>
-            </item>
-        </layer-list>
+        <shape android:shape="oval">
+            <size
+                android:width="12dp"
+                android:height="12dp" />
+            <solid android:color="#FFFFFF" />
+        </shape>
     </item>
 </selector>
