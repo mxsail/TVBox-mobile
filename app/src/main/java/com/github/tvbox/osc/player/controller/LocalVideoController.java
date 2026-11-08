@@ -135,7 +135,7 @@ public class LocalVideoController extends BaseController {
     public MyBatteryView mMyBatteryView;
     Handler myHandle;
     Runnable myRunnable;
-    int myHandleSeconds = 4000;//闲置多少毫秒秒关闭底栏  默认6秒
+    int myHandleSeconds = 5000;//闲置多少毫秒关闭底栏(与点播页 VodController 5000 统一)
 
     int videoPlayState = 0;
 
