@@ -1,36 +1,29 @@
 package com.github.tvbox.osc.ui.dialog;
 
-import android.view.View;
-
 import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.blankj.utilcode.util.ColorUtils;
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.github.tvbox.osc.R;
-import com.github.tvbox.osc.bean.VodInfo;
 import com.github.tvbox.osc.databinding.DialogAllChannelBinding;
-import com.github.tvbox.osc.ui.fragment.LiveFragment;
 import com.github.tvbox.osc.ui.adapter.LiveChannelGroupNewAdapter;
 import com.github.tvbox.osc.ui.adapter.LiveChannelItemNewAdapter;
-import com.github.tvbox.osc.ui.widget.GridSpacingItemDecoration;
-import com.github.tvbox.osc.util.FastClickCheckUtil;
-import com.github.tvbox.osc.util.Utils;
-import com.lxj.xpopup.XPopup;
+import com.github.tvbox.osc.ui.fragment.LiveFragment;
 import com.lxj.xpopup.core.DrawerPopupView;
-import com.lxj.xpopup.enums.PopupPosition;
-import com.lxj.xpopup.interfaces.OnSelectListener;
 import com.owen.tvrecyclerview.widget.V7LinearLayoutManager;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.util.List;
-
+/**
+ * 全频道右侧抽屉: 直播页 Compose 化后不再共享页面 adapter 实例,
+ * 这里自建两份 adapter 用 uiState 快照填充, 选中态点击瞬间生效并自动滚动。
+ */
 public class AllChannelsRightDialog extends DrawerPopupView {
 
     private final LiveFragment mActivity;
     private com.github.tvbox.osc.databinding.DialogAllChannelBinding mBinding;
+    private LiveChannelGroupNewAdapter groupAdapter;
+    private LiveChannelItemNewAdapter channelAdapter;
 
     public AllChannelsRightDialog(@NonNull @NotNull LiveFragment fragment) {
         super(fragment.requireActivity());
@@ -64,18 +57,34 @@ public class AllChannelsRightDialog extends DrawerPopupView {
         mBinding.mGroupGridView.setHasFixedSize(true);
         mBinding.mGroupGridView.setLayoutManager(new V7LinearLayoutManager(getContext(), 1, false));
 
-        if (mActivity.liveChannelGroupAdapter!=null){
-            mBinding.mGroupGridView.setAdapter(mActivity.liveChannelGroupAdapter);
-        }
-
+        groupAdapter = new LiveChannelGroupNewAdapter();
+        groupAdapter.setNewData(mActivity.getUiState().getGroups());
+        groupAdapter.setSelectedGroupIndex(mActivity.getUiState().getSelectedGroupIdx());
+        mBinding.mGroupGridView.setAdapter(groupAdapter);
+        groupAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
+            @Override
+            public void onItemClick(BaseQuickAdapter adapter, android.view.View view, int position) {
+                mActivity.selectChannelGroup(position, false, -1);
+                groupAdapter.setSelectedGroupIndex(position);
+                channelAdapter.setNewData(mActivity.getUiState().getChannels());
+            }
+        });
     }
+
     private void initLiveChannelView() {
         mBinding.mChannelGridView.setHasFixedSize(true);
         mBinding.mChannelGridView.setLayoutManager(new V7LinearLayoutManager(getContext(), 1, false));
 
-        if (mActivity.liveChannelItemAdapter!=null){
-            mBinding.mChannelGridView.setAdapter(mActivity.liveChannelItemAdapter);
-        }
+        channelAdapter = new LiveChannelItemNewAdapter();
+        channelAdapter.setNewData(mActivity.getUiState().getChannels());
+        channelAdapter.setSelectedChannelIndex(mActivity.getUiState().getSelectedChannelIdx());
+        mBinding.mChannelGridView.setAdapter(channelAdapter);
+        channelAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
+            @Override
+            public void onItemClick(BaseQuickAdapter adapter, android.view.View view, int position) {
+                mActivity.clickLiveChannel(position);
+                dismiss();
+            }
+        });
     }
-
 }

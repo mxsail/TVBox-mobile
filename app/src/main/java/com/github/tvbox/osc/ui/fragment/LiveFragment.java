@@ -1,9 +1,5 @@
 package com.github.tvbox.osc.ui.fragment;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.animation.IntEvaluator;
-import android.animation.ObjectAnimator;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -12,32 +8,26 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkRequest;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
 import android.util.Base64;
-import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.FrameLayout;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.compose.ui.platform.ComposeView;
 import androidx.core.content.ContextCompat;
-import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.Lifecycle;
-import androidx.recyclerview.widget.RecyclerView;
 
 import com.blankj.utilcode.util.ConvertUtils;
 import com.blankj.utilcode.util.ScreenUtils;
 import com.blankj.utilcode.util.ToastUtils;
-import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.api.ApiConfig;
 import com.github.tvbox.osc.base.App;
@@ -48,39 +38,34 @@ import com.github.tvbox.osc.bean.LiveChannelItem;
 import com.github.tvbox.osc.bean.LivePlayerManager;
 import com.github.tvbox.osc.bean.LiveSettingGroup;
 import com.github.tvbox.osc.bean.LiveSettingItem;
+import com.github.tvbox.osc.constant.IntentKey;
 import com.github.tvbox.osc.download.PlayUrlResolver;
+import com.github.tvbox.osc.event.LiveSourceChangedEvent;
+import com.github.tvbox.osc.event.RefreshEvent;
+import com.github.tvbox.osc.player.MyVideoView;
 import com.github.tvbox.osc.player.controller.LiveNewController;
+import com.github.tvbox.osc.service.PlayService;
 import com.github.tvbox.osc.ui.activity.MainActivity;
-import com.github.tvbox.osc.ui.adapter.LiveChannelGroupNewAdapter;
-import com.github.tvbox.osc.ui.adapter.LiveChannelItemNewAdapter;
-import com.github.tvbox.osc.ui.adapter.LiveSettingGroupAdapter;
-import com.github.tvbox.osc.ui.adapter.LiveSettingItemAdapter;
+import com.github.tvbox.osc.ui.compose.LoadState;
+import com.github.tvbox.osc.ui.compose.LiveUiState;
 import com.github.tvbox.osc.ui.dialog.AllChannelsRightDialog;
 import com.github.tvbox.osc.ui.dialog.CastListDialog;
 import com.github.tvbox.osc.ui.dialog.LivePasswordDialog;
 import com.github.tvbox.osc.ui.dialog.LiveSettingDialog;
 import com.github.tvbox.osc.ui.dialog.LiveSettingRightDialog;
-import com.github.tvbox.osc.ui.tv.widget.ViewObj;
-import com.github.tvbox.osc.ui.widget.LinearSpacingItemDecoration;
 import com.github.tvbox.osc.ui.widget.PlayerMenuView;
 import com.github.tvbox.osc.ui.widget.PlayerTitleView;
-import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.live.TxtSubscribe;
-import com.github.tvbox.osc.constant.IntentKey;
-import com.github.tvbox.osc.event.LiveSourceChangedEvent;
-import com.github.tvbox.osc.event.RefreshEvent;
-import com.github.tvbox.osc.service.PlayService;
-import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
 import com.google.gson.JsonArray;
 import com.lxj.xpopup.XPopup;
 import com.lxj.xpopup.core.BasePopupView;
 import com.lxj.xpopup.enums.PopupPosition;
 import com.orhanobut.hawk.Hawk;
-import com.owen.tvrecyclerview.widget.TvRecyclerView;
-import com.owen.tvrecyclerview.widget.V7LinearLayoutManager;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -91,32 +76,23 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 
-import xyz.doikki.videocontroller.component.LiveControlView;
 import xyz.doikki.videoplayer.player.VideoView;
 
 /**
- * 直播 tab 页(原 LiveActivity 逻辑整体迁入,随 tab 懒加载初始化)
+ * 直播 tab 页(原 LiveActivity 逻辑整体迁入, 随 tab 懒加载初始化)。
+ * Compose 化: 业务逻辑(频道/线路/密码/EPG/后台播放/按键)全部保留在本 Fragment,
+ * 渲染层换 LiveScreen(Compose); 播放器 MyVideoView 与 doikki 控制器仍为 View 内嵌。
  */
 public class LiveFragment extends BaseLazyFragment {
-    private VideoView mVideoView;
-    private TextView tvChannelInfo;
-    private LinearLayout tvLeftChannelListLayout;
-    private RecyclerView mChannelGroupView;
-    private RecyclerView mLiveChannelView;
-    public LiveChannelGroupNewAdapter liveChannelGroupAdapter;
-    public LiveChannelItemNewAdapter liveChannelItemAdapter;
 
-    private LinearLayout tvRightSettingLayout;
-    private TvRecyclerView mSettingGroupView;
-    private TvRecyclerView mSettingItemView;
-    private LiveSettingGroupAdapter liveSettingGroupAdapter;
-    private LiveSettingItemAdapter liveSettingItemAdapter;
-    private List<LiveSettingGroup> liveSettingGroupList = new ArrayList<>();
+    private VideoView mVideoView;
+    public LiveUiState uiState = new LiveUiState();
 
     private int currentChannelGroupIndex = -1;
     private Handler mHandler = new Handler();
 
     private List<LiveChannelGroup> liveChannelGroupList = new ArrayList<>();
+    private List<LiveSettingGroup> liveSettingGroupList = new ArrayList<>();
     private int currentLiveChannelIndex = -1;
     private int currentLiveChangeSourceTimes = 0;
     /** 连续自动换源失败计数(只有真正 STATE_PLAYING 才清零), 超上限停止自动换源避免断网时无限跳台 */
@@ -129,43 +105,42 @@ public class LiveFragment extends BaseLazyFragment {
     private LivePlayerManager livePlayerManager = new LivePlayerManager();
     private ArrayList<Integer> channelGroupPasswordConfirmed = new ArrayList<>();
 
-//EPG   by 龍
+    //EPG   by 龍
     private LiveChannelItem channel_Name = null;
     private Hashtable hsEpg = new Hashtable();
-    TextView tv_channelnum;
-    TextView tip_chname;
-
-    TextView tv_srcinfo;
     public String epgStringAddress = "";
 
     private boolean isSHIYI = false;
     private boolean isBack = false;
-    private ImageView imgLiveIcon;
     SimpleDateFormat timeFormat = new SimpleDateFormat("yyyy-MM-dd");
     private int videoWidth = 1920;
     private int videoHeight = 1080;
-    private boolean show = false;
     private PlayerTitleView mPlayerTitleView;
     private BasePopupView mSettingRightDialog;
     private BasePopupView mSettingBottomDialog;
     private BasePopupView mAllChannelRightDialog;
     /** 切走 tab 时因可见性暂停的,切回时自动恢复 */
     private boolean resumeOnTabReenter = false;
+    /** 设置面板自动隐藏任务(可复位) */
+    private Runnable mHideSettingRun = this::hideSettingPanel;
+
+    /** 供 LiveScreen 内嵌的视频视图(Compose 渲染层读取) */
+    public VideoView getVideoView() {
+        return mVideoView;
+    }
+
+    public LiveUiState getUiState() {
+        return uiState;
+    }
 
     @Override
     protected int getLayoutResID() {
-        return R.layout.fragment_live;
+        // Compose 渲染层不再充气 XML
+        return 0;
     }
 
-    // ===== 直播页视图惰性化(首帧性能) =====
-    // 底部导航 4 tab 常驻时, 首页相邻的本页视图会在应用首帧被 ViewPager 实例化并参与
-    // measure/layout(fragment_live 246 行+视频区)。这里首帧只返回轻量 stub 容器,
-    // 首次切到本页(setUserVisibleHint=true)再充气完整布局, 让首帧布局只负担首页一页。
-    private boolean realViewInflated = false;
-    private FrameLayout stubContainer;
-
     @Override
-    public void onCreate(@androidx.annotation.Nullable Bundle savedInstanceState) {
+    public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (!EventBus.getDefault().isRegistered(this)) {
             EventBus.getDefault().register(this);
@@ -188,12 +163,8 @@ public class LiveFragment extends BaseLazyFragment {
             currentLiveChangeSourceTimes = 0;
             autoSwitchFailStreak = 0;
             liveChannelGroupList.clear();
-            if (liveChannelGroupAdapter != null) {
-                liveChannelGroupAdapter.setNewData(new ArrayList<>());
-            }
-            if (liveChannelItemAdapter != null) {
-                liveChannelItemAdapter.setNewData(new ArrayList<>());
-            }
+            uiState.setGroups(new ArrayList<>());
+            uiState.setChannels(new ArrayList<>());
             showLoading();
         } else {
             // 切换直播源完成：装载新频道列表并自动开播第一频道
@@ -202,62 +173,135 @@ public class LiveFragment extends BaseLazyFragment {
     }
 
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @androidx.annotation.Nullable ViewGroup container, @androidx.annotation.Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         me.jessyan.autosize.AutoSize.autoConvertDensity(getActivity(), getSizeInDp(), isBaseOnWidth());
-        if (!realViewInflated && !getUserVisibleHint()) {
-            stubContainer = new FrameLayout(requireContext());
-            isViewCreated = true;
-            return stubContainer;
+        // 视频视图按组合周期重建(旧实例随视图销毁一并释放)
+        if (mVideoView != null) {
+            mVideoView.release();
         }
-        return super.onCreateView(inflater, container, savedInstanceState);
+        mVideoView = new MyVideoView(requireContext());
+        setupVideoView();
+        uiState.setVideoHeightPx((int) ((long) ScreenUtils.getScreenWidth() * 9 / 16));
+
+        ComposeView composeView = new ComposeView(requireContext());
+        com.github.tvbox.osc.ui.compose.LiveScreenKt.attachLiveScreen(this, composeView);
+        rootView = composeView;
+        isViewCreated = true;
+        return rootView;
     }
 
     @Override
-    public void setUserVisibleHint(boolean isVisibleToUser) {
-        if (isVisibleToUser) {
-            ensureRealView();
+    public void onDestroyView() {
+        super.onDestroyView();
+        unregisterNetworkCallback();
+        if (mVideoView != null) {
+            mVideoView.release();
+            mVideoView = null;
         }
-        super.setUserVisibleHint(isVisibleToUser);
-    }
-
-    /** 首次可见: 把完整布局充气进 stub 容器并让 rootView 指向它, 必须发生在基类分发 init() 之前 */
-    private void ensureRealView() {
-        if (realViewInflated || stubContainer == null || getContext() == null) {
-            return;
-        }
-        realViewInflated = true;
-        LayoutInflater.from(requireContext()).inflate(getLayoutResID(), stubContainer, true);
-        rootView = stubContainer.getChildAt(0);
+        rootView = null;
     }
 
     @Override
     protected void init() {
-        View liveRoot = findViewById(R.id.live_root);
-        // MainActivity 关闭了 decorFitsSystemWindows,直播页视频区自行避开状态栏
-        if (liveRoot != null) {
-            ViewCompat.setOnApplyWindowInsetsListener(liveRoot, (v, insets) -> {
-                int top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
-                if (v.getPaddingTop() != top) v.setPadding(0, top, 0, 0);
-                return insets;
-            });
-            liveRoot.post(() -> {
-                WindowInsetsCompat rootInsets = ViewCompat.getRootWindowInsets(liveRoot);
-                if (rootInsets == null) return;
-                int top = rootInsets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
-                if (liveRoot.getPaddingTop() != top) liveRoot.setPadding(0, top, 0, 0);
-            });
-        }
-
+        // 业务初始化(首次可见时由基类懒加载分发)
         epgStringAddress = Hawk.get(HawkConfig.EPG_URL, "");
         if (epgStringAddress == null || epgStringAddress.length() < 5)
             epgStringAddress = "http://epg.51zmt.top:8000/api/diyp/";
 
-        setLoadSir(findViewById(R.id.live_root));
-        mVideoView = findViewById(R.id.mVideoView);
-        // 视频区初始即按标准 16:9(屏宽x9/16)占位, 起播后仅按实际比例微调, 不再从固定 300dp 跳变
-        resizeLiveVideoArea((int) ((long) ScreenUtils.getScreenWidth() * 9 / 16));
-        registerNetworkCallback();
-        // 视频区高度自适应宽高比(去上下黑边): 布局固定 300dp, 16:9 内容上下黑边明显
+        initLiveChannelList();
+        initLiveSettingGroupList();
+    }
+
+    /** 懒加载是否已执行(宿主按键/返回分发前置判断) */
+    public boolean isUiReady() {
+        return mVideoView != null;
+    }
+
+    /** 播放器与 doikki 控制器装配(每次视图创建执行) */
+    private void setupVideoView() {
+        LiveNewController controller = new LiveNewController(requireActivity());
+        PlayerMenuView playerMenuView = new PlayerMenuView(requireActivity());
+        playerMenuView.setOnPlayerMenuClickListener(new PlayerMenuView.OnPlayerMenuClickListener() {
+            @Override
+            public void expand() {
+                showAllChannelDialog();
+            }
+
+            @Override
+            public void onSetting() {
+                showSettingDialog(true);
+            }
+
+            @Override
+            public void onCast() {
+                showCastDialog();
+            }
+        });
+        controller.addControlComponent(playerMenuView); //菜单栏,设置投屏等
+        controller.addControlComponent(new xyz.doikki.videocontroller.component.LiveControlView(requireActivity())); //直播控制条
+        //标题栏
+        mPlayerTitleView = new PlayerTitleView(requireActivity());
+        //Fragment 宿主下标题栏返回=通知 MainActivity 切回首页 tab
+        mPlayerTitleView.setOnBackListener(() -> {
+            if (mActivity instanceof MainActivity) {
+                ((MainActivity) mActivity).goToTab(0);
+                return true;
+            }
+            return false;
+        });
+        controller.addControlComponent(mPlayerTitleView);
+        controller.setListener(new LiveNewController.LiveControlListener() {
+
+            @Override
+            public void setting() {
+                //showSettingGroup();
+            }
+
+            @Override
+            public void playStateChanged(int playState) {
+                switch (playState) {
+                    case VideoView.STATE_IDLE:
+                    case VideoView.STATE_PAUSED:
+                        break;
+                    case VideoView.STATE_PREPARED:
+                    case VideoView.STATE_BUFFERED:
+                    case VideoView.STATE_PLAYING:
+                        currentLiveChangeSourceTimes = 0;
+                        if (playState == VideoView.STATE_PLAYING) {
+                            // 只有真正出画面才算成功, 连续失败计数清零
+                            autoSwitchFailStreak = 0;
+                        }
+                        mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
+                        break;
+                    case VideoView.STATE_ERROR:
+                    case VideoView.STATE_PLAYBACK_COMPLETED:
+                        mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
+                        mHandler.postDelayed(mConnectTimeoutChangeSourceRun, 2000);
+                        break;
+                    case VideoView.STATE_PREPARING:
+                    case VideoView.STATE_BUFFERING:
+                        mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
+                        mHandler.postDelayed(mConnectTimeoutChangeSourceRun, (Hawk.get(HawkConfig.LIVE_CONNECT_TIMEOUT, 1) + 1) * 5000);
+                        break;
+                }
+            }
+
+            @Override
+            public void changeSource(int direction) {
+                if (direction > 0) {
+                    playNextSource();
+                } else {
+                    playPreSource();
+                }
+            }
+        });
+        controller.setCanChangePosition(false);
+        controller.setEnableInNormal(true);
+        controller.setGestureEnabled(true);
+        controller.setDoubleTapTogglePlayEnabled(false);
+        mVideoView.setVideoController(controller);
+        mVideoView.setProgressManager(null);
+        // 视频区高度自适应宽高比: 起播后按实际比例微调(初始 16:9 在 onCreateView 设置)
         mVideoView.addOnStateChangeListener(new VideoView.SimpleOnStateChangeListener() {
             @Override
             public void onPlayStateChanged(int playState) {
@@ -268,49 +312,7 @@ public class LiveFragment extends BaseLazyFragment {
                 }
             }
         });
-
-        tvLeftChannelListLayout = findViewById(R.id.tvLeftChannnelListLayout);
-
-        mChannelGroupView = findViewById(R.id.mGroupGridView);
-        mLiveChannelView = findViewById(R.id.mChannelGridView);
-        mChannelGroupView.addItemDecoration(new LinearSpacingItemDecoration(20, true));
-        mLiveChannelView.addItemDecoration(new LinearSpacingItemDecoration(20, true));
-
-        tvRightSettingLayout = findViewById(R.id.tvRightSettingLayout);
-        mSettingGroupView = findViewById(R.id.mSettingGroupView);
-        mSettingItemView = findViewById(R.id.mSettingItemView);
-        tvChannelInfo = findViewById(R.id.tvChannel);
-
-        //EPG  findViewById  by 龍
-        tip_chname = findViewById(R.id.tv_channel_bar_name);//底部名称
-        tip_chname.setOnClickListener(view -> {
-            mChannelGroupView.scrollToPosition(currentChannelGroupIndex);
-            mLiveChannelView.scrollToPosition(currentLiveChannelIndex);
-        });
-        tv_channelnum = findViewById(R.id.tv_channel_bottom_number); //底部数字
-
-        tv_srcinfo = findViewById(R.id.tv_source);//线路状态
-
-        //源切换
-        findViewById(R.id.ic_pre_source).setOnClickListener(view -> playPreSource());
-        findViewById(R.id.ic_next_source).setOnClickListener(view -> playNextSource());
-        tv_srcinfo.setOnClickListener(view -> playNextSource());
-        //投屏/设置
-        findViewById(R.id.ic_setting).setOnClickListener(view -> showSettingDialog(false));
-        findViewById(R.id.ic_cast).setOnClickListener(view -> showCastDialog());
-
-        initVideoView();
-        initChannelGroupView();
-        initLiveChannelView();
-        initSettingGroupView();
-        initSettingItemView();
-        initLiveChannelList();
-        initLiveSettingGroupList();
-    }
-
-    /** 懒加载是否已执行(宿主按键/返回分发前置判断) */
-    public boolean isUiReady() {
-        return mVideoView != null;
+        registerNetworkCallback();
     }
 
     //显示底部EPG
@@ -320,14 +322,14 @@ public class LiveFragment extends BaseLazyFragment {
         // 判空先行: 旧实现先解引用 getChannelName 再判 channel_Name == null, 判空是死代码
         if (channel_Name != null && channel_Name.getChannelName() != null) {
             mPlayerTitleView.setTitle(channel_Name.getChannelName());
-            tip_chname.setText(channel_Name.getChannelName());
-            tv_channelnum.setText("" + channel_Name.getChannelNum());
+            uiState.setEpgName(channel_Name.getChannelName());
+            uiState.setEpgNum("" + channel_Name.getChannelNum());
             //todo 上一/下一/当前节目信息
 
             if (channel_Name.getSourceNum() <= 0) {
-                tv_srcinfo.setText("1/1");
+                uiState.setEpgSource("源 1/1");
             } else {
-                tv_srcinfo.setText("线路" + (channel_Name.getSourceIndex() + 1) + "/" + channel_Name.getSourceNum());
+                uiState.setEpgSource("源 " + (channel_Name.getSourceIndex() + 1) + "/" + channel_Name.getSourceNum());
             }
         }
     }
@@ -337,9 +339,8 @@ public class LiveFragment extends BaseLazyFragment {
      */
     public boolean handleBack() {
         if (!isUiReady()) return false;
-        if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
-            mHandler.removeCallbacks(mHideSettingLayoutRun);
-            mHandler.post(mHideSettingLayoutRun);
+        if (uiState.getSettingVisible()) {
+            hideSettingPanel();
         } else if (isBack) {
             isBack = false;
             playPreSource();
@@ -364,7 +365,7 @@ public class LiveFragment extends BaseLazyFragment {
             int keyCode = event.getKeyCode();
             if (keyCode == KeyEvent.KEYCODE_MENU) {
                 //showSettingGroup();
-            } else if (!isListOrSettingLayoutVisible()) {
+            } else if (!isSettingPanelVisible()) {
                 switch (keyCode) {
                     case KeyEvent.KEYCODE_DPAD_UP:
                         if (Hawk.get(HawkConfig.LIVE_CHANNEL_REVERSE, false))
@@ -400,6 +401,12 @@ public class LiveFragment extends BaseLazyFragment {
                 }
             }
         }
+    }
+
+    /** 频道列表滚动到当前选中项(遥控器 OK/点频道名反馈) */
+    public void scrollChannelListToSelection() {
+        if (currentChannelGroupIndex < 0) return;
+        uiState.scrollToSelected(currentChannelGroupIndex, currentLiveChannelIndex, currentChannelGroupIndex == 0);
     }
 
     /** 网络恢复监听: 断网导致自动换源停摆/错误态时, 网络恢复自动重试当前频道 */
@@ -455,6 +462,7 @@ public class LiveFragment extends BaseLazyFragment {
         }
         stopBackgroundPlayNotification();
         unregisterNetworkCallback();
+        uiState.cancelScope();
         mHandler.removeCallbacksAndMessages(null);
         if (mVideoView != null) {
             mVideoView.release();
@@ -492,6 +500,30 @@ public class LiveFragment extends BaseLazyFragment {
 
     private final Runnable mAdaptAspectRatioRun = this::adaptVideoAspectRatio;
 
+    /** 连接超时/错误自动换源任务 */
+    private Runnable mConnectTimeoutChangeSourceRun = new Runnable() {
+        @Override
+        public void run() {
+            //已切走 tab(或退后台)时不再自动换源续播
+            if (!currentVisibleState || !getUserVisibleHint()) return;
+            if (currentLiveChannelItem == null) return;
+            // 断网时全部线路/频道轮换也无济于事: 连续自动换源超上限即停止并提示, 避免无限跳台
+            if (autoSwitchFailStreak >= AUTO_SWITCH_FAIL_CAP) {
+                ToastUtils.showShort("多次自动换源失败已停止,请检查网络后重新选择频道");
+                return;
+            }
+            autoSwitchFailStreak++;
+            currentLiveChangeSourceTimes++;
+            if (currentLiveChannelItem.getSourceNum() == currentLiveChangeSourceTimes) {
+                currentLiveChangeSourceTimes = 0;
+                Integer[] groupChannelIndex = getNextChannel(Hawk.get(HawkConfig.LIVE_CHANNEL_REVERSE, false) ? -1 : 1);
+                playChannel(groupChannelIndex[0], groupChannelIndex[1], false);
+            } else {
+                playNextSource();
+            }
+        }
+    };
+
     /** 视频区高度自适应视频宽高比(全屏时跳过, doikki 全屏会把播放容器挪到 decor) */
     private void adaptVideoAspectRatio() {
         if (mVideoView == null || mVideoView.isFullScreen()) return;
@@ -502,25 +534,7 @@ public class LiveFragment extends BaseLazyFragment {
         int targetH = (int) ((long) width * size[1] / size[0]);
         targetH = Math.max(ConvertUtils.dp2px(140),
                 Math.min(targetH, (int) (ScreenUtils.getScreenHeight() * 0.55f)));
-        resizeLiveVideoArea(targetH);
-    }
-
-    /** 视频区(VideoView)与父占位容器同高收缩: 父容器不缩, 视频下方的频道信息不会上移 */
-    private void resizeLiveVideoArea(int targetH) {
-        if (mVideoView == null) return;
-        android.view.ViewGroup.LayoutParams lp = mVideoView.getLayoutParams();
-        if (lp != null && Math.abs(lp.height - targetH) > 8) {
-            lp.height = targetH;
-            mVideoView.setLayoutParams(lp);
-        }
-        if (mVideoView.getParent() instanceof android.view.ViewGroup) {
-            android.view.ViewGroup wrapper = (android.view.ViewGroup) mVideoView.getParent();
-            android.view.ViewGroup.LayoutParams wlp = wrapper.getLayoutParams();
-            if (wlp != null && Math.abs(wlp.height - targetH) > 8) {
-                wlp.height = targetH;
-                wrapper.setLayoutParams(wlp);
-            }
-        }
+        uiState.setVideoHeightPx(targetH);
     }
 
     /** 直播后台播放: 复用 PlayService 媒体通知(标题=频道名, 副标题=线路名), 通知按钮走 VOD_CONTROL 广播 */
@@ -585,42 +599,21 @@ public class LiveFragment extends BaseLazyFragment {
         }
     }
 
+    /** 遥控器 OK/确认: 列表本就常驻, 滚动到当前选中项 */
     private void showChannelList() {
-        if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
-            mHandler.removeCallbacks(mHideSettingLayoutRun);
-            mHandler.post(mHideSettingLayoutRun);
+        if (uiState.getSettingVisible()) {
+            hideSettingPanel();
             return;
         }
-        //重新载入上一次状态
-        liveChannelItemAdapter.setNewData(getLiveChannels(currentChannelGroupIndex));
-        if (currentLiveChannelIndex > -1) {
-            mLiveChannelView.smoothScrollToPosition(currentLiveChannelIndex);
-            if (currentChannelGroupIndex == 0) {
-                mChannelGroupView.scrollToPosition(currentChannelGroupIndex);
-            } else {
-                mChannelGroupView.smoothScrollToPosition(currentChannelGroupIndex);
-            }
-        }
+        scrollChannelListToSelection();
     }
 
     private void showChannelInfo() {
-        tvChannelInfo.setText(String.format(Locale.getDefault(), "%d %s %s(%d/%d)", currentLiveChannelItem.getChannelNum(),
+        if (currentLiveChannelItem == null) return;
+        uiState.setChannelInfoText(String.format(Locale.getDefault(), "%d %s %s(%d/%d)", currentLiveChannelItem.getChannelNum(),
                 currentLiveChannelItem.getChannelName(), currentLiveChannelItem.getSourceName(),
                 currentLiveChannelItem.getSourceIndex() + 1, currentLiveChannelItem.getSourceNum()));
-
-        FrameLayout.LayoutParams lParams = new FrameLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
-            lParams.gravity = Gravity.LEFT;
-            lParams.leftMargin = 60;
-            lParams.topMargin = 30;
-        } else {
-            lParams.gravity = Gravity.RIGHT;
-            lParams.rightMargin = 60;
-            lParams.topMargin = 30;
-        }
-        tvChannelInfo.setLayoutParams(lParams);
-
-        tvChannelInfo.setVisibility(View.VISIBLE);
+        uiState.setChannelInfoVisible(true);
         mHandler.removeCallbacks(mHideChannelInfoRun);
         mHandler.postDelayed(mHideChannelInfoRun, 3000);
     }
@@ -628,13 +621,13 @@ public class LiveFragment extends BaseLazyFragment {
     private Runnable mHideChannelInfoRun = new Runnable() {
         @Override
         public void run() {
-            tvChannelInfo.setVisibility(View.INVISIBLE);
+            uiState.setChannelInfoVisible(false);
         }
     };
 
     private boolean playChannel(int channelGroupIndex, int liveChannelIndex, boolean changeSource) {
         if ((channelGroupIndex == currentChannelGroupIndex && liveChannelIndex == currentLiveChannelIndex && !changeSource)
-                || (changeSource && currentLiveChannelItem.getSourceNum() == 1)) {
+                || (changeSource && currentLiveChannelItem != null && currentLiveChannelItem.getSourceNum() == 1)) {
             // 同频道同线路重入: 也给一次频道信息反馈, 不再静默
             showChannelInfo();
             return true;
@@ -694,211 +687,37 @@ public class LiveFragment extends BaseLazyFragment {
         playChannel(currentChannelGroupIndex, currentLiveChannelIndex, true);
     }
 
-    //显示设置列表
+    /** 显示右侧滑入设置面板(Compose AnimatedVisibility, 5 秒无操作自动隐藏) */
     private void showSettingGroup() {
-
-        if (tvRightSettingLayout.getVisibility() == View.INVISIBLE) {
+        if (!uiState.getSettingVisible()) {
             if (!isCurrentLiveChannelValid()) return;
             //重新载入默认状态
             loadCurrentSourceList();
-            liveSettingGroupAdapter.setNewData(liveSettingGroupList);
-            selectSettingGroup(0, false);
-            mSettingGroupView.smoothScrollToPosition(0);
-            mSettingItemView.smoothScrollToPosition(currentLiveChannelItem.getSourceIndex());
-            mHandler.postDelayed(mFocusAndShowSettingGroup, 200);
+            uiState.setSettingGroups(liveSettingGroupList);
+            uiState.setSettingItems(liveSettingGroupList.get(0).getLiveSettingItems());
+            uiState.setSettingGroupIdx(0);
+            uiState.setSettingItemSelectedIdx(currentLiveChannelItem.getSourceIndex());
+            uiState.setSettingVisible(true);
+            resetSettingHideTimer();
         } else {
-            mHandler.removeCallbacks(mHideSettingLayoutRun);
-            mHandler.post(mHideSettingLayoutRun);
+            hideSettingPanel();
         }
     }
 
-    private Runnable mFocusAndShowSettingGroup = new Runnable() {
-        @Override
-        public void run() {
-            if (mSettingGroupView.isScrolling() || mSettingItemView.isScrolling() || mSettingGroupView.isComputingLayout() || mSettingItemView.isComputingLayout()) {
-                mHandler.postDelayed(this, 100);
-            } else {
-                RecyclerView.ViewHolder holder = mSettingGroupView.findViewHolderForAdapterPosition(0);
-                if (holder != null)
-                    holder.itemView.requestFocus();
-                tvRightSettingLayout.setVisibility(View.VISIBLE);
-                ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) tvRightSettingLayout.getLayoutParams();
-                if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
-                    ViewObj viewObj = new ViewObj(tvRightSettingLayout, params);
-                    ObjectAnimator animator = ObjectAnimator.ofObject(viewObj, "marginRight", new IntEvaluator(), -tvRightSettingLayout.getLayoutParams().width, 0);
-                    animator.setDuration(200);
-                    animator.addListener(new AnimatorListenerAdapter() {
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            super.onAnimationEnd(animation);
-                            mHandler.postDelayed(mHideSettingLayoutRun, 5000);
-                        }
-                    });
-                    animator.start();
-                }
-            }
-        }
-    };
-
-    private Runnable mHideSettingLayoutRun = new Runnable() {
-        @Override
-        public void run() {
-            ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) tvRightSettingLayout.getLayoutParams();
-            if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
-                ViewObj viewObj = new ViewObj(tvRightSettingLayout, params);
-                ObjectAnimator animator = ObjectAnimator.ofObject(viewObj, "marginRight", new IntEvaluator(), 0, -tvRightSettingLayout.getLayoutParams().width);
-                animator.setDuration(200);
-                animator.addListener(new AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        super.onAnimationEnd(animation);
-                        tvRightSettingLayout.setVisibility(View.INVISIBLE);
-                        liveSettingGroupAdapter.setSelectedGroupIndex(-1);
-                    }
-                });
-                animator.start();
-            }
-        }
-    };
-
-    private void initVideoView() {
-        LiveNewController controller = new LiveNewController(requireActivity());
-        PlayerMenuView playerMenuView = getPlayerMenuView();
-        controller.addControlComponent(playerMenuView); //菜单栏,设置投屏等
-        controller.addControlComponent(new LiveControlView(requireActivity())); //直播控制条
-        //标题栏
-        mPlayerTitleView = new PlayerTitleView(requireActivity());
-        //Fragment 宿主下标题栏返回=通知 MainActivity 切回首页 tab
-        mPlayerTitleView.setOnBackListener(() -> {
-            if (mActivity instanceof MainActivity) {
-                ((MainActivity) mActivity).goToTab(0);
-                return true;
-            }
-            return false;
-        });
-        controller.addControlComponent(mPlayerTitleView);
-        controller.setListener(new LiveNewController.LiveControlListener() {
-
-            @Override
-            public void setting() {
-                //showSettingGroup();
-            }
-
-            @Override
-            public void playStateChanged(int playState) {
-                switch (playState) {
-                    case VideoView.STATE_IDLE:
-                    case VideoView.STATE_PAUSED:
-                        break;
-                    case VideoView.STATE_PREPARED:
-                    case VideoView.STATE_BUFFERED:
-                    case VideoView.STATE_PLAYING:
-                        currentLiveChangeSourceTimes = 0;
-                        if (playState == VideoView.STATE_PLAYING) {
-                            // 只有真正出画面才算成功, 连续失败计数清零
-                            autoSwitchFailStreak = 0;
-                        }
-                        mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
-                        break;
-                    case VideoView.STATE_ERROR:
-                    case VideoView.STATE_PLAYBACK_COMPLETED:
-                        mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
-                        mHandler.postDelayed(mConnectTimeoutChangeSourceRun, 2000);
-                        break;
-                    case VideoView.STATE_PREPARING:
-                    case VideoView.STATE_BUFFERING:
-                        mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
-                        mHandler.postDelayed(mConnectTimeoutChangeSourceRun, (Hawk.get(HawkConfig.LIVE_CONNECT_TIMEOUT, 1) + 1) * 5000);
-                        break;
-                }
-            }
-
-            @Override
-            public void changeSource(int direction) {
-                if (direction > 0) {
-                    playNextSource();
-                } else {
-                    playPreSource();
-                }
-            }
-        });
-        controller.setCanChangePosition(false);
-        controller.setEnableInNormal(true);
-        controller.setGestureEnabled(true);
-        controller.setDoubleTapTogglePlayEnabled(false);
-        mVideoView.setVideoController(controller);
-        mVideoView.setProgressManager(null);
+    private void hideSettingPanel() {
+        mHandler.removeCallbacks(mHideSettingRun);
+        uiState.setSettingVisible(false);
+        uiState.setSettingGroupIdx(-1);
     }
 
-    @NonNull
-    private PlayerMenuView getPlayerMenuView() {
-        PlayerMenuView playerMenuView = new PlayerMenuView(requireActivity());
-        playerMenuView.setOnPlayerMenuClickListener(new PlayerMenuView.OnPlayerMenuClickListener() {
-            @Override
-            public void expand() {
-                showAllChannelDialog();
-            }
-
-            @Override
-            public void onSetting() {
-                showSettingDialog(true);
-            }
-
-            @Override
-            public void onCast() {
-                showCastDialog();
-            }
-        });
-        return playerMenuView;
+    private void resetSettingHideTimer() {
+        mHandler.removeCallbacks(mHideSettingRun);
+        mHandler.postDelayed(mHideSettingRun, 5000);
     }
 
-    private Runnable mConnectTimeoutChangeSourceRun = new Runnable() {
-        @Override
-        public void run() {
-            //已切走 tab(或退后台)时不再自动换源续播
-            if (!currentVisibleState || !getUserVisibleHint()) return;
-            if (currentLiveChannelItem == null) return;
-            // 断网时全部线路/频道轮换也无济于事: 连续自动换源超上限即停止并提示, 避免无限跳台
-            if (autoSwitchFailStreak >= AUTO_SWITCH_FAIL_CAP) {
-                ToastUtils.showShort("多次自动换源失败已停止,请检查网络后重新选择频道");
-                return;
-            }
-            autoSwitchFailStreak++;
-            currentLiveChangeSourceTimes++;
-            if (currentLiveChannelItem.getSourceNum() == currentLiveChangeSourceTimes) {
-                currentLiveChangeSourceTimes = 0;
-                Integer[] groupChannelIndex = getNextChannel(Hawk.get(HawkConfig.LIVE_CHANNEL_REVERSE, false) ? -1 : 1);
-                playChannel(groupChannelIndex[0], groupChannelIndex[1], false);
-            } else {
-                playNextSource();
-            }
-        }
-    };
-
-    private void initChannelGroupView() {
-        mChannelGroupView.setHasFixedSize(true);
-        mChannelGroupView.setLayoutManager(new V7LinearLayoutManager(requireActivity(), 1, false));
-
-        liveChannelGroupAdapter = new LiveChannelGroupNewAdapter();
-        mChannelGroupView.setAdapter(liveChannelGroupAdapter);
-
-        //手机/模拟器
-        liveChannelGroupAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
-            @Override
-            public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
-                FastClickCheckUtil.check(view);
-                selectChannelGroup(position, false, -1);
-            }
-        });
-    }
-
-    private void selectChannelGroup(int groupIndex, boolean focus, int liveChannelIndex) {
-        if (focus) {
-            liveChannelGroupAdapter.setFocusedGroupIndex(groupIndex);
-            liveChannelItemAdapter.setFocusedChannelIndex(-1);
-        }
-        if ((groupIndex > -1 && groupIndex != liveChannelGroupAdapter.getSelectedGroupIndex()) || isNeedInputPassword(groupIndex)) {
-            liveChannelGroupAdapter.setSelectedGroupIndex(groupIndex);
+    public void selectChannelGroup(int groupIndex, boolean focus, int liveChannelIndex) {
+        if ((groupIndex > -1 && groupIndex != uiState.getSelectedGroupIdx()) || isNeedInputPassword(groupIndex)) {
+            uiState.setSelectedGroupIdx(groupIndex);
             if (isNeedInputPassword(groupIndex)) {
                 showPasswordDialog(groupIndex, liveChannelIndex);
                 return;
@@ -907,111 +726,42 @@ public class LiveFragment extends BaseLazyFragment {
         }
     }
 
-    private void initLiveChannelView() {
-        mLiveChannelView.setHasFixedSize(true);
-        mLiveChannelView.setLayoutManager(new V7LinearLayoutManager(requireActivity(), 1, false));
-
-        liveChannelItemAdapter = new LiveChannelItemNewAdapter();
-        mLiveChannelView.setAdapter(liveChannelItemAdapter);
-
-        liveChannelItemAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
-            @Override
-            public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
-                FastClickCheckUtil.check(view);
-                clickLiveChannel(position);
-            }
-        });
+    public void clickLiveChannel(int position) {
+        uiState.setSelectedChannelIdx(position);
+        playChannel(uiState.getSelectedGroupIdx(), position, false);
     }
 
-    private void clickLiveChannel(int position) {
-        liveChannelItemAdapter.setSelectedChannelIndex(position);
-        playChannel(liveChannelGroupAdapter.getSelectedGroupIndex(), position, false);
-    }
-
-    private void initSettingGroupView() {
-        mSettingGroupView.setHasFixedSize(true);
-        mSettingGroupView.setLayoutManager(new V7LinearLayoutManager(requireActivity(), 1, false));
-
-        liveSettingGroupAdapter = new LiveSettingGroupAdapter();
-        mSettingGroupView.setAdapter(liveSettingGroupAdapter);
-        mSettingGroupView.addOnScrollListener(new RecyclerView.OnScrollListener() {
-            @Override
-            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
-                super.onScrollStateChanged(recyclerView, newState);
-                mHandler.removeCallbacks(mHideSettingLayoutRun);
-                mHandler.postDelayed(mHideSettingLayoutRun, 5000);
-            }
-        });
-
-        liveSettingGroupAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
-            @Override
-            public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
-                FastClickCheckUtil.check(view);
-                selectSettingGroup(position, false);
-            }
-        });
-    }
-
-    private void selectSettingGroup(int position, boolean focus) {
+    public void selectSettingGroup(int position, boolean focus) {
         if (!isCurrentLiveChannelValid()) return;
-        if (focus) {
-            liveSettingGroupAdapter.setFocusedGroupIndex(position);
-            liveSettingItemAdapter.setFocusedItemIndex(-1);
-        }
-        if (position == liveSettingGroupAdapter.getSelectedGroupIndex() || position < -1)
+        if (position == uiState.getSettingGroupIdx() || position < -1)
             return;
 
-        liveSettingGroupAdapter.setSelectedGroupIndex(position);
-        liveSettingItemAdapter.setNewData(liveSettingGroupList.get(position).getLiveSettingItems());
+        uiState.setSettingGroupIdx(position);
+        uiState.setSettingItems(liveSettingGroupList.get(position).getLiveSettingItems());
 
         switch (position) {
             case 0:
-                liveSettingItemAdapter.selectItem(currentLiveChannelItem.getSourceIndex(), true, false);
+                uiState.setSettingItemSelectedIdx(currentLiveChannelItem.getSourceIndex());
                 break;
             case 1:
-                liveSettingItemAdapter.selectItem(livePlayerManager.getLivePlayerScale(), true, true);
+                uiState.setSettingItemSelectedIdx(livePlayerManager.getLivePlayerScale());
                 break;
             case 2:
-                liveSettingItemAdapter.selectItem(livePlayerManager.getLivePlayerType(), true, true);
+                uiState.setSettingItemSelectedIdx(livePlayerManager.getLivePlayerType());
+                break;
+            default:
+                uiState.setSettingItemSelectedIdx(-1);
                 break;
         }
-        int smoothScrollToPosition = liveSettingItemAdapter.getSelectedItemIndex();
-        if (smoothScrollToPosition < 0) smoothScrollToPosition = 0;
-        mSettingItemView.smoothScrollToPosition(smoothScrollToPosition);
-        mHandler.removeCallbacks(mHideSettingLayoutRun);
-        mHandler.postDelayed(mHideSettingLayoutRun, 5000);
+        resetSettingHideTimer();
     }
 
-    private void initSettingItemView() {
-        mSettingItemView.setHasFixedSize(true);
-        mSettingItemView.setLayoutManager(new V7LinearLayoutManager(requireActivity(), 1, false));
-
-        liveSettingItemAdapter = new LiveSettingItemAdapter();
-        mSettingItemView.setAdapter(liveSettingItemAdapter);
-        mSettingItemView.addOnScrollListener(new RecyclerView.OnScrollListener() {
-            @Override
-            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
-                super.onScrollStateChanged(recyclerView, newState);
-                mHandler.removeCallbacks(mHideSettingLayoutRun);
-                mHandler.postDelayed(mHideSettingLayoutRun, 5000);
-            }
-        });
-
-        liveSettingItemAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
-            @Override
-            public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
-                FastClickCheckUtil.check(view);
-                clickSettingItem(position);
-            }
-        });
-    }
-
-    private void clickSettingItem(int position) {
-        int settingGroupIndex = liveSettingGroupAdapter.getSelectedGroupIndex();
+    public void clickSettingItem(int position) {
+        int settingGroupIndex = uiState.getSettingGroupIdx();
         if (settingGroupIndex < 4) {
-            if (position == liveSettingItemAdapter.getSelectedItemIndex())
+            if (position == uiState.getSettingItemSelectedIdx())
                 return;
-            liveSettingItemAdapter.selectItem(position, true, true);
+            uiState.setSettingItemSelectedIdx(position);
         }
         switch (settingGroupIndex) {
             case 0://线路切换
@@ -1050,11 +800,10 @@ public class LiveFragment extends BaseLazyFragment {
                         Hawk.put(HawkConfig.LIVE_CROSS_GROUP, select);
                         break;
                 }
-                liveSettingItemAdapter.selectItem(position, select, false);
+                uiState.setSettingItemSelectedIdx(select ? position : -1);
                 break;
         }
-        mHandler.removeCallbacks(mHideSettingLayoutRun);
-        mHandler.postDelayed(mHideSettingLayoutRun, 5000);
+        resetSettingHideTimer();
     }
 
     private void initLiveChannelList() {
@@ -1171,33 +920,27 @@ public class LiveFragment extends BaseLazyFragment {
 
         livePlayerManager.init(mVideoView);
 
-        tvRightSettingLayout.setVisibility(View.INVISIBLE);
+        uiState.setSettingVisible(false);
 
-        liveChannelGroupAdapter.setNewData(liveChannelGroupList);
+        uiState.setGroups(liveChannelGroupList);
         int playChannelIndex = lastLiveChannelIndex > -1 ? lastLiveChannelIndex : 0;
         currentChannelGroupIndex = lastChannelGroupIndex;
         currentLiveChannelIndex = playChannelIndex;
         if (getUserVisibleHint()) {
             selectChannelGroup(lastChannelGroupIndex, false, playChannelIndex);
             if (playChannelIndex > -1) {
-                liveChannelItemAdapter.setSelectedChannelIndex(playChannelIndex);
-                mLiveChannelView.scrollToPosition(playChannelIndex);
+                uiState.setSelectedChannelIdx(playChannelIndex);
             }
         } else {
             // 不可见状态(冷启动尚未进入直播): 仅装载频道列表，暂不拉流起播
-            liveChannelItemAdapter.setNewData(getLiveChannels(lastChannelGroupIndex));
-            liveChannelGroupAdapter.setSelectedGroupIndex(lastChannelGroupIndex);
-            if (playChannelIndex > -1) {
-                liveChannelItemAdapter.setSelectedChannelIndex(playChannelIndex);
-                mLiveChannelView.scrollToPosition(playChannelIndex);
-            }
+            uiState.setChannels(getLiveChannels(lastChannelGroupIndex));
+            uiState.setSelectedGroupIdx(lastChannelGroupIndex);
+            uiState.setSelectedChannelIdx(playChannelIndex > -1 ? playChannelIndex : -1);
         }
     }
 
-    private boolean isListOrSettingLayoutVisible() {
-        // 只看右侧滑入设置面板: 左侧频道浏览区是常驻布局(XML 默认 VISIBLE 且从不切换),
-        // 旧守卫把它当模态面板, 导致遥控器上下键换台/左右键换线路整组按键永远不可达
-        return tvRightSettingLayout.getVisibility() == View.VISIBLE;
+    private boolean isSettingPanelVisible() {
+        return uiState.getSettingVisible();
     }
 
     private void initLiveSettingGroupList() {
@@ -1264,35 +1007,23 @@ public class LiveFragment extends BaseLazyFragment {
 
             @Override
             public void onCancel() {
-                if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
-                    int groupIndex = liveChannelGroupAdapter.getSelectedGroupIndex();
-                    liveChannelItemAdapter.setNewData(getLiveChannels(groupIndex));
-                }
+                uiState.setChannels(getLiveChannels(uiState.getSelectedGroupIdx()));
             }
         });
         dialog.show();
     }
 
     private void loadChannelGroupDataAndPlay(int groupIndex, int liveChannelIndex) {
-        liveChannelItemAdapter.setNewData(getLiveChannels(groupIndex));
+        uiState.setChannels(getLiveChannels(groupIndex));
         if (groupIndex == currentChannelGroupIndex) {
-            if (currentLiveChannelIndex > -1)
-                mLiveChannelView.smoothScrollToPosition(currentLiveChannelIndex);
-            liveChannelItemAdapter.setSelectedChannelIndex(currentLiveChannelIndex);
+            uiState.setSelectedChannelIdx(currentLiveChannelIndex);
         } else {
-            mLiveChannelView.smoothScrollToPosition(0);
-            liveChannelItemAdapter.setSelectedChannelIndex(-1);
+            uiState.setSelectedChannelIdx(-1);
         }
 
         if (liveChannelIndex > -1) {
             clickLiveChannel(liveChannelIndex);
-            if (groupIndex == 0) {//部分手机smoothScrollToPosition向上划出屏幕
-                mChannelGroupView.scrollToPosition(groupIndex);
-            } else {
-                mChannelGroupView.smoothScrollToPosition(groupIndex);
-            }
-
-            mLiveChannelView.smoothScrollToPosition(liveChannelIndex);
+            uiState.scrollToSelected(groupIndex, liveChannelIndex, groupIndex == 0);
             playChannel(groupIndex, liveChannelIndex, false);
         }
     }
@@ -1448,7 +1179,7 @@ public class LiveFragment extends BaseLazyFragment {
      *
      * @param fullScreenStyle 全屏显示侧边弹窗
      */
-    private void showSettingDialog(boolean fullScreenStyle) {
+    public void showSettingDialog(boolean fullScreenStyle) {
         if (!isCurrentLiveChannelValid()) {
             ToastUtils.showShort("当前频道未加载");
             return;
@@ -1470,5 +1201,22 @@ public class LiveFragment extends BaseLazyFragment {
                     .asCustom(new LiveSettingDialog(this));
             mSettingBottomDialog.show();
         }
+    }
+
+    // ===== Compose 三态(等价旧 LoadSir, 不再挂 View) =====
+
+    @Override
+    protected void showLoading() {
+        uiState.setLoadState(LoadState.Loading);
+    }
+
+    @Override
+    protected void showEmpty() {
+        uiState.setLoadState(LoadState.Empty);
+    }
+
+    @Override
+    protected void showSuccess() {
+        uiState.setLoadState(LoadState.Success);
     }
 }
