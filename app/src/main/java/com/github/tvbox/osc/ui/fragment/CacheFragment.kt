@@ -280,21 +280,21 @@ class CacheFragment : Fragment() {
         loadData()
     }
 
-    /** 切回本 tab: 有结构性变化或存在下载中集数时才重绑 */
+    /** 切回本 tab: 无条件重查一次(loadExecutor 内部有合并), 保证新入队/下载中/刚完成的集立即可见 */
     override fun setUserVisibleHint(isVisibleToUser: Boolean) {
         userVisible = isVisibleToUser
         super.setUserVisibleHint(isVisibleToUser)
         if (isVisibleToUser && isAdded() && view != null) {
-            if (dataDirty.compareAndSet(true, false) || liveProgress.isNotEmpty()) {
-                loadData()
-            }
+            dataDirty.set(false)
+            loadData()
         }
     }
 
     override fun onResume() {
         super.onResume()
         me.jessyan.autosize.AutoSize.autoConvertDensity(activity, 360f, true)
-        if (userVisible && (dataDirty.compareAndSet(true, false) || liveProgress.isNotEmpty())) {
+        if (userVisible) {
+            dataDirty.set(false)
             loadData()
         }
     }
