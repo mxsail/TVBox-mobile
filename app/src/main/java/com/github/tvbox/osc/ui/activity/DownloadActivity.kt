@@ -196,6 +196,9 @@ class DownloadActivity : BaseActivity() {
                         th.printStackTrace()
                     }
                     com.github.tvbox.osc.ui.fragment.CacheFragment.markSizesDirty()
+                    // 通知缓存 tab 重查数据库(删除不产生下载事件, 不发则底部数量不刷新)
+                    org.greenrobot.eventbus.EventBus.getDefault()
+                        .post(com.github.tvbox.osc.event.DownloadEvent(com.github.tvbox.osc.event.DownloadEvent.TYPE_TASKS_CHANGED))
                     runOnUiThread {
                         if (detailGroupKey != null) finish() else loadData()
                     }
@@ -225,6 +228,8 @@ class DownloadActivity : BaseActivity() {
                         th.printStackTrace()
                     }
                     com.github.tvbox.osc.ui.fragment.CacheFragment.markSizesDirty()
+                    org.greenrobot.eventbus.EventBus.getDefault()
+                        .post(com.github.tvbox.osc.event.DownloadEvent(com.github.tvbox.osc.event.DownloadEvent.TYPE_TASKS_CHANGED))
                     loadData()
                 }
             }
