@@ -31,9 +31,19 @@ import xyz.doikki.videoplayer.render.RenderViewFactory;
 import xyz.doikki.videoplayer.render.TextureRenderViewFactory;
 
 public class PlayerHelper {
+    public static final int RENDER_TEXTURE_VIEW = 0;
+    public static final int RENDER_SURFACE_VIEW = 1;
+
+    public static ArrayList<Integer> getRenderTypes() {
+        ArrayList<Integer> renderTypes = new ArrayList<>();
+        renderTypes.add(RENDER_TEXTURE_VIEW);
+        renderTypes.add(RENDER_SURFACE_VIEW);
+        return renderTypes;
+    }
+
     public static void updateCfg(VideoView videoView, JSONObject playerCfg) {
         int playerType = Hawk.get(HawkConfig.PLAY_TYPE, 0);
-        int renderType = Hawk.get(HawkConfig.PLAY_RENDER, 0);
+        int renderType = Hawk.get(HawkConfig.PLAY_RENDER, RENDER_TEXTURE_VIEW);
         String ijkCode = Hawk.get(HawkConfig.IJK_CODEC, "软解码");
         int scale = Hawk.get(HawkConfig.PLAY_SCALE, 0);
         try {
@@ -79,12 +89,12 @@ public class PlayerHelper {
         }
         RenderViewFactory renderViewFactory = null;
         switch (renderType) {
-            case 0:
+            case RENDER_SURFACE_VIEW:
+                renderViewFactory = SurfaceRenderViewFactory.create();
+                break;
+            case RENDER_TEXTURE_VIEW:
             default:
                 renderViewFactory = TextureRenderViewFactory.create();
-                break;
-            case 1:
-                renderViewFactory = SurfaceRenderViewFactory.create();
                 break;
         }
         videoView.setPlayerFactory(playerFactory);
@@ -129,12 +139,12 @@ public class PlayerHelper {
         int renderType = Hawk.get(HawkConfig.PLAY_RENDER, 0);
         RenderViewFactory renderViewFactory = null;
         switch (renderType) {
-            case 0:
+            case RENDER_SURFACE_VIEW:
+                renderViewFactory = SurfaceRenderViewFactory.create();
+                break;
+            case RENDER_TEXTURE_VIEW:
             default:
                 renderViewFactory = TextureRenderViewFactory.create();
-                break;
-            case 1:
-                renderViewFactory = SurfaceRenderViewFactory.create();
                 break;
         }
         videoView.setPlayerFactory(playerFactory);
@@ -254,7 +264,7 @@ public class PlayerHelper {
     }
 
     public static String getRenderName(int renderType) {
-        if (renderType == 1) {
+        if (renderType == RENDER_SURFACE_VIEW) {
             return "SurfaceView";
         } else {
             return "TextureView";

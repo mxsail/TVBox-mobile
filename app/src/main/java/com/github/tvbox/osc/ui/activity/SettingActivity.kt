@@ -224,7 +224,7 @@ class SettingActivity : BaseActivity() {
             )
         }
         var ijkCodecValue by remember { mutableStateOf(Hawk.get(HawkConfig.IJK_CODEC, "")) }
-        var renderValue by remember { mutableStateOf(PlayerHelper.getRenderName(Hawk.get(HawkConfig.PLAY_RENDER, 0))) }
+        var renderValue by remember { mutableStateOf(PlayerHelper.getRenderName(Hawk.get(HawkConfig.PLAY_RENDER, PlayerHelper.RENDER_TEXTURE_VIEW))) }
         var scaleValue by remember { mutableStateOf(PlayerHelper.getScaleName(Hawk.get(HawkConfig.PLAY_SCALE, 0))) }
         var ijkCache by remember { mutableStateOf(Hawk.get(HawkConfig.IJK_CACHE_PLAY, false)) }
         var syncValue by remember { mutableStateOf(if (Hawk.get(HawkConfig.SYNC_ENABLED, false)) "已启用" else "未启用") }
@@ -343,9 +343,15 @@ class SettingActivity : BaseActivity() {
                         dialog.show()
                     }
                     MenuRow(R.drawable.ic_material_48, "渲染方式", renderValue) {
-                        showSelect("请选择默认渲染方式", listOf("SurfaceView", "TextureView"), Hawk.get(HawkConfig.PLAY_RENDER, 0)) { pos ->
-                            Hawk.put(HawkConfig.PLAY_RENDER, pos)
-                            renderValue = PlayerHelper.getRenderName(pos)
+                        val renderTypes = PlayerHelper.getRenderTypes()
+                        val renderNames = renderTypes.map { PlayerHelper.getRenderName(it) }
+                        val currentRender = Hawk.get(HawkConfig.PLAY_RENDER, PlayerHelper.RENDER_TEXTURE_VIEW)
+                        var defaultPos = renderTypes.indexOf(currentRender)
+                        if (defaultPos < 0) defaultPos = 0
+                        showSelect("请选择默认渲染方式", renderNames, defaultPos) { pos ->
+                            val selectedType = renderTypes[pos]
+                            Hawk.put(HawkConfig.PLAY_RENDER, selectedType)
+                            renderValue = PlayerHelper.getRenderName(selectedType)
                             PlayerHelper.init()
                         }
                     }
