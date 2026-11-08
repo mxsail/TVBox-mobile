@@ -357,6 +357,9 @@ public class PlayFragment extends BaseLazyFragment {
         mVideoView.addOnStateChangeListener(new VideoView.SimpleOnStateChangeListener() {
             @Override
             public void onPlayStateChanged(int playState) {
+                // 返回退出后 onDestroyView 已置空 mVideoView, ExoPlayer 已排队的事件仍会
+                // 经 controller 派发到这里(mActivity 引用还在), 直接 NPE
+                if (mVideoView == null || !isAdded()) return;
                 if (mActivity instanceof DetailActivity) {
                     if (playState == VideoView.STATE_PLAYING) {
                         ((DetailActivity) mActivity).onPlaybackStarted();
