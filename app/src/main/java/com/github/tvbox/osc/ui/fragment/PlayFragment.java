@@ -920,9 +920,8 @@ public class PlayFragment extends BaseLazyFragment {
 
     void startPlayUrl(String url, HashMap<String, String> headers) {
         LOG.i("playUrl:" + url);
-        if (autoRetryCount > 0 && url.contains(".m3u8")) {
-            url = "http://home.jundie.top:666/unBom.php?m3u8=" + url;//尝试去bom头再次播放
-        }
+        // 旧实现重试时把 m3u8 地址拼到硬编码第三方去 BOM 服务(home.jundie.top:666):
+        // 域名不可达则重试必败, 还把播放地址泄露给第三方, 移除后直接重试原始地址
         String finalUrl = url;
         if (mActivity == null || !isAdded()) return;
         requireActivity().runOnUiThread(() -> {
