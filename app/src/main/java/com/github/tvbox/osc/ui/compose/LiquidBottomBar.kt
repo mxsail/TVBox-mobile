@@ -810,6 +810,9 @@ fun LiquidBottomTabs(
             Row(
                 Modifier
                     .graphicsLayer { translationX = panelOffset }
+                    // InteractiveHighlight 的按压高亮是无裁剪的全幅 drawRect(Plus 混合),
+                    // 悬浮底栏上会露出底栏胶囊外的直角亮区, 裁进底栏形状内
+                    .clip(barShape)
                     .then(interactiveHighlight.modifier)
                     .height(barHeight)
                     .fillMaxWidth()
