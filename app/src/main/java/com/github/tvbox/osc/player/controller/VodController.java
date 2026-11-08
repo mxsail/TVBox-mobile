@@ -866,8 +866,7 @@ public class VodController extends BaseController {
         if (!simSlideStart)
             return;
         mControlWrapper.seekTo(simSeekPosition);
-        if (!mControlWrapper.isPlaying())
-            mControlWrapper.start();
+        // 与触摸手势 seek 行为对齐: 暂停态按键快进松手保持暂停, 不强制恢复播放
         simSlideStart = false;
         simSeekPosition = 0;
         simSlideOffset = 0;
@@ -1026,6 +1025,18 @@ public class VodController extends BaseController {
         if (super.onKeyEvent(event)) {
             return true;
         }
+        // 锁定态吞掉全部按键(快进/暂停/呼出控制栏), 只提示先解锁
+        if (isLock) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                int keyCode = event.getKeyCode();
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER
+                        || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_MENU
+                        || keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    ToastUtils.showShort("已锁定,请先解锁");
+                }
+            }
+            return true;
+        }
         int keyCode = event.getKeyCode();
         int action = event.getAction();
         if (isBottomVisible()) {
@@ -1132,6 +1143,11 @@ public class VodController extends BaseController {
 
     @Override
     public boolean onBackPressed() {
+        // 锁定态返回不退出播放页, 提示先解锁
+        if (isLock) {
+            ToastUtils.showShort("已锁定,请先解锁");
+            return true;
+        }
         if (super.onBackPressed()) {
             return true;
         }
