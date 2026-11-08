@@ -20,6 +20,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.JsPromptResult;
 import android.webkit.JsResult;
 import android.webkit.WebChromeClient;
@@ -1816,10 +1817,12 @@ public class PlayFragment extends BaseLazyFragment {
 
     boolean checkVideoFormat(String url) {
         try {
-            if (url.contains("url=http") || url.contains(".html")) {
+            if (TextUtils.isEmpty(url)) return false;
+            // 排除纯网页，但若带 url=http 参数的真实视频流（如反向代理/中转m3u8）应予以放行
+            if (url.contains(".html") || (url.contains("url=http") && !url.contains(".m3u8") && !url.contains(".mp4"))) {
                 return false;
             }
-            if (sourceBean.getType() == 3) {
+            if (sourceBean != null && sourceBean.getType() == 3) {
                 Spider sp = ApiConfig.get().getCSP(sourceBean);
                 if (sp != null && sp.manualVideoCheck()) {
                     return sp.isVideoFormat(url);
@@ -1828,6 +1831,81 @@ public class PlayFragment extends BaseLazyFragment {
             return VideoParseRuler.checkIsVideoForParse(webUrl, url);
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    private static final String SNIFFER_MUTE_AND_HOOK_JS =
+            "(function() {" +
+            "  try {" +
+            "    var report = function(u) {" +
+            "      if (u && typeof u === 'string' && u.indexOf('http') === 0 && u.indexOf('blob:') !== 0) {" +
+            "        if (window.TvBoxBridge && window.TvBoxBridge.onVideoDetected) {" +
+            "          window.TvBoxBridge.onVideoDetected(u);" +
+            "        }" +
+            "      }" +
+            "    };" +
+            "    var muteMedia = function(el) {" +
+            "      if (el) {" +
+            "        el.muted = true;" +
+            "        el.volume = 0;" +
+            "        report(el.src);" +
+            "        report(el.currentSrc);" +
+            "      }" +
+            "    };" +
+            "    if (!window._tvbox_hooked) {" +
+            "      window._tvbox_hooked = true;" +
+            "      var origPlay = HTMLMediaElement.prototype.play;" +
+            "      HTMLMediaElement.prototype.play = function() {" +
+            "        this.muted = true;" +
+            "        this.volume = 0;" +
+            "        report(this.src);" +
+            "        report(this.currentSrc);" +
+            "        return origPlay.apply(this, arguments);" +
+            "      };" +
+            "      var origSrcDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');" +
+            "      if (origSrcDesc && origSrcDesc.set) {" +
+            "        var origSet = origSrcDesc.set;" +
+            "        origSrcDesc.set = function(val) {" +
+            "          report(val);" +
+            "          return origSet.apply(this, arguments);" +
+            "        };" +
+            "        Object.defineProperty(HTMLMediaElement.prototype, 'src', origSrcDesc);" +
+            "      }" +
+            "    }" +
+            "    document.querySelectorAll('video, audio').forEach(muteMedia);" +
+            "    if (window.hls && window.hls.url) report(window.hls.url);" +
+            "    if (window.dp && window.dp.video && window.dp.video.src) report(window.dp.video.src);" +
+            "    if (window.player && window.player.url) report(window.player.url);" +
+            "    if (!window._tvbox_obs && (document.documentElement || document.body)) {" +
+            "      window._tvbox_obs = new MutationObserver(function() {" +
+            "        document.querySelectorAll('video, audio').forEach(muteMedia);" +
+            "      });" +
+            "      window._tvbox_obs.observe(document.documentElement || document.body, { childList: true, subtree: true });" +
+            "    }" +
+            "  } catch(e) {}" +
+            "})();";
+
+    private class SniffBridge {
+        @JavascriptInterface
+        public void onVideoDetected(String detectedUrl) {
+            if (TextUtils.isEmpty(detectedUrl) || mActivity == null || !isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (loadFoundCount.get() == 0 && checkVideoFormat(detectedUrl)) {
+                    LOG.i("SniffBridge detected video: " + detectedUrl);
+                    loadFoundVideoUrls.add(detectedUrl);
+                    loadFoundVideoUrlsHeader.put(detectedUrl, new HashMap<>());
+                    if (loadFoundCount.incrementAndGet() == 1) {
+                        mHandler.removeMessages(100);
+                        String cookie = CookieManager.getInstance().getCookie(detectedUrl);
+                        HashMap<String, String> headers = new HashMap<>();
+                        if (!TextUtils.isEmpty(cookie)) {
+                            headers.put("Cookie", " " + cookie);
+                        }
+                        playUrl(detectedUrl, headers);
+                        stopLoadWebView(true);
+                    }
+                }
+            });
         }
     }
 
@@ -1922,6 +2000,7 @@ public class PlayFragment extends BaseLazyFragment {
         });
         SysWebClient mSysWebClient = new SysWebClient();
         webView.setWebViewClient(mSysWebClient);
+        webView.addJavascriptInterface(new SniffBridge(), "TvBoxBridge");
         webView.setBackgroundColor(Color.BLACK);
     }
 
@@ -1940,11 +2019,13 @@ public class PlayFragment extends BaseLazyFragment {
         @Override
         public void onPageStarted(WebView view, String url, Bitmap favicon) {
             super.onPageStarted(view, url, favicon);
+            view.evaluateJavascript(SNIFFER_MUTE_AND_HOOK_JS, null);
         }
 
         @Override
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
+            view.evaluateJavascript(SNIFFER_MUTE_AND_HOOK_JS, null);
             String click = sourceBean.getClickSelector();
             LOG.i("onPageFinished url:" + url);
 
@@ -2038,6 +2119,7 @@ public class PlayFragment extends BaseLazyFragment {
         @Override
         public void onLoadResource(WebView webView, String url) {
             super.onLoadResource(webView, url);
+            webView.evaluateJavascript(SNIFFER_MUTE_AND_HOOK_JS, null);
         }
     }
 

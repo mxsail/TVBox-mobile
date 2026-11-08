@@ -2,6 +2,7 @@ package com.github.tvbox.osc.download;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Handler;
@@ -471,6 +472,23 @@ public class HeadlessParser {
         wv.setBackgroundColor(Color.BLACK);
     }
 
+    private static final String SNIFFER_MUTE_JS =
+            "(function() {" +
+            "  try {" +
+            "    var muteMedia = function(el) { if (el) { el.muted = true; el.volume = 0; } };" +
+            "    HTMLMediaElement.prototype.play = function() {" +
+            "      this.muted = true; this.volume = 0;" +
+            "      return HTMLMediaElement.prototype.play.apply(this, arguments);" +
+            "    };" +
+            "    document.querySelectorAll('video, audio').forEach(muteMedia);" +
+            "    if (document.documentElement || document.body) {" +
+            "      new MutationObserver(function() {" +
+            "        document.querySelectorAll('video, audio').forEach(muteMedia);" +
+            "      }).observe(document.documentElement || document.body, { childList: true, subtree: true });" +
+            "    }" +
+            "  } catch(e) {}" +
+            "})();";
+
     private class HeadlessWebClient extends WebViewClient {
 
         @Override
@@ -484,8 +502,19 @@ public class HeadlessParser {
         }
 
         @Override
+        public void onPageStarted(WebView view, String url, Bitmap favicon) {
+            super.onPageStarted(view, url, favicon);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                view.evaluateJavascript(SNIFFER_MUTE_JS, null);
+            }
+        }
+
+        @Override
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                view.evaluateJavascript(SNIFFER_MUTE_JS, null);
+            }
             // 与播放端一致:按源配置的 clickSelector 自动点击播放按钮
             try {
                 String click = sourceBean.getClickSelector();
@@ -567,10 +596,12 @@ public class HeadlessParser {
     /** 与 PlayFragment.checkVideoFormat 一致:type3 spider 可手动判定,否则走通用规则 */
     private boolean isVideoUrl(String url) {
         try {
-            if (url.contains("url=http") || url.contains(".html")) {
+            if (TextUtils.isEmpty(url)) return false;
+            // 排除纯网页，但若带 url=http 参数的真实视频流（如反向代理/中转m3u8）应予以放行
+            if (url.contains(".html") || (url.contains("url=http") && !url.contains(".m3u8") && !url.contains(".mp4"))) {
                 return false;
             }
-            if (sourceBean.getType() == 3) {
+            if (sourceBean != null && sourceBean.getType() == 3) {
                 Spider sp = ApiConfig.get().getCSP(sourceBean);
                 if (sp != null && sp.manualVideoCheck()) {
                     return sp.isVideoFormat(url);

@@ -132,10 +132,9 @@ public class DefaultConfig {
     }
 
     private static final Pattern snifferMatch = Pattern.compile(
-            "http((?!http).){12,}?\\.(m3u8|mp4|flv|avi|mkv|rm|wmv|mpg|m4a)\\?.*|" +
-            "http((?!http).){12,}\\.(m3u8|mp4|flv|avi|mkv|rm|wmv|mpg|m4a)|" +
-            "http((?!http).)*?video/tos*|" +
-            "http((?!http).){20,}?/m3u8\\?pt=m3u8.*|" +
+            "http((?!http).)*?\\.(m3u8|mp4|flv|avi|mkv|rm|wmv|mpg|m4a)(\\?.*)?$|" +
+            "http((?!http).)*?/m3u8(\\?.*)?$|" +
+            "http((?!http).)*?video/tos.*|" +
             "http((?!http).)*?default\\.ixigua\\.com/.*|" +
             "http((?!http).)*?dycdn-tos\\.pstatp[^\\?]*|" +
             "http.*?/player/m3u8play\\.php\\?url=.*|" +
@@ -145,7 +144,8 @@ public class DefaultConfig {
             "http.*?/download.aspx\\?.*|" +
             "http.*?/api/up_api.php\\?.*|" +
             "https.*?\\.66yk\\.cn.*|" +
-            "http((?!http).)*?netease\\.com/file/.*"
+            "http((?!http).)*?netease\\.com/file/.*",
+            Pattern.CASE_INSENSITIVE
     );
     public static boolean isVideoFormat(String url) {
         Uri uri = Uri.parse(url);
