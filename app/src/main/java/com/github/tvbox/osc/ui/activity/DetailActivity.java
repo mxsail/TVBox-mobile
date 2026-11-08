@@ -1439,6 +1439,11 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             }
             toggleSubtitleTextSize();
             registerActionReceiver(false);
+            // 退出画中画后媒体通知可能仍常驻(前台/后台同一服务), 接收器必须重新挂上,
+            // 否则通知栏播放/上下一集按钮全部失效
+            if (ServiceUtils.isServiceRunning(PlayService.class)) {
+                registerActionReceiver(true);
+            }
             updatePipParams();
         }
     }
