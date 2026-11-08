@@ -16,8 +16,8 @@
         android:layout_height="wrap_content"
         android:layout_gravity="top"
         android:background="@drawable/player_scrim_top"
-        android:paddingTop="10dp"
-        android:paddingBottom="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="2dp"
         android:visibility="gone"
         tools:visibility="visible">
 
@@ -174,7 +174,7 @@
         android:background="@drawable/player_scrim_bottom"
         android:gravity="center_vertical"
         android:orientation="vertical"
-        android:paddingTop="28dp"
+        android:paddingTop="12dp"
         android:visibility="gone"
         tools:visibility="visible">
 
@@ -182,7 +182,7 @@
             android:id="@+id/parse_root"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="@dimen/dp_10"
+            android:layout_marginBottom="4dp"
             android:layout_marginHorizontal="20dp"
             android:orientation="horizontal"
             android:visibility="gone"
@@ -213,8 +213,8 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
-            android:layout_marginHorizontal="2dp"
+            android:layout_marginBottom="3dp"
+            android:layout_marginHorizontal="4dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
@@ -248,7 +248,7 @@
             <SeekBar
                 android:id="@+id/seekBar"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="36dp"
                 android:layout_gravity="center"
                 android:layout_weight="1"
                 android:background="@null"
@@ -263,7 +263,7 @@
                 android:paddingBottom="0dp"
                 android:progressDrawable="@drawable/player_seek_track"
                 android:thumb="@drawable/player_seek_thumb"
-                android:thumbOffset="6dp" />
+                android:thumbOffset="10dp" />
 
             <TextView
                 android:id="@+id/total_time"
@@ -586,22 +586,13 @@
         app:trackThickness="3dp"
         tools:visibility="visible" />
 
+    <!-- 居中多余网速胶囊已移除, 统一由顶部右上角状态栏显示实时网速, 保留桩节点兼容 findViewById -->
     <TextView
         android:id="@+id/tv_play_load_net_speed"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginTop="76dp"
-        android:background="@drawable/bg_player_pill"
-        android:focusable="false"
-        android:focusableInTouchMode="false"
-        android:paddingHorizontal="14dp"
-        android:paddingVertical="6dp"
-        android:tag="play_load_net_speed"
-        tools:text="10kb/s"
-        android:textColor="@color/white"
-        android:textSize="12sp"
-         />
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        tools:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/ll_speed"
