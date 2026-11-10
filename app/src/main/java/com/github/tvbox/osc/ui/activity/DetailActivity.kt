@@ -172,7 +172,7 @@ class DetailActivity : BaseActivity() {
         ImmersionBar.with(this)
             .transparentStatusBar()
             .statusBarDarkFont(!Utils.isDarkTheme())
-            .navigationBarColor(Color.TRANSPARENT)
+            .navigationBarColor(android.R.color.transparent)
             .fitsSystemWindows(true)
             .init()
     }
