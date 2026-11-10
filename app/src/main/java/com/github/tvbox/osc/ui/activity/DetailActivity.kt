@@ -12,6 +12,7 @@ import android.content.IntentFilter
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.net.Uri
@@ -162,6 +163,9 @@ class DetailActivity : BaseActivity() {
 
     override fun init() {
         PlayService.stop()
+        window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.BLACK))
+        window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
+        findViewById<android.view.View>(android.R.id.content)?.setBackgroundColor(android.graphics.Color.BLACK)
         initView()
         initViewModel()
         initData()
@@ -291,9 +295,13 @@ class DetailActivity : BaseActivity() {
                         factory = {
                             val p = vodPlayerManager?.playerView?.parent as? ViewGroup
                             p?.removeView(vodPlayerManager?.playerView)
-                            vodPlayerManager!!.playerView
+                            vodPlayerManager!!.playerView.apply {
+                                setBackgroundColor(android.graphics.Color.BLACK)
+                            }
                         },
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(androidx.compose.ui.graphics.Color.Black)
                     )
                 }
             } else {
@@ -867,6 +875,9 @@ class DetailActivity : BaseActivity() {
 
     private fun prepareForPip() {
         isCurrentlyInPip = true
+        window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.BLACK))
+        window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
+        findViewById<android.view.View>(android.R.id.content)?.setBackgroundColor(android.graphics.Color.BLACK)
         mAllSeriesRightDialog?.dismiss()
         uiState = uiState.copy(showAllEpisodesSheet = false)
         vodPlayerManager?.hideAllDialogSuccess()
@@ -940,11 +951,14 @@ class DetailActivity : BaseActivity() {
         if (isInPip) {
             wasFullscreenBeforePip = fullWindows
             prepareForPip()
+            window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.BLACK))
+            window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
             ImmersionBar.with(this)
                 .hideBar(BarHide.FLAG_HIDE_BAR)
                 .fitsSystemWindows(false)
                 .init()
             val content = findViewById<android.view.View>(android.R.id.content)
+            content?.setBackgroundColor(android.graphics.Color.BLACK)
             content?.setPadding(0, 0, 0, 0)
             registerActionReceiver(true)
         } else {

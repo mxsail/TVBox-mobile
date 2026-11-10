@@ -78,6 +78,7 @@
         <activity
             android:name=".ui.activity.DetailActivity"
             android:supportsPictureInPicture="true"
+            android:theme="@style/DetailTheme"
             android:launchMode="singleTask"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"/>
         <activity
