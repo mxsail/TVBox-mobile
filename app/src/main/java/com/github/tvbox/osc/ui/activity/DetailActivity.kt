@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.net.Uri
@@ -144,6 +145,7 @@ class DetailActivity : BaseActivity() {
     private var autoPlayFromCache = false
     private var downloadEpisodeKey: String? = null
     private var hydratedFromSnapshot = false
+    private var isCurrentlyInPip by mutableStateOf(false)
     private var wasFullscreenBeforePip = false
     private val pendingDownloadTasks = ArrayList<DownloadEpisode>()
 
@@ -282,44 +284,57 @@ class DetailActivity : BaseActivity() {
                 .fillMaxSize()
                 .background(androidx.compose.ui.graphics.Color.Black)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        if (fullWindows) androidx.compose.ui.graphics.Color.Black
-                        else MaterialTheme.colorScheme.background
+            if (isCurrentlyInPip) {
+                // 画中画模式：仅保留纯播放器视口且填满全屏，彻底剔除任何状态栏留白与下部详情布局
+                if (vodPlayerManager != null) {
+                    AndroidView(
+                        factory = {
+                            val p = vodPlayerManager?.playerView?.parent as? ViewGroup
+                            p?.removeView(vodPlayerManager?.playerView)
+                            vodPlayerManager!!.playerView
+                        },
+                        modifier = Modifier.fillMaxSize()
                     )
-            ) {
-                // 顶部播放器：竖屏 16:9，全屏铺满
-                if (showPreview && vodPlayerManager != null) {
-                    Box(
-                        modifier = if (fullWindows) {
-                            Modifier.fillMaxSize()
-                        } else {
-                            Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(16f / 9f)
-                        }
-                    ) {
-                        AndroidView(
-                            factory = {
-                                val p = vodPlayerManager?.playerView?.parent as? ViewGroup
-                                p?.removeView(vodPlayerManager?.playerView)
-                                vodPlayerManager!!.playerView
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
                 }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            if (fullWindows) androidx.compose.ui.graphics.Color.Black
+                            else MaterialTheme.colorScheme.background
+                        )
+                ) {
+                    // 顶部播放器：竖屏 16:9，全屏铺满
+                    if (showPreview && vodPlayerManager != null) {
+                        Box(
+                            modifier = if (fullWindows) {
+                                Modifier.fillMaxSize()
+                            } else {
+                                Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(16f / 9f)
+                            }
+                        ) {
+                            AndroidView(
+                                factory = {
+                                    val p = vodPlayerManager?.playerView?.parent as? ViewGroup
+                                    p?.removeView(vodPlayerManager?.playerView)
+                                    vodPlayerManager!!.playerView
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
 
-                // 竖屏下半部详情选集
-                if (!fullWindows) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    ) {
-                        DetailScreen(
+                    // 竖屏下半部详情选集
+                    if (!fullWindows) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) {
+                            DetailScreen(
                             state = uiState,
                             callbacks = object : DetailScreenCallbacks {
                                 override fun onDetailClick() {
@@ -401,6 +416,7 @@ class DetailActivity : BaseActivity() {
             }
         }
     }
+}
 
     private fun initViewModel() {
         sourceViewModel = ViewModelProvider(this).get(SourceViewModel::class.java)
@@ -761,6 +777,24 @@ class DetailActivity : BaseActivity() {
         }
     }
 
+    private fun calculateVideoContentRect(): Rect? {
+        val renderView = vodPlayerManager?.player?.renderView
+        if (renderView != null && renderView.isShown) {
+            val renderRect = Rect()
+            if (renderView.getGlobalVisibleRect(renderRect) && !renderRect.isEmpty) {
+                return renderRect
+            }
+        }
+        val playerView = vodPlayerManager?.playerView
+        if (playerView != null && playerView.isShown) {
+            val viewRect = Rect()
+            if (playerView.getGlobalVisibleRect(viewRect) && !viewRect.isEmpty) {
+                return viewRect
+            }
+        }
+        return null
+    }
+
     private fun buildPipParams(): PictureInPictureParams? {
         if (!Utils.supportsPiPMode()) return null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -778,12 +812,17 @@ class DetailActivity : BaseActivity() {
                 builder.setAspectRatio(Rational(16, 9))
             }
 
+            val videoRect = calculateVideoContentRect()
+            if (videoRect != null && !videoRect.isEmpty) {
+                builder.setSourceRectHint(videoRect)
+            }
+
             val isPlaying = vodPlayerManager?.player?.isPlaying ?: false
             val actions = ArrayList<RemoteAction>()
-            actions.add(generateRemoteAction(android.R.drawable.ic_media_previous, IntentKey.BROADCAST_ACTION_PREV, "上一集", "Play Previous"))
-            val playIcon = if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+            actions.add(generateRemoteAction(R.drawable.ic_notify_pre, IntentKey.BROADCAST_ACTION_PREV, "上一集", "Play Previous"))
+            val playIcon = if (isPlaying) R.drawable.ic_notify_pause else R.drawable.ic_notify_play
             actions.add(generateRemoteAction(playIcon, IntentKey.BROADCAST_ACTION_PLAYPAUSE, if (isPlaying) "暂停" else "播放", "Play/Pause"))
-            actions.add(generateRemoteAction(android.R.drawable.ic_media_next, IntentKey.BROADCAST_ACTION_NEXT, "下一集", "Play Next"))
+            actions.add(generateRemoteAction(R.drawable.ic_notify_next, IntentKey.BROADCAST_ACTION_NEXT, "下一集", "Play Next"))
             builder.setActions(actions)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -827,10 +866,11 @@ class DetailActivity : BaseActivity() {
     }
 
     private fun prepareForPip() {
+        isCurrentlyInPip = true
         mAllSeriesRightDialog?.dismiss()
         uiState = uiState.copy(showAllEpisodesSheet = false)
         vodPlayerManager?.hideAllDialogSuccess()
-        fullWindows = false
+        vodPlayerManager?.controller?.setInPipMode(true)
     }
 
     override fun onPictureInPictureUiStateChanged(pipState: PictureInPictureUiState) {
@@ -896,9 +936,16 @@ class DetailActivity : BaseActivity() {
     }
 
     private fun handlePipModeChanged(isInPip: Boolean) {
+        this.isCurrentlyInPip = isInPip
         if (isInPip) {
             wasFullscreenBeforePip = fullWindows
-            vodPlayerManager?.controller?.setInPipMode(true)
+            prepareForPip()
+            ImmersionBar.with(this)
+                .hideBar(BarHide.FLAG_HIDE_BAR)
+                .fitsSystemWindows(false)
+                .init()
+            val content = findViewById<android.view.View>(android.R.id.content)
+            content?.setPadding(0, 0, 0, 0)
             registerActionReceiver(true)
         } else {
             vodPlayerManager?.controller?.setInPipMode(false)
