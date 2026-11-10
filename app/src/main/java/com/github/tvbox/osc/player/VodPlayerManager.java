@@ -1,4 +1,8 @@
-package com.github.tvbox.osc.ui.fragment;
+package com.github.tvbox.osc.player;
+
+import android.view.LayoutInflater;
+import androidx.lifecycle.ViewModelStoreOwner;
+import me.jessyan.autosize.internal.CustomAdapt;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
@@ -49,7 +53,6 @@ import com.github.catvod.crawler.Spider;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.api.ApiConfig;
 import com.github.tvbox.osc.base.App;
-import com.github.tvbox.osc.base.BaseLazyFragment;
 import com.github.tvbox.osc.bean.ParseBean;
 import com.github.tvbox.osc.bean.SourceBean;
 import com.github.tvbox.osc.bean.Subtitle;
@@ -124,7 +127,23 @@ import xyz.doikki.videoplayer.player.AbstractPlayer;
 import xyz.doikki.videoplayer.player.ProgressManager;
 import xyz.doikki.videoplayer.player.VideoView;
 
-public class PlayFragment extends BaseLazyFragment {
+public class VodPlayerManager implements CustomAdapt {
+    public interface Callback {
+        void onPlaybackStarted();
+        void updatePipParams();
+        void chooseSeriesDialog();
+        void toggleFullPreview();
+        void showCastDialog();
+        void enterPip();
+        void showParseRoot(boolean show, ParseAdapter adapter);
+    }
+
+    private Activity mActivity;
+    private Context mContext;
+    private Callback mCallback;
+    private ViewGroup mPlayerView;
+    private volatile boolean mDestroyed = false;
+
     private MyVideoView mVideoView;
     private TextView mPlayLoadTip;
     private ImageView mPlayLoadErr;
@@ -132,6 +151,24 @@ public class PlayFragment extends BaseLazyFragment {
     private VodController mController;
     private SourceViewModel sourceViewModel;
     private Handler mHandler;
+
+    public boolean isDestroyed() {
+        return mDestroyed || mActivity == null || mActivity.isFinishing() || mActivity.isDestroyed();
+    }
+
+    public ViewGroup getPlayerView() {
+        return mPlayerView;
+    }
+
+    @Override
+    public boolean isBaseOnWidth() {
+        return true;
+    }
+
+    @Override
+    public float getSizeInDp() {
+        return 0;
+    }
 
     private final long videoDuration = -1;
     /**
@@ -152,10 +189,7 @@ public class PlayFragment extends BaseLazyFragment {
      * 换集后重新允许自动切换(旧的全局布尔导致首集切换过后续集永不切换)
      */
     String retriedSwitchPlayerKey = "";
-    @Override
-    protected int getLayoutResID() {
-        return R.layout.activity_play;
-    }
+
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void refresh(RefreshEvent event) {
@@ -166,8 +200,10 @@ public class PlayFragment extends BaseLazyFragment {
         }
     }
 
-    @Override
-    protected void init() {
+    public void init(Activity activity, Callback callback) {
+        this.mActivity = activity;
+        this.mContext = activity;
+        this.mCallback = callback;
         initView();
         initViewModel();
         initData();
@@ -224,15 +260,13 @@ public class PlayFragment extends BaseLazyFragment {
                 return false;
             }
         });
-        mVideoView = findViewById(R.id.mVideoView);
-        // 预览小窗强制 TextureView 渲染: SurfaceView 尺寸变化/全屏切换会销毁重建 surface,
-        // 解码器可能失联(MediaCodec -19 dec surface not connected)→ 有声无画持续加载。
-        // TextureView 是普通 View, 生命周期平滑; 预览小窗体积下性能无差。
+        mPlayerView = (ViewGroup) LayoutInflater.from(mActivity).inflate(R.layout.activity_play, null, false);
+        mVideoView = mPlayerView.findViewById(R.id.mVideoView);
         mVideoView.setRenderViewFactory(xyz.doikki.videoplayer.render.TextureRenderViewFactory.create());
-        mPlayLoadTip = findViewById(R.id.play_load_tip);
-        mPlayLoading = findViewById(R.id.play_loading);
-        mPlayLoadErr = findViewById(R.id.play_load_error);
-        mController = new VodController(requireContext());
+        mPlayLoadTip = mPlayerView.findViewById(R.id.play_load_tip);
+        mPlayLoading = mPlayerView.findViewById(R.id.play_loading);
+        mPlayLoadErr = mPlayerView.findViewById(R.id.play_load_error);
+        mController = new VodController(mActivity);
         mController.showParse(false);
         mController.setCanChangePosition(true);
         mController.setEnableInNormal(true);
@@ -248,22 +282,20 @@ public class PlayFragment extends BaseLazyFragment {
 
             @Override
             public long getSavedProgress(String url) {
-                return PlayFragment.this.getSavedProgress(url);
+                return VodPlayerManager.this.getSavedProgress(url);
             }
         };
         mVideoView.setProgressManager(progressManager);
         mController.setListener(new VodController.VodControlListener() {
-            final DetailActivity activity = (DetailActivity) mActivity;
             @Override
             public void chooseSeries() {
-                //activity中已处理
-                activity.showAllSeriesDialog();
+                if (mCallback != null) mCallback.chooseSeriesDialog();
             }
 
             @Override
             public void playNext(boolean rmProgress) {
                 String preProgressKey = progressKey;
-                PlayFragment.this.playNext(rmProgress);
+                VodPlayerManager.this.playNext(rmProgress);
                 if (rmProgress && preProgressKey != null) {
                     String pKey = MD5.string2MD5(preProgressKey);
                     CacheManager.delete(pKey, 0);
@@ -273,7 +305,7 @@ public class PlayFragment extends BaseLazyFragment {
 
             @Override
             public void playPre() {
-                PlayFragment.this.playPrevious();
+                VodPlayerManager.this.playPrevious();
             }
 
             @Override
@@ -320,24 +352,27 @@ public class PlayFragment extends BaseLazyFragment {
 
             @Override
             public void toggleFullScreen() {
-                activity.toggleFullPreview();
+                if (mCallback != null) mCallback.toggleFullPreview();
             }
 
             @Override
             public void exit() {
-                // 走 dispatcher(等价旧 activity.onBackPressed(), 兼容预见性返回链路)
-                ((com.github.tvbox.osc.base.BaseActivity) activity).getOnBackPressedDispatcher().onBackPressed();
+                if (mActivity instanceof com.github.tvbox.osc.base.BaseActivity) {
+                    ((com.github.tvbox.osc.base.BaseActivity) mActivity).getOnBackPressedDispatcher().onBackPressed();
+                } else if (mActivity != null) {
+                    mActivity.onBackPressed();
+                }
             }
 
             @Override
             public void cast() {
-                activity.showCastDialog();
+                if (mCallback != null) mCallback.showCastDialog();
             }
 
             @Override
             public void onHideBottom() {
-                if (mFullWindows){
-                    ImmersionBar.with(activity)
+                if (mFullWindows && mActivity != null) {
+                    ImmersionBar.with(mActivity)
                             .hideBar(BarHide.FLAG_HIDE_BAR)
                             .init();
                 }
@@ -345,30 +380,30 @@ public class PlayFragment extends BaseLazyFragment {
 
             @Override
             public void showSetting() {
-                if (mFullWindows){
-                    mPlayingControlRightDialog = new XPopup.Builder(activity).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
-                            .isViewMode(true)//改为view模式无法自动响应返回键操作,onBackPress时手动dismiss
+                if (mActivity == null) return;
+                if (mFullWindows) {
+                    mPlayingControlRightDialog = new XPopup.Builder(mActivity).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
+                            .isViewMode(true)
                             .popupHeight(ScreenUtils.getScreenHeight())
                             .popupPosition(PopupPosition.Right)
-                            .asCustom(new PlayingControlRightDialog(activity,mController,mVideoView));
+                            .asCustom(new PlayingControlRightDialog(mActivity, mController, mVideoView));
                     mPlayingControlRightDialog.show();
-                }else {
-                    mPlayingControlDialog = new XPopup.Builder(activity).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
+                } else {
+                    mPlayingControlDialog = new XPopup.Builder(mActivity).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                             .isViewMode(true)
-                            .asCustom(new PlayingControlDialog(activity,mController,mVideoView));
+                            .asCustom(new PlayingControlDialog(mActivity, mController, mVideoView));
                     mPlayingControlDialog.show();
                 }
             }
 
             @Override
             public void pip() {
-                activity.enterPip();
+                if (mCallback != null) mCallback.enterPip();
             }
 
             @Override
             public void showParseRoot(boolean show, ParseAdapter adapter) {
-                DetailActivity activity = (DetailActivity)mActivity;
-                activity.showParseRoot(show,adapter);
+                if (mCallback != null) mCallback.showParseRoot(show, adapter);
             }
         });
         mVideoView.setVideoController(mController);
@@ -376,21 +411,12 @@ public class PlayFragment extends BaseLazyFragment {
         mVideoView.addOnStateChangeListener(new VideoView.SimpleOnStateChangeListener() {
             @Override
             public void onPlayStateChanged(int playState) {
-                // 返回退出后 onDestroyView 已置空 mVideoView, ExoPlayer 已排队的事件仍会
-                // 经 controller 派发到这里(mActivity 引用还在), 直接 NPE
-                if (mVideoView == null || !isAdded()) return;
-                if (mActivity instanceof DetailActivity) {
-                    if (playState == VideoView.STATE_PLAYING) {
-                        // 真正出画面/出声时强制清掉残留的加载提示
-                        // (起播链路的 hideTip 若被后续 setTip 覆盖, 声音已响而 UI 停在"加载")
-                        hideTip();
-                        ((DetailActivity) mActivity).onPlaybackStarted();
-                    } else {
-                        ((DetailActivity) mActivity).updatePipParams();
-                    }
-                    // 预览窗固定 16:9(宽=屏宽), 不随视频比例动态调整:
-                    // 主流播放应用的标准做法(YT/B站/长视频 App), 非 16:9 内容在容器内
-                    // 等比 letterbox; 动态 resize 对 SurfaceView 有撕 surface 风险
+                if (mVideoView == null || isDestroyed()) return;
+                if (playState == VideoView.STATE_PLAYING) {
+                    hideTip();
+                    if (mCallback != null) mCallback.onPlaybackStarted();
+                } else {
+                    if (mCallback != null) mCallback.updatePipParams();
                 }
             }
         });
@@ -451,7 +477,7 @@ public class PlayFragment extends BaseLazyFragment {
     }
 
     void selectMySubtitle() throws Exception {
-        SubtitleDialog subtitleDialog = new SubtitleDialog(getActivity());
+        SubtitleDialog subtitleDialog = new SubtitleDialog(mActivity);
         subtitleDialog.setSubtitleViewListener(new SubtitleDialog.SubtitleViewListener() {
             @Override
             public void setTextSize(int size) {
@@ -481,12 +507,12 @@ public class PlayFragment extends BaseLazyFragment {
         subtitleDialog.setSearchSubtitleListener(new SubtitleDialog.SearchSubtitleListener() {
             @Override
             public void openSearchSubtitleDialog() {
-                SearchSubtitleDialog searchSubtitleDialog = new SearchSubtitleDialog(getActivity());
+                SearchSubtitleDialog searchSubtitleDialog = new SearchSubtitleDialog(mActivity);
                 searchSubtitleDialog.setSubtitleLoader(new SearchSubtitleDialog.SubtitleLoader() {
                     @Override
                     public void loadSubtitle(Subtitle subtitle) {
-                        if (!isAdded()) return;
-                        requireActivity().runOnUiThread(new Runnable() {
+                        if (isDestroyed()) return;
+                        mActivity.runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
                                 String zimuUrl = subtitle.getUrl();
@@ -508,7 +534,7 @@ public class PlayFragment extends BaseLazyFragment {
         subtitleDialog.setLocalFileChooserListener(new SubtitleDialog.LocalFileChooserListener() {
             @Override
             public void openLocalFileChooserDialog() {
-                new ChooserDialog(getActivity(),R.style.FileChooser)
+                new ChooserDialog(mActivity,R.style.FileChooser)
                         .withFilter(false, false, "srt", "ass", "scc", "stl", "ttml")
                         .withStartFile("/storage/emulated/0/Download")
                         .withChosenListener(new ChooserDialog.Result() {
@@ -528,9 +554,9 @@ public class PlayFragment extends BaseLazyFragment {
     @SuppressLint("UseCompatLoadingForColorStateLists")
     void setSubtitleViewTextStyle(int style) {
         if (style == 0) {
-            mController.mSubtitleView.setTextColor(getContext().getResources().getColorStateList(R.color.color_FFFFFF));
+            mController.mSubtitleView.setTextColor(mContext.getResources().getColorStateList(R.color.color_FFFFFF));
         } else if (style == 1) {
-            mController.mSubtitleView.setTextColor(getContext().getResources().getColorStateList(R.color.color_FFB6C1));
+            mController.mSubtitleView.setTextColor(mContext.getResources().getColorStateList(R.color.color_FFB6C1));
         }
     }
 
@@ -551,7 +577,7 @@ public class PlayFragment extends BaseLazyFragment {
         }
         List<TrackInfoBean> bean = trackInfo.getAudio();
         if (bean.size() < 1) return;
-        SelectDialog<TrackInfoBean> dialog = new SelectDialog<>(getActivity());
+        SelectDialog<TrackInfoBean> dialog = new SelectDialog<>(mActivity);
         dialog.setTip("切换音轨");
         dialog.setAdapter(new SelectDialogAdapter.SelectDialogInterface<TrackInfoBean>() {
             @Override
@@ -680,9 +706,9 @@ public class PlayFragment extends BaseLazyFragment {
     }
 
     void setTip(String msg, boolean loading, boolean err) {
-        if (!isAdded()) return;
+        if (isDestroyed()) return;
         //影魔
-        requireActivity().runOnUiThread(() -> {
+        mActivity.runOnUiThread(() -> {
             mPlayLoadTip.setText(msg);
             mPlayLoadTip.setVisibility(View.VISIBLE);
             mPlayLoading.setVisibility(loading ? View.VISIBLE : View.GONE);
@@ -720,7 +746,7 @@ public class PlayFragment extends BaseLazyFragment {
 
     /** 错误页重试入口: 重新走一遍当前集的完整播放链路(重解析/重嗅探) */
     private void retryCurrentPlay() {
-        if (!isAdded() || mVodInfo == null) return;
+        if (isDestroyed() || mVodInfo == null) return;
         play(false);
     }
 
@@ -731,8 +757,8 @@ public class PlayFragment extends BaseLazyFragment {
     }
 
     void errorWithRetry(String err, boolean finish) {
-        if (!autoRetry() && isAdded()) {
-            requireActivity().runOnUiThread(new Runnable() {
+        if (!autoRetry() && !isDestroyed()) {
+            mActivity.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     if (finish) {
@@ -887,7 +913,7 @@ public class PlayFragment extends BaseLazyFragment {
                                 startPlayUrl(url, headers);
                             else {
                                 startPlayUrl("http://127.0.0.1:" + RemoteServer.serverPort + "/m3u8", headers);
-                                //Toast.makeText(getContext(), "已移除视频广告", Toast.LENGTH_SHORT).show();
+                                //Toast.makeText(mContext, "已移除视频广告", Toast.LENGTH_SHORT).show();
                             }
                             return;
                         }
@@ -906,7 +932,7 @@ public class PlayFragment extends BaseLazyFragment {
                                             startPlayUrl(finalforwardurl, headers);
                                         else {
                                             startPlayUrl("http://127.0.0.1:" + RemoteServer.serverPort + "/m3u8", headers);
-                                            //Toast.makeText(getContext(), "已移除视频广告", Toast.LENGTH_SHORT).show();
+                                            //Toast.makeText(mContext, "已移除视频广告", Toast.LENGTH_SHORT).show();
                                         }
                                     }
 
@@ -941,8 +967,8 @@ public class PlayFragment extends BaseLazyFragment {
         // 旧实现重试时把 m3u8 地址拼到硬编码第三方去 BOM 服务(home.jundie.top:666):
         // 域名不可达则重试必败, 还把播放地址泄露给第三方, 移除后直接重试原始地址
         String finalUrl = url;
-        if (mActivity == null || !isAdded()) return;
-        requireActivity().runOnUiThread(() -> {
+        if (mActivity == null || isDestroyed()) return;
+        mActivity.runOnUiThread(() -> {
             stopParse();
             if (mVideoView != null) {
                 mVideoView.release();
@@ -956,7 +982,7 @@ public class PlayFragment extends BaseLazyFragment {
                             setTip("调用外部播放器" + PlayerHelper.getPlayerName(playerType) + "进行播放", true, false);
                             boolean callResult = false;
                             long progress = getSavedProgress(progressKey);
-                            callResult = PlayerHelper.runExternalPlayer(playerType, requireActivity(), finalUrl, playTitle, playSubtitle, headers, progress);
+                            callResult = PlayerHelper.runExternalPlayer(playerType, mActivity, finalUrl, playTitle, playSubtitle, headers, progress);
                             setTip("调用外部播放器" + PlayerHelper.getPlayerName(playerType) + (callResult ? "成功" : "失败"), callResult, !callResult);
                             return;
                         }
@@ -981,7 +1007,7 @@ public class PlayFragment extends BaseLazyFragment {
     private void initSubtitleView() {
         // 返回退出时 onDestroyView 已 release 并置空 mVideoView, ExoPlayer 已排队的
         // PREPARED 事件仍会经 controller 派发到这里, 空引用直接 NPE
-        if (mVideoView == null || mVideoView.getMediaPlayer() == null || !isAdded()) return;
+        if (mVideoView == null || mVideoView.getMediaPlayer() == null || isDestroyed()) return;
         TrackInfo trackInfo = null;
         if (mVideoView.getMediaPlayer() instanceof IjkMediaPlayer) {
             trackInfo = ((IjkMediaPlayer) (mVideoView.getMediaPlayer())).getTrackInfo();
@@ -1065,7 +1091,7 @@ public class PlayFragment extends BaseLazyFragment {
     }
 
     private void initViewModel() {
-        sourceViewModel = new ViewModelProvider(this).get(SourceViewModel.class);
+        sourceViewModel = new ViewModelProvider((ViewModelStoreOwner) mActivity).get(SourceViewModel.class);
         sourceViewModel.playResult.observeForever(mObserverPlayResult);
     }
 
@@ -1185,10 +1211,8 @@ public class PlayFragment extends BaseLazyFragment {
      *  用户主动暂停不置位, 回前台保持暂停不被强制续播 */
     private boolean mPausedByLifecycle = false;
 
-    @Override
     public void onPause() {
-        super.onPause();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && getActivity() != null && getActivity().isInPictureInPictureMode()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && mActivity != null && mActivity.isInPictureInPictureMode()) {
             return;
         }
         int bgPlayType = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0);
@@ -1202,9 +1226,7 @@ public class PlayFragment extends BaseLazyFragment {
         }
     }
 
-    @Override
     public void onResume() {
-        super.onResume();
         // 只恢复"因切后台/被遮挡而暂停"的播放; 用户手动暂停的回来保持暂停
         if (mVideoView != null && mPausedByLifecycle) {
             mPausedByLifecycle = false;
@@ -1212,7 +1234,6 @@ public class PlayFragment extends BaseLazyFragment {
         }
     }
 
-    @Override
     public void onHiddenChanged(boolean hidden) {
         if (hidden) {
             if (mVideoView != null) {
@@ -1227,7 +1248,7 @@ public class PlayFragment extends BaseLazyFragment {
                 mVideoView.resume();
             }
         }
-        super.onHiddenChanged(hidden);
+        
     }
 
     /** 网络恢复监听: 错误态/卡加载态时自动重试当前集, 断网期间用户无需手动点重试 */
@@ -1235,15 +1256,15 @@ public class PlayFragment extends BaseLazyFragment {
 
     private void registerNetworkCallback() {
         try {
-            if (mNetworkCallback != null || getActivity() == null) return;
-            ConnectivityManager cm = (ConnectivityManager) requireActivity().getApplicationContext()
+            if (mNetworkCallback != null || mActivity == null) return;
+            ConnectivityManager cm = (ConnectivityManager) mActivity.getApplicationContext()
                     .getSystemService(Context.CONNECTIVITY_SERVICE);
             if (cm == null) return;
             mNetworkCallback = new ConnectivityManager.NetworkCallback() {
                 @Override
                 public void onAvailable(@NonNull Network network) {
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(PlayFragment.this::onNetworkRestored);
+                    if (mActivity != null) {
+                        mActivity.runOnUiThread(VodPlayerManager.this::onNetworkRestored);
                     }
                 }
             };
@@ -1256,8 +1277,8 @@ public class PlayFragment extends BaseLazyFragment {
 
     private void unregisterNetworkCallback() {
         try {
-            if (mNetworkCallback != null && getActivity() != null) {
-                ConnectivityManager cm = (ConnectivityManager) getActivity().getApplicationContext()
+            if (mNetworkCallback != null && mActivity != null) {
+                ConnectivityManager cm = (ConnectivityManager) mActivity.getApplicationContext()
                         .getSystemService(Context.CONNECTIVITY_SERVICE);
                 if (cm != null) cm.unregisterNetworkCallback(mNetworkCallback);
             }
@@ -1268,7 +1289,7 @@ public class PlayFragment extends BaseLazyFragment {
 
     /** 网络恢复: 明确错误态或错误 tip 还挂着(卡加载)时重试; 手动暂停态不受打扰 */
     private void onNetworkRestored() {
-        if (mVideoView == null || !isAdded() || mVodInfo == null) return;
+        if (mVideoView == null || isDestroyed() || mVodInfo == null) return;
         int st = mVideoView.getCurrentPlayState();
         boolean stuckOnError = st == VideoView.STATE_ERROR
                 || (st == VideoView.STATE_IDLE && mPlayLoadTip.getVisibility() == View.VISIBLE);
@@ -1277,11 +1298,11 @@ public class PlayFragment extends BaseLazyFragment {
         }
     }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        //手动注销
-        sourceViewModel.playResult.removeObserver(mObserverPlayResult);
+    public void onDestroy() {
+        mDestroyed = true;
+        if (sourceViewModel != null) {
+            sourceViewModel.playResult.removeObserver(mObserverPlayResult);
+        }
 
         EventBus.getDefault().unregister(this);
         unregisterNetworkCallback();
@@ -1307,7 +1328,7 @@ public class PlayFragment extends BaseLazyFragment {
             hasNext = mVodInfo.playIndex + 1 < mVodInfo.seriesMap.get(mVodInfo.playFlag).size();
         }
         if (!hasNext) {
-            Toast.makeText(requireContext(), "已经是最后一集了!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(mActivity, "已经是最后一集了!", Toast.LENGTH_SHORT).show();
             return;
         } else {
             mVodInfo.playIndex++;
@@ -1324,7 +1345,7 @@ public class PlayFragment extends BaseLazyFragment {
             hasPre = mVodInfo.playIndex - 1 >= 0;
         }
         if (!hasPre) {
-            Toast.makeText(requireContext(), "已经是第一集了!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(mActivity, "已经是第一集了!", Toast.LENGTH_SHORT).show();
             return;
         }
         mVodInfo.playIndex--;
@@ -1401,7 +1422,7 @@ public class PlayFragment extends BaseLazyFragment {
         }
         if (isUnsupportedMediaUrl(vs.url)) {//磁力/迅雷/ed2k/ftp 直链(迅雷 SDK 已移除)
             hideTip();
-            Toast.makeText(requireContext(), "该链接需要磁力/迅雷播放,当前版本不支持", Toast.LENGTH_SHORT).show();
+            Toast.makeText(mActivity, "该链接需要磁力/迅雷播放,当前版本不支持", Toast.LENGTH_SHORT).show();
             return;
         }
         sourceViewModel.getPlay(sourceKey, mVodInfo.playFlag, progressKey, vs.url, subtitleCacheKey);
@@ -1439,10 +1460,10 @@ public class PlayFragment extends BaseLazyFragment {
      * 播放本地缓存文件(file://),进度仍记录在原progressKey下
      */
     private void startLocalUrl(String path) {
-        if (mActivity == null || !isAdded()) return;
+        if (mActivity == null || isDestroyed()) return;
         final String url = "file://" + path;
         mCurrentUrl = url;
-        requireActivity().runOnUiThread(() -> {
+        mActivity.runOnUiThread(() -> {
             stopParse();
             if (mVideoView != null) {
                 hideTip();
@@ -1710,8 +1731,8 @@ public class PlayFragment extends BaseLazyFragment {
                             if (rs.has("ua")) {
                                 webUserAgent = rs.optString("ua").trim();
                             }
-                            if (!isAdded()) return;
-                            requireActivity().runOnUiThread(new Runnable() {
+                            if (isDestroyed()) return;
+                            mActivity.runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
                                     // 本次播放已有嗅探命中并起播: 迟到的解析结果直接丢弃,
@@ -1778,8 +1799,8 @@ public class PlayFragment extends BaseLazyFragment {
     }
 
     void loadUrl(String url) {
-        if (!isAdded()) return;
-        requireActivity().runOnUiThread(() -> {
+        if (isDestroyed()) return;
+        mActivity.runOnUiThread(() -> {
             if (mSysWebView != null) {
                 mSysWebView.stopLoading();
                 if (webUserAgent != null) {
@@ -1796,8 +1817,8 @@ public class PlayFragment extends BaseLazyFragment {
     }
 
     void stopLoadWebView(boolean destroy) {
-        if (mActivity == null || !isAdded()) return;
-        requireActivity().runOnUiThread(() -> {
+        if (mActivity == null || isDestroyed()) return;
+        mActivity.runOnUiThread(() -> {
 
             if (mSysWebView != null) {
                 mSysWebView.stopLoading();
@@ -1889,8 +1910,8 @@ public class PlayFragment extends BaseLazyFragment {
     private class SniffBridge {
         @JavascriptInterface
         public void onVideoDetected(String detectedUrl) {
-            if (TextUtils.isEmpty(detectedUrl) || mActivity == null || !isAdded()) return;
-            requireActivity().runOnUiThread(() -> {
+            if (TextUtils.isEmpty(detectedUrl) || mActivity == null || isDestroyed()) return;
+            mActivity.runOnUiThread(() -> {
                 if (loadFoundCount.get() == 0 && checkVideoFormat(detectedUrl)) {
                     LOG.i("SniffBridge detected video: " + detectedUrl);
                     loadFoundVideoUrls.add(detectedUrl);
@@ -1919,7 +1940,7 @@ public class PlayFragment extends BaseLazyFragment {
         public void setOverScrollMode(int mode) {
             super.setOverScrollMode(mode);
             if (mContext instanceof Activity)
-                AutoSize.autoConvertDensityOfCustomAdapt((Activity) mContext, PlayFragment.this);
+                AutoSize.autoConvertDensityOfCustomAdapt((Activity) mContext, VodPlayerManager.this);
         }
 
         @Override
@@ -1940,7 +1961,7 @@ public class PlayFragment extends BaseLazyFragment {
         webView.setFocusableInTouchMode(false);
         webView.clearFocus();
         webView.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
-        requireActivity().addContentView(webView, layoutParams);
+        mActivity.addContentView(webView, layoutParams);
         /* 添加webView配置 */
         final WebSettings settings = webView.getSettings();
         settings.setNeedInitialFocus(false);

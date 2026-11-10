@@ -73,7 +73,7 @@ import com.github.tvbox.osc.ui.dialog.CacheSelectDialog;
 import com.github.tvbox.osc.ui.dialog.CastListDialog;
 import com.github.tvbox.osc.ui.dialog.QuickSearchDialog;
 import com.github.tvbox.osc.ui.dialog.VideoDetailDialog;
-import com.github.tvbox.osc.ui.fragment.PlayFragment;
+import com.github.tvbox.osc.player.VodPlayerManager;
 import com.github.tvbox.osc.ui.widget.LinearSpacingItemDecoration;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
@@ -121,7 +121,7 @@ import java.util.concurrent.Executors;
  */
 
 public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
-    private PlayFragment playFragment = null;
+    private VodPlayerManager vodPlayerManager = null;
     private SourceViewModel sourceViewModel;
     private Movie.Video mVideo;
     private VodInfo vodInfo;
@@ -178,10 +178,10 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     @Override
     protected void onResume() {
         super.onResume();
-        if (playFragment != null && playFragment.getController() != null
+        if (vodPlayerManager != null && vodPlayerManager.getController() != null
                 && !(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode())) {
             // 确实不在画中画才清标记, 避免与进入回调顺序耦合导致 InPipMode 被误翻
-            playFragment.getController().setInPipMode(false);
+            vodPlayerManager.getController().setInPipMode(false);
         }
         updatePipParams();
     }
@@ -203,9 +203,44 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         isReverse = false;
         preFlag = "";
         if (showPreview) {
-            playFragment = new PlayFragment();
-            getSupportFragmentManager().beginTransaction().add(R.id.previewPlayer, playFragment).commit();
-            getSupportFragmentManager().beginTransaction().show(playFragment).commitAllowingStateLoss();
+            vodPlayerManager = new VodPlayerManager();
+            vodPlayerManager.init(this, new VodPlayerManager.Callback() {
+                @Override
+                public void onPlaybackStarted() {
+                    DetailActivity.this.onPlaybackStarted();
+                }
+
+                @Override
+                public void updatePipParams() {
+                    DetailActivity.this.updatePipParams();
+                }
+
+                @Override
+                public void chooseSeriesDialog() {
+                    showAllSeriesDialog();
+                }
+
+                @Override
+                public void toggleFullPreview() {
+                    DetailActivity.this.toggleFullPreview();
+                }
+
+                @Override
+                public void showCastDialog() {
+                    DetailActivity.this.showCastDialog();
+                }
+
+                @Override
+                public void enterPip() {
+                    DetailActivity.this.enterPip();
+                }
+
+                @Override
+                public void showParseRoot(boolean show, com.github.tvbox.osc.ui.adapter.ParseAdapter adapter) {
+                    DetailActivity.this.showParseRoot(show, adapter);
+                }
+            });
+            mBinding.previewPlayer.addView(vodPlayerManager.getPlayerView(), new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
 
         composeBridge = new DetailComposeBridge(mBinding.composeDetail, new DetailComposeBridge.Callbacks() {
@@ -312,11 +347,11 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     @Override
     protected void onUserLeaveHint() {
         super.onUserLeaveHint();
-        if (playFragment == null || playFragment.getPlayer() == null) {
+        if (vodPlayerManager == null || vodPlayerManager.getPlayer() == null) {
             return;
         }
         int bgType = Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0);
-        boolean isPlaying = playFragment.getPlayer().isPlaying();
+        boolean isPlaying = vodPlayerManager.getPlayer().isPlaying();
         if (bgType == 2 && isPlaying) {
             prepareForPip();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !isInPictureInPictureMode()) {
@@ -349,7 +384,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         new XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                 .maxWidth(ConvertUtils.dp2px(360))
                 .asCustom(new CastListDialog(this, new CastVideo(vodSeries.name
-                        , TextUtils.isEmpty(playFragment.getFinalUrl()) ? vodSeries.url : playFragment.getFinalUrl())))
+                        , TextUtils.isEmpty(vodPlayerManager.getFinalUrl()) ? vodSeries.url : vodPlayerManager.getFinalUrl())))
                 .show();
     }
 
@@ -467,7 +502,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
 //                    bundle.putSerializable("VodInfo", previewVodInfo);
                 App.getInstance().setVodInfo(previewVodInfo);
             }
-            playFragment.setData(bundle);
+            vodPlayerManager.setData(bundle);
         }
     }
 
@@ -671,7 +706,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     private void jumpWhenPlayerReady() {
         // autoJumpDone: 已起播过; jumpPending: post 在途——防快照/网络两条路径各入队一个跳转
         if (autoJumpDone || jumpPending) return;
-        if (playFragment != null && playFragment.getView() != null) {
+        if (vodPlayerManager != null && vodPlayerManager.getPlayerView() != null) {
             doPreviewJump();
         } else if (mBinding != null) {
             jumpPending = true;
@@ -994,7 +1029,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         if (composeBridge != null) {
             composeBridge.dismissAllEpisodesDialog();
         }
-        if (playFragment != null && playFragment.hideAllDialogSuccess()) {//fragment有弹窗隐藏并拦截返回
+        if (vodPlayerManager != null && vodPlayerManager.hideAllDialogSuccess()) {//fragment有弹窗隐藏并拦截返回
             return;
         }
         if (fullWindows) {
@@ -1006,7 +1041,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (event != null && playFragment != null) {
+        if (event != null && vodPlayerManager != null) {
             // 媒体键(蓝牙耳机/键盘)任何布局形态都转发给播放器;
             // 方向键/OK 仅全屏转发, 竖屏预览下保留详情页自身的焦点导航
             int keyCode = event.getKeyCode();
@@ -1014,7 +1049,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                     || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE
                     || keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS
                     || keyCode == KeyEvent.KEYCODE_MEDIA_STOP;
-            if ((fullWindows || mediaKey) && playFragment.dispatchKeyEvent(event)) {
+            if ((fullWindows || mediaKey) && vodPlayerManager.dispatchKeyEvent(event)) {
                 return true;
             }
         }
@@ -1040,7 +1075,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         fullWindows = !fullWindows;
 
         //交由fragment处理播放器全屏逻辑
-        playFragment.changedLandscape(fullWindows);
+        vodPlayerManager.changedLandscape(fullWindows);
         //activity处理预览尺寸(全屏/非全屏预览)
         mBinding.previewPlayer.setLayoutParams(fullWindows ? windowsFull : windowsPreview);
         if (!fullWindows) {
@@ -1102,7 +1137,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
      * 已有集播放过→直接入队;否则先暂存,等 PlayFragment 首帧回调后自动入队。
      */
     public void queueDownloadAfterPlay(List<DownloadEpisode> tasks) {
-        if (playbackStarted || playFragment == null) {
+        if (playbackStarted || vodPlayerManager == null) {
             DownloadTaskManager.get().enqueue(tasks);
             // 立即刷新选集"已下载"角标与弹窗可选态, 否则重开弹窗仍显示未下载
             refreshCachedBadge();
@@ -1112,7 +1147,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         pendingDownloadTasks.addAll(tasks);
         ToastUtils.showShort(String.format("开始播放后将自动开始下载(%d集)", tasks.size()));
         // 播放器空闲/出错(没有在加载)时主动起播当前集;正在加载则等它自己起播
-        if (playFragment.isPlayerIdleOrError()) {
+        if (vodPlayerManager.isPlayerIdleOrError()) {
             jumpToPlay();
         }
     }
@@ -1155,7 +1190,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     public void use1DMDownload() {
         if (vodInfo != null && vodInfo.seriesMap.get(vodInfo.playFlag).size() > 0) {
             VodInfo.VodSeries vod = vodInfo.seriesMap.get(vodInfo.playFlag).get(vodInfo.playIndex);
-            String url = TextUtils.isEmpty(playFragment.getFinalUrl()) ? vod.url : playFragment.getFinalUrl();
+            String url = TextUtils.isEmpty(vodPlayerManager.getFinalUrl()) ? vod.url : vodPlayerManager.getFinalUrl();
             // 创建Intent对象，启动1DM App
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
             intent.setDataAndType(Uri.parse(url), "video/mp4");
@@ -1196,8 +1231,8 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
      * 计算视频画面在当前屏幕中的实际显示区域（去除播放器容器上下或左右的黑边）
      */
     private Rect calculateVideoContentRect() {
-        if (playFragment != null && playFragment.getPlayer() != null) {
-            View renderView = playFragment.getPlayer().getRenderView();
+        if (vodPlayerManager != null && vodPlayerManager.getPlayer() != null) {
+            View renderView = vodPlayerManager.getPlayer().getRenderView();
             if (renderView != null && renderView.isShown()) {
                 Rect renderRect = new Rect();
                 if (renderView.getGlobalVisibleRect(renderRect) && !renderRect.isEmpty()) {
@@ -1221,8 +1256,8 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
             int vWidth = 0;
             int vHeight = 0;
-            if (playFragment != null && playFragment.getPlayer() != null) {
-                int[] size = playFragment.getPlayer().getVideoSize();
+            if (vodPlayerManager != null && vodPlayerManager.getPlayer() != null) {
+                int[] size = vodPlayerManager.getPlayer().getVideoSize();
                 if (size != null && size.length >= 2) {
                     vWidth = size[0];
                     vHeight = size[1];
@@ -1250,7 +1285,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
 
             List<RemoteAction> actions = new ArrayList<>();
             actions.add(generateRemoteAction(android.R.drawable.ic_media_previous, IntentKey.BROADCAST_ACTION_PREV, "上一集", "Play Previous"));
-            boolean isPlaying = playFragment != null && playFragment.getPlayer() != null && playFragment.getPlayer().isPlaying();
+            boolean isPlaying = vodPlayerManager != null && vodPlayerManager.getPlayer() != null && vodPlayerManager.getPlayer().isPlaying();
             int playIcon = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
             actions.add(generateRemoteAction(playIcon, IntentKey.BROADCAST_ACTION_PLAYPAUSE, isPlaying ? "暂停" : "播放", "Play/Pause"));
             actions.add(generateRemoteAction(android.R.drawable.ic_media_next, IntentKey.BROADCAST_ACTION_NEXT, "下一集", "Play Next"));
@@ -1301,9 +1336,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     }
 
     private void prepareForPip() {
-        if (playFragment != null) {
-            playFragment.hideAllDialogSuccess();
-            VodController controller = playFragment.getController();
+        if (vodPlayerManager != null) {
+            vodPlayerManager.hideAllDialogSuccess();
+            VodController controller = vodPlayerManager.getController();
             if (controller != null) {
                 controller.setInPipMode(true);
             }
@@ -1348,22 +1383,22 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
 
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    if (intent == null || !IntentKey.BROADCAST_ACTION.equals(intent.getAction()) || playFragment == null || playFragment.getController() == null) {
+                    if (intent == null || !IntentKey.BROADCAST_ACTION.equals(intent.getAction()) || vodPlayerManager == null || vodPlayerManager.getController() == null) {
                         return;
                     }
 
                     int currentStatus = intent.getIntExtra("action", 1);
                     if (currentStatus == IntentKey.BROADCAST_ACTION_PREV) {
-                        playFragment.playPrevious();
+                        vodPlayerManager.playPrevious();
                     } else if (currentStatus == IntentKey.BROADCAST_ACTION_PLAYPAUSE) {
-                        playFragment.getController().togglePlay();
+                        vodPlayerManager.getController().togglePlay();
                         updatePipParams();
                     } else if (currentStatus == IntentKey.BROADCAST_ACTION_NEXT) {
-                        playFragment.playNext(false);
+                        vodPlayerManager.playNext(false);
                     } else if (currentStatus == IntentKey.BROADCAST_ACTION_SEEK) {
                         // 通知栏媒体卡片拖动进度条
-                        if (playFragment.getPlayer() != null) {
-                            playFragment.getPlayer().seekTo(intent.getLongExtra(IntentKey.BROADCAST_ACTION_POSITION, 0));
+                        if (vodPlayerManager.getPlayer() != null) {
+                            vodPlayerManager.getPlayer().seekTo(intent.getLongExtra(IntentKey.BROADCAST_ACTION_POSITION, 0));
                         }
                     } else if (currentStatus == IntentKey.BROADCAST_ACTION_CLOSE) {
                         playServerSwitch(false);
@@ -1419,8 +1454,8 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             registerActionReceiver(true);
         } else {
             applySystemBarStyle();
-            if (playFragment != null && playFragment.getController() != null) {
-                playFragment.getController().setInPipMode(false);
+            if (vodPlayerManager != null && vodPlayerManager.getController() != null) {
+                vodPlayerManager.getController().setInPipMode(false);
             }
             // 退出画中画恢复时：严格根据进画中画前的状态（竖屏 vs 全屏）恢复
             if (windowsPreview == null) {
@@ -1437,8 +1472,8 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                 syncPreviewPlaceHeight();
             }
             mBinding.llLayout.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
-            if (playFragment != null) {
-                playFragment.changedLandscape(fullWindows);
+            if (vodPlayerManager != null) {
+                vodPlayerManager.changedLandscape(fullWindows);
             }
             toggleSubtitleTextSize();
             registerActionReceiver(false);
@@ -1457,7 +1492,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     private void playServerSwitch(boolean open) {
         if (open) {
             VodInfo.VodSeries vod = vodInfo.seriesMap.get(vodInfo.playFlag).get(vodInfo.playIndex);
-            PlayService.start(playFragment.getPlayer(), vodInfo.name + "&&" + vod.name + "&&"
+            PlayService.start(vodPlayerManager.getPlayer(), vodInfo.name + "&&" + vod.name + "&&"
                     + (vodInfo.pic == null ? "" : vodInfo.pic));
             registerActionReceiver(true);
         } else {
@@ -1469,7 +1504,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     }
 
     public String getCurrentVodUrl() {
-        return playFragment == null ? "" : playFragment.getFinalUrl();
+        return vodPlayerManager == null ? "" : vodPlayerManager.getFinalUrl();
     }
 
     public void quickLineChange() {
@@ -1514,7 +1549,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             }
             screenShotListenManager.setListener(imagePath -> {
 
-                if (playFragment.getPlayer().isInPlaybackState())return;
+                if (vodPlayerManager.getPlayer().isInPlaybackState())return;
 
                 new XPopup.Builder(this).hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
                         .isDarkTheme(Utils.isDarkTheme())
