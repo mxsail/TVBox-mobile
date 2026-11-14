@@ -92,9 +92,9 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
 
     // Compose 底栏响应状态
     private val currentTabState = mutableIntStateOf(0)
-    private val floatingState = mutableStateOf(false)
+    private val floatingState = mutableStateOf(ThemeManager.barFloating())
     private val showLabelsState = mutableStateOf(true)
-    private val materialState = mutableStateOf(Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID))
+    private val materialState = mutableStateOf(ThemeManager.material())
     private val navInsetState = mutableIntStateOf(0)
 
     /** 「上次观看」悬浮条内容(主页内容就绪后由 HomeFragment 置入) */
@@ -420,9 +420,10 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
     }
 
     fun applyBarStyle() {
-        val floating = Hawk.get(HawkConfig.BAR_FLOATING, false)
+        ThemeManager.normalizeBarFloating()
+        val floating = ThemeManager.barFloating()
         val showLabels = Hawk.get(HawkConfig.BAR_SHOW_LABELS, true)
-        val material = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID)
+        val material = ThemeManager.material()
         floatingState.value = floating
         showLabelsState.value = showLabels
         materialState.value = material

@@ -74,7 +74,7 @@ public class HawkConfig {
      */
     public static final String PREDICTIVE_BACK = "predictive_back";
     /**
-     * 悬浮底栏(HyperOS 风格胶囊)
+     * 悬浮底栏(HyperOS 风格胶囊); 液态玻璃材质下强制为 true(见 ThemeManager.barFloating)
      */
     public static final String BAR_FLOATING = "bar_floating";
     /**

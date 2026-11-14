@@ -273,12 +273,7 @@ class AppearanceActivity : BaseActivity() {
         var liquidDispersion by remember { mutableStateOf(Hawk.get(HawkConfig.LIQUID_DISPERSION, true)) }
         var fontPath by remember { mutableStateOf(Hawk.get(HawkConfig.FONT_PATH, "")) }
         var predictive by remember { mutableStateOf(Hawk.get(HawkConfig.PREDICTIVE_BACK, false)) }
-        var barFloating by remember {
-            mutableStateOf(
-                if (material == ThemeManager.MATERIAL_LIQUID) true
-                else Hawk.get(HawkConfig.BAR_FLOATING, false)
-            )
-        }
+        var barFloating by remember { mutableStateOf(ThemeManager.barFloating()) }
         var barLabels by remember { mutableStateOf(Hawk.get(HawkConfig.BAR_SHOW_LABELS, true)) }
         var barAutoHide by remember { mutableStateOf(Hawk.get(HawkConfig.BAR_AUTO_HIDE, false)) }
 

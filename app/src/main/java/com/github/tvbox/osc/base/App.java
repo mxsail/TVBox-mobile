@@ -113,9 +113,11 @@ public class App extends MultiDexApplication {
         putDefault(HawkConfig.LIQUID_DISPERSION, true);        //液态玻璃: 色散彩虹开关
         putDefault(HawkConfig.FONT_PATH, "");                 //自定义字体: 空=系统默认
         putDefault(HawkConfig.PREDICTIVE_BACK, false);        //预见性返回手势
-        putDefault(HawkConfig.BAR_FLOATING, false);           //悬浮底栏
+        putDefault(HawkConfig.BAR_FLOATING, true);            //悬浮底栏: 默认液态玻璃, 强制悬浮形态
         putDefault(HawkConfig.BAR_SHOW_LABELS, true);         //底栏显示名称: true=图标+文字
         putDefault(HawkConfig.BAR_AUTO_HIDE, false);          //底栏随滚动隐藏
+        //旧版首启默认值/备份还原可能留下「液态玻璃 + 非悬浮」, 启动时按当前规则校正
+        ThemeManager.normalizeBarFloating();
         putDefault(HawkConfig.SYNC_ENABLED, false);
         putDefault(HawkConfig.SYNC_SPACE_ID, "default");
         putDefault(HawkConfig.SYNC_AUTO, true);

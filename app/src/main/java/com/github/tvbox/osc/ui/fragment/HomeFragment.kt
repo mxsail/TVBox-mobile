@@ -114,7 +114,7 @@ class HomeFragment : Fragment() {
     // ---------------- Compose 响应状态 ----------------
     private val selectedTabState = mutableIntStateOf(0)
     private val categoriesState = mutableStateOf<List<String>>(listOf("主页"))
-    private val materialState = mutableStateOf(Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID))
+    private val materialState = mutableStateOf(ThemeManager.material())
     private val isTabsExpandedState = mutableStateOf(false)
     private val sourceNameState = mutableStateOf("")
     private val pageLoadState = mutableStateOf(LoadState.None)
@@ -153,7 +153,7 @@ class HomeFragment : Fragment() {
     @Subscribe(threadMode = ThreadMode.MAIN)
     fun onAppearanceChanged(event: AppearanceChangedEvent) {
         if (event.type == AppearanceChangedEvent.TYPE_STYLE) {
-            materialState.value = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID)
+            materialState.value = ThemeManager.material()
         }
     }
 

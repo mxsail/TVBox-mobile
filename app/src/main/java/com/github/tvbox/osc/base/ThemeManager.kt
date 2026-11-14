@@ -24,13 +24,31 @@ object ThemeManager {
     const val MATERIAL_YOU = "you"                 // Material You: 实底跟随 M3 动态色
     const val MATERIAL_LIQUID = "liquid"           // 液态玻璃(默认): 折射+色散+高光
 
-    /** 读取材质(二选: Material You / 液态玻璃; 非悬浮底栏状态下强制为 Material You) */
+    /**
+     * 读取材质(二选: Material You / 液态玻璃)。液态玻璃为默认材质且强制使用悬浮底栏,
+     * 不再因底栏形态把材质降级为实底, 避免底栏渲染与设置页/弹窗得出不同结论。
+     */
     @JvmStatic
     fun material(): String {
-        val floating = Hawk.get(HawkConfig.BAR_FLOATING, false)
-        if (!floating) return MATERIAL_YOU
         val stored = Hawk.get(HawkConfig.UI_MATERIAL, MATERIAL_LIQUID)
         return if (stored == MATERIAL_YOU) MATERIAL_YOU else MATERIAL_LIQUID
+    }
+
+    /** 底栏形态: 液态玻璃强制悬浮(设置页已锁定开关, 这里是读取层兜底) */
+    @JvmStatic
+    fun barFloating(): Boolean =
+        material() == MATERIAL_LIQUID || Hawk.get(HawkConfig.BAR_FLOATING, true)
+
+    /**
+     * 校正「液态玻璃 + 非悬浮」的非法组合: 旧版首次启动默认值、本地备份还原
+     * 都可能留下该组合, 统一写回悬浮, 保证各读取链路结论一致。
+     * App 启动与 MainActivity 应用底栏样式时调用。
+     */
+    @JvmStatic
+    fun normalizeBarFloating() {
+        if (material() == MATERIAL_LIQUID && !Hawk.get(HawkConfig.BAR_FLOATING, true)) {
+            Hawk.put(HawkConfig.BAR_FLOATING, true)
+        }
     }
 
     class Preset(val id: String, val label: String, val overlayRes: Int, val swatchRes: Int)
