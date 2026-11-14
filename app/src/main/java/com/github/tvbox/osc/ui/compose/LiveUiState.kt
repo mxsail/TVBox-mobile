@@ -1,6 +1,7 @@
 package com.github.tvbox.osc.ui.compose
 
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.ui.platform.AndroidUiDispatcher
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -19,7 +20,7 @@ import kotlinx.coroutines.launch
  */
 class LiveUiState {
 
-    var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    var scope = CoroutineScope(SupervisorJob() + AndroidUiDispatcher.Main)
         private set
 
     /** 三态(等价旧 LoadSir) */
@@ -54,14 +55,21 @@ class LiveUiState {
     /** 列表滚动到选中项(Java 侧 showChannelList 调用) */
     fun scrollToSelected(groupIdx: Int, channelIdx: Int, groupTop: Boolean) {
         scope.launch {
-            if (groupTop) groupListState.scrollToItem(groupIdx)
-            else groupListState.animateScrollToItem(groupIdx)
-            if (channelIdx > -1) channelListState.animateScrollToItem(channelIdx)
+            try {
+                if (groupIdx > -1) {
+                    groupListState.scrollToItem(if (groupTop) 0 else groupIdx)
+                }
+                if (channelIdx > -1) {
+                    channelListState.scrollToItem(channelIdx)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun cancelScope() {
         scope.cancel()
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        scope = CoroutineScope(SupervisorJob() + AndroidUiDispatcher.Main)
     }
 }

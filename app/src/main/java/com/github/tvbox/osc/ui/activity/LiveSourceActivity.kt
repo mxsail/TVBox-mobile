@@ -286,7 +286,7 @@ class LiveSourceActivity : BaseActivity() {
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 14.dp)
             ) {
                 // 1. 顶部常驻单选项：跟随当前订阅源
                 item {
@@ -303,14 +303,15 @@ class LiveSourceActivity : BaseActivity() {
                             .padding(vertical = 4.dp)
                             .then(
                                 if (isFollowSelected) Modifier.border(
-                                    1.5.dp, colorScheme.primary, RoundedCornerShape(16.dp)
+                                    1.5.dp, colorScheme.primary, RoundedCornerShape(18.dp)
                                 ) else Modifier
                             ),
                         colors = CardDefaults.cardColors(
                             containerColor = if (isFollowSelected) colorScheme.secondaryContainer
                             else colorScheme.surfaceContainerLow
                         ),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                     ) {
                         Row(
                             modifier = Modifier
@@ -374,14 +375,15 @@ class LiveSourceActivity : BaseActivity() {
                                 .padding(vertical = 5.dp)
                                 .then(
                                     if (selected) Modifier.border(
-                                        1.5.dp, colorScheme.primary, RoundedCornerShape(16.dp)
+                                        1.5.dp, colorScheme.primary, RoundedCornerShape(18.dp)
                                     ) else Modifier
                                 ),
                             colors = CardDefaults.cardColors(
                                 containerColor = if (selected) colorScheme.secondaryContainer
                                 else colorScheme.surfaceContainerLow
                             ),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(18.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                         ) {
                             Row(
                                 modifier = Modifier

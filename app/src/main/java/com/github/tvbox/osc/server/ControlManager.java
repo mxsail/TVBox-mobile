@@ -19,7 +19,6 @@ import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 
 /**
  * @author pj567
@@ -97,7 +96,6 @@ public class ControlManager {
             });
             try {
                 mServer.start();
-                IjkMediaPlayer.setDotPort(Hawk.get(HawkConfig.DOH_URL, 0) > 0, RemoteServer.serverPort);
                 break;
             } catch (IOException ex) {
                 RemoteServer.serverPort++;

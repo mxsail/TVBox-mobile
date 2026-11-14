@@ -8,12 +8,13 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -126,8 +127,8 @@ class AboutActivity : BaseActivity() {
         Scaffold(
             containerColor = colorScheme.background,
             topBar = {
-                TopAppBar(
-                    title = { Text("关于", fontSize = 16.sp) },
+                CenterAlignedTopAppBar(
+                    title = { Text("关于", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
                             Icon(
@@ -145,7 +146,7 @@ class AboutActivity : BaseActivity() {
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 14.dp)
             ) {
                 SectionTitle("版本")
                 GroupCard {

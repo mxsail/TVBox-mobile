@@ -162,9 +162,9 @@ private fun LiveSettingsPanel(fragment: LiveFragment, uiState: LiveUiState, modi
 private fun LiveEpgBar(fragment: LiveFragment, uiState: LiveUiState) {
     Column(
         Modifier
-            .padding(10.dp)
+            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp)
             .fillMaxWidth()
-            .background(colorScheme.surfaceContainerLow, RoundedCornerShape(16.dp))
+            .background(colorScheme.surfaceContainerLow, RoundedCornerShape(18.dp))
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -232,8 +232,8 @@ private fun LiveEpgBar(fragment: LiveFragment, uiState: LiveUiState) {
 private fun LiveChannelBrowser(fragment: LiveFragment, uiState: LiveUiState, modifier: Modifier) {
     Row(
         modifier
-            .padding(start = 10.dp, end = 10.dp, bottom = 10.dp)
-            .background(colorScheme.surfaceContainerLow, RoundedCornerShape(16.dp))
+            .padding(start = 14.dp, end = 14.dp, bottom = 14.dp)
+            .background(colorScheme.surfaceContainerLow, RoundedCornerShape(18.dp))
     ) {
         LazyColumn(
             state = uiState.groupListState,

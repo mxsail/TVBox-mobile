@@ -441,15 +441,16 @@ class DownloadActivity : BaseActivity() {
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 header.value?.let { hd ->
                     item {
                         // 剧集信息卡: 左侧大海报定高撑起卡片, 右侧文字列与播放按钮同列左对齐
                         Card(
                             colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(18.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                         ) {
                             Row(
                                 modifier = Modifier.padding(12.dp),
@@ -532,7 +533,8 @@ class DownloadActivity : BaseActivity() {
                     val row = epRows.value[index]
                     Card(
                         colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                     ) {
                         Row(
                             modifier = Modifier

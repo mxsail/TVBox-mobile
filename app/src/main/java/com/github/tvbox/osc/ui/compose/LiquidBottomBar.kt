@@ -1,16 +1,14 @@
 package com.github.tvbox.osc.ui.compose
 
-import androidx.compose.animation.AnimatedVisibility
+import android.content.res.Configuration
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.MutatorMutex
 import androidx.compose.foundation.background
@@ -329,9 +327,9 @@ class DampedDragAnimation(
     val visibilityThreshold: Float,
     val initialScale: Float,
     val pressedScale: Float,
-    val onDragStarted: DampedDragAnimation.(position: Offset) -> Unit,
-    val onDragStopped: DampedDragAnimation.() -> Unit,
-    val onDrag: DampedDragAnimation.(size: IntSize, dragAmount: Offset) -> Unit,
+    var onDragStarted: (DampedDragAnimation.(position: Offset) -> Unit)? = null,
+    var onDragStopped: (DampedDragAnimation.() -> Unit)? = null,
+    var onDrag: (DampedDragAnimation.(size: IntSize, dragAmount: Offset) -> Unit)? = null,
 ) {
     private val valueAnimationSpec = spring(1f, 1000f, visibilityThreshold)
     private val velocityAnimationSpec = spring(0.5f, 300f, visibilityThreshold * 10f)
@@ -359,19 +357,19 @@ class DampedDragAnimation(
     val modifier: Modifier = Modifier.pointerInput(Unit) {
         inspectDragGestures(
             onDragStart = { down ->
-                onDragStarted(down.position)
+                onDragStarted?.invoke(this@DampedDragAnimation, down.position)
                 press()
             },
             onDragEnd = {
-                onDragStopped()
+                onDragStopped?.invoke(this@DampedDragAnimation)
                 release()
             },
             onDragCancel = {
-                onDragStopped()
+                onDragStopped?.invoke(this@DampedDragAnimation)
                 release()
             }
         ) { _, dragAmount ->
-            onDrag(size, dragAmount)
+            onDrag?.invoke(this@DampedDragAnimation, size, dragAmount)
         }
     }
 
@@ -520,7 +518,7 @@ fun LiquidBottomTabs(
         val currentTabWidth by rememberUpdatedState(tabWidth)
 
         val offsetAnimation = remember { Animatable(0f) }
-        val panelOffset by remember(density) {
+        val panelOffset by remember(density, constraints.maxWidth) {
             derivedStateOf {
                 val fraction = (offsetAnimation.value / constraints.maxWidth).fastCoerceIn(-1f, 1f)
                 with(density) {
@@ -542,44 +540,51 @@ fun LiquidBottomTabs(
                 valueRange = 0f..(tabsCount - 1).toFloat(),
                 visibilityThreshold = 0.001f,
                 initialScale = 1f,
-                pressedScale = LiquidBarSpec.PressedHeightDp.toFloat() / LiquidBarSpec.ContentHeightDp.toFloat(),
-                onDragStarted = { position ->
-                    isDraggingSlider = true
-                    pendingDragTargetTab = -1
-                    // 全域手势: 按下位置所在 Tab 即为目标, 非激活 Tab 按下即弹射飞渡
-                    val insetPx = with(density) { 4f.dp.toPx() }
-                    val touchX = (position.x - insetPx).coerceIn(0f, constraints.maxWidth.toFloat() - insetPx * 2)
-                    val rawTab = (touchX / currentTabWidth).toInt().coerceIn(0, tabsCount - 1)
-                    val touchedTab = if (isLtr) rawTab else (tabsCount - 1 - rawTab)
-                    if (abs(targetValue - touchedTab) > 0.001f) {
-                        updateValue(touchedTab.toFloat())
-                    }
-                },
-                onDragStopped = {
-                    val targetIndex = targetValue.fastRoundToInt().coerceIn(0, tabsCount - 1)
-                    isDraggingSlider = false
-                    pendingDragTargetTab = targetIndex
-                    updateValue(targetIndex.toFloat())
-                    currentOnTabSelected(targetIndex)
-                    animationScope.launch {
-                        offsetAnimation.animateTo(
-                            0f,
-                            spring(1f, 300f, 0.5f)
-                        )
-                    }
-                },
-                onDrag = { _, dragAmount ->
-                    if (dragAmount.x != 0f) {
-                        updateValue(
-                            (targetValue + dragAmount.x / currentTabWidth * if (isLtr) 1f else -1f)
-                                .fastCoerceIn(0f, (tabsCount - 1).toFloat())
-                        )
-                        animationScope.launch {
-                            offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x)
-                        }
-                    }
-                }
+                pressedScale = LiquidBarSpec.PressedHeightDp.toFloat() / LiquidBarSpec.ContentHeightDp.toFloat()
             )
+        }
+
+        dampedDragAnimation.onDragStarted = { position ->
+            isDraggingSlider = true
+            pendingDragTargetTab = -1
+            // 全域手势: 按下位置所在 Tab 即为目标, 每次均依据当前实时宽度和边界计算
+            val insetPx = with(density) { 4f.dp.toPx() }
+            val touchX = (position.x - insetPx).coerceIn(0f, constraints.maxWidth.toFloat() - insetPx * 2)
+            val rawTab = if (tabWidth > 0f) {
+                (touchX / tabWidth).toInt().coerceIn(0, tabsCount - 1)
+            } else {
+                0
+            }
+            val touchedTab = if (isLtr) rawTab else (tabsCount - 1 - rawTab)
+            if (abs(targetValue - touchedTab) > 0.001f) {
+                updateValue(touchedTab.toFloat())
+            }
+        }
+
+        dampedDragAnimation.onDragStopped = {
+            val targetIndex = targetValue.fastRoundToInt().coerceIn(0, tabsCount - 1)
+            isDraggingSlider = false
+            pendingDragTargetTab = targetIndex
+            updateValue(targetIndex.toFloat())
+            currentOnTabSelected(targetIndex)
+            animationScope.launch {
+                offsetAnimation.animateTo(
+                    0f,
+                    spring(1f, 300f, 0.5f)
+                )
+            }
+        }
+
+        dampedDragAnimation.onDrag = { _, dragAmount ->
+            if (dragAmount.x != 0f && tabWidth > 0f) {
+                updateValue(
+                    (targetValue + dragAmount.x / tabWidth * if (isLtr) 1f else -1f)
+                        .fastCoerceIn(0f, (tabsCount - 1).toFloat())
+                )
+                animationScope.launch {
+                    offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x)
+                }
+            }
         }
         LaunchedEffect(selectedTabIndex) {
             snapshotFlow { currentSelectedTabIndex() }
@@ -847,32 +852,34 @@ fun LiquidBottomBar(
     material: String = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID),
     navInsetBottom: Dp = 0.dp,
     backdrop: Backdrop = emptyBackdrop(),
-    pageScrollFraction: Float? = null,
-    filterVisible: Boolean = false,
-    onFilterClick: () -> Unit = {}
+    pageScrollFraction: Float? = null
 ) {
     val tabs = MainBottomTabs
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val effectiveFloating = floating || isLandscape
 
-    Row(
+    Box(
         modifier = modifier
+            .widthIn(max = 400.dp)
             .fillMaxWidth()
             .padding(
-                start = if (floating) LiquidBarSpec.HorizontalMarginDp.dp else 0.dp,
-                end = if (floating) LiquidBarSpec.HorizontalMarginDp.dp else 0.dp,
-                top = if (floating) LiquidBarSpec.TopInsetDp.dp else 0.dp,
-                bottom = if (floating) (navInsetBottom + 10.dp) else 0.dp
+                start = if (effectiveFloating) LiquidBarSpec.HorizontalMarginDp.dp else 0.dp,
+                end = if (effectiveFloating) LiquidBarSpec.HorizontalMarginDp.dp else 0.dp,
+                top = if (effectiveFloating) LiquidBarSpec.TopInsetDp.dp else 0.dp,
+                bottom = if (effectiveFloating) (navInsetBottom + 10.dp) else 0.dp
             )
             .graphicsLayer { clip = false },
-        verticalAlignment = Alignment.CenterVertically
+        contentAlignment = Alignment.Center
     ) {
         LiquidBottomTabs(
             selectedTabIndex = { selectedIndex },
             onTabSelected = onTabSelected,
             backdrop = backdrop,
             tabsCount = tabs.size,
-            modifier = Modifier.weight(1f), // 筛选钮可见时底栏收窄让位
-            floating = floating,
-            navInsetBottom = if (floating) 0.dp else navInsetBottom,
+            modifier = Modifier.fillMaxWidth(),
+            floating = effectiveFloating,
+            navInsetBottom = if (effectiveFloating) 0.dp else navInsetBottom,
             pageScrollFraction = pageScrollFraction,
             material = material,
             showLabels = showLabels
@@ -920,60 +927,6 @@ fun LiquidBottomBar(
                         )
                     }
                 }
-            }
-        }
-
-        // 分类筛选玻璃圆钮: 与底栏并排; 停靠模式下融入底栏(撑满高度/方角/贴边), 悬浮模式保持独立圆钮。
-        // 展开动画必须临界阻尼(dampingRatio=1): 欠阻尼 spring 宽度过冲期间按钮内容 End 对齐,
-        // 会在与底栏之间露出一段空隙, 落定才消失——停靠模式要求严丝合缝
-        AnimatedVisibility(
-            visible = filterVisible,
-            enter = expandHorizontally(
-                animationSpec = spring(dampingRatio = 1f, stiffness = 380f),
-                expandFrom = Alignment.End
-            ) + fadeIn(tween(180)),
-            exit = shrinkHorizontally(tween(180), shrinkTowards = Alignment.End) +
-                fadeOut(tween(140))
-        ) {
-            val isLightTheme = !isSystemInDarkTheme()
-            val isLiquid = material == ThemeManager.MATERIAL_LIQUID
-            val containerColor = if (isLightTheme) Color(0xFFFAFAFA).copy(0.4f) else Color(0xFF121212).copy(0.4f)
-            val solidCircle = if (isLightTheme) Color(0xFFF7F7F9) else Color(0xFF202024)
-            val buttonShape = if (floating) CircleShape else RoundedCornerShape(0.dp)
-            val buttonHeight = if (floating) LiquidBarSpec.HeightDp.dp else (LiquidBarSpec.HeightDp.dp + navInsetBottom)
-            Box(
-                modifier = Modifier
-                    .padding(start = if (floating) 10.dp else 0.dp)
-                    .size(width = LiquidBarSpec.HeightDp.dp, height = buttonHeight)
-                    .then(
-                        if (material == ThemeManager.MATERIAL_YOU || !isLiquidGlassSupported) {
-                            Modifier.background(solidCircle, buttonShape)
-                        } else {
-                            Modifier.drawBackdrop(
-                                backdrop = backdrop,
-                                shape = { buttonShape },
-                                effects = {
-                                    vibrancy()
-                                    blur(8f.dp.toPx())
-                                    lens(24f.dp.toPx(), 24f.dp.toPx())
-                                },
-                                onDrawSurface = { drawRect(containerColor) }
-                            )
-                        }
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onFilterClick
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_filter_list),
-                    contentDescription = "筛选",
-                    tint = if (isLightTheme) Color.Black else Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
             }
         }
     }

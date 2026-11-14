@@ -3,10 +3,7 @@ package com.github.tvbox.osc.util;
 import android.app.Activity;
 import android.content.Context;
 
-import com.github.tvbox.osc.api.ApiConfig;
-import com.github.tvbox.osc.bean.IJKCode;
-import com.github.tvbox.osc.player.EXOmPlayer;
-import com.github.tvbox.osc.player.IjkMediaPlayer;
+import com.github.tvbox.osc.player.CorePlayer;
 import com.github.tvbox.osc.player.render.SurfaceRenderViewFactory;
 import com.github.tvbox.osc.player.thirdparty.Kodi;
 import com.github.tvbox.osc.player.thirdparty.MXPlayer;
@@ -22,9 +19,6 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import tv.danmaku.ijk.media.player.IjkLibLoader;
-import xyz.doikki.videoplayer.exo.ExoMediaPlayerFactory;
-import xyz.doikki.videoplayer.player.AndroidMediaPlayerFactory;
 import xyz.doikki.videoplayer.player.PlayerFactory;
 import xyz.doikki.videoplayer.player.VideoView;
 import xyz.doikki.videoplayer.render.RenderViewFactory;
@@ -47,47 +41,27 @@ public class PlayerHelper {
         String ijkCode = Hawk.get(HawkConfig.IJK_CODEC, "软解码");
         int scale = Hawk.get(HawkConfig.PLAY_SCALE, 0);
         try {
-            playerType = playerCfg.getInt("pl");
-            renderType = playerCfg.getInt("pr");
-            ijkCode = playerCfg.getString("ijk");
-            scale = playerCfg.getInt("sc");
+            if (playerCfg.has("pl")) playerType = playerCfg.getInt("pl");
+            if (playerCfg.has("pr")) renderType = playerCfg.getInt("pr");
+            if (playerCfg.has("ijk")) ijkCode = playerCfg.getString("ijk");
+            if (playerCfg.has("sc")) scale = playerCfg.getInt("sc");
         } catch (JSONException e) {
             e.printStackTrace();
         }
-        IJKCode codec = ApiConfig.get().getIJKCodec(ijkCode);
-        PlayerFactory playerFactory;
-        if (playerType == 1) {
-            playerFactory = new PlayerFactory<IjkMediaPlayer>() {
-                @Override
-                public IjkMediaPlayer createPlayer(Context context) {
-                    return new IjkMediaPlayer(context, codec);
-                }
-            };
-            try {
-                tv.danmaku.ijk.media.player.IjkMediaPlayer.loadLibrariesOnce(new IjkLibLoader() {
-                    @Override
-                    public void loadLibrary(String s) throws UnsatisfiedLinkError, SecurityException {
-                        try {
-                            System.loadLibrary(s);
-                        } catch (Throwable th) {
-                            th.printStackTrace();
-                        }
-                    }
-                });
-            } catch (Throwable th) {
-                th.printStackTrace();
+
+        final int selectedType = playerType;
+        final boolean softwareDecode = ijkCode != null && ijkCode.contains("软");
+
+        PlayerFactory playerFactory = new PlayerFactory<CorePlayer>() {
+            @Override
+            public CorePlayer createPlayer(Context context) {
+                CorePlayer player = new CorePlayer(selectedType);
+                player.setSoftwareDecode(softwareDecode);
+                return player;
             }
-        } else if (playerType == 2) {
-            playerFactory = new PlayerFactory<EXOmPlayer>() {
-                @Override
-                public EXOmPlayer createPlayer(Context context) {
-                    return new EXOmPlayer(context);
-                }
-            };
-        } else {
-            playerFactory = AndroidMediaPlayerFactory.create();
-        }
-        RenderViewFactory renderViewFactory = null;
+        };
+
+        RenderViewFactory renderViewFactory;
         switch (renderType) {
             case RENDER_SURFACE_VIEW:
                 renderViewFactory = SurfaceRenderViewFactory.create();
@@ -97,76 +71,17 @@ public class PlayerHelper {
                 renderViewFactory = TextureRenderViewFactory.create();
                 break;
         }
+
         videoView.setPlayerFactory(playerFactory);
         videoView.setRenderViewFactory(renderViewFactory);
         videoView.setScreenScaleType(scale);
     }
 
     public static void updateCfg(VideoView videoView) {
-        int playType = Hawk.get(HawkConfig.PLAY_TYPE, 0);
-        PlayerFactory playerFactory;
-        if (playType == 1) {
-            playerFactory = new PlayerFactory<IjkMediaPlayer>() {
-                @Override
-                public IjkMediaPlayer createPlayer(Context context) {
-                    return new IjkMediaPlayer(context, null);
-                }
-            };
-            try {
-                tv.danmaku.ijk.media.player.IjkMediaPlayer.loadLibrariesOnce(new IjkLibLoader() {
-                    @Override
-                    public void loadLibrary(String s) throws UnsatisfiedLinkError, SecurityException {
-                        try {
-                            System.loadLibrary(s);
-                        } catch (Throwable th) {
-                            th.printStackTrace();
-                        }
-                    }
-                });
-            } catch (Throwable th) {
-                th.printStackTrace();
-            }
-        } else if (playType == 2) {
-            playerFactory = new PlayerFactory<EXOmPlayer>() {
-                @Override
-                public EXOmPlayer createPlayer(Context context) {
-                    return new EXOmPlayer(context);
-                }
-            };
-        } else {
-            playerFactory = AndroidMediaPlayerFactory.create();
-        }
-        int renderType = Hawk.get(HawkConfig.PLAY_RENDER, 0);
-        RenderViewFactory renderViewFactory = null;
-        switch (renderType) {
-            case RENDER_SURFACE_VIEW:
-                renderViewFactory = SurfaceRenderViewFactory.create();
-                break;
-            case RENDER_TEXTURE_VIEW:
-            default:
-                renderViewFactory = TextureRenderViewFactory.create();
-                break;
-        }
-        videoView.setPlayerFactory(playerFactory);
-        videoView.setRenderViewFactory(renderViewFactory);
+        updateCfg(videoView, new JSONObject());
     }
 
-
     public static void init() {
-        try {
-            tv.danmaku.ijk.media.player.IjkMediaPlayer.loadLibrariesOnce(new IjkLibLoader() {
-                @Override
-                public void loadLibrary(String s) throws UnsatisfiedLinkError, SecurityException {
-                    try {
-                        System.loadLibrary(s);
-                    } catch (Throwable th) {
-                        th.printStackTrace();
-                    }
-                }
-            });
-        } catch (Throwable th) {
-            th.printStackTrace();
-        }
     }
 
     public static String getPlayerName(int playType) {
@@ -174,7 +89,7 @@ public class PlayerHelper {
         if (playersInfo.containsKey(playType)) {
             return playersInfo.get(playType);
         } else {
-            return "系统播放器";
+            return "Media3";
         }
     }
 
@@ -182,9 +97,9 @@ public class PlayerHelper {
     public static HashMap<Integer, String> getPlayersInfo() {
         if (mPlayersInfo == null) {
             HashMap<Integer, String> playersInfo = new HashMap<>();
-            playersInfo.put(0, "系统播放器");
-            playersInfo.put(1, "IJK播放器");
-            playersInfo.put(2, "Exo播放器");
+            playersInfo.put(0, "Media3");
+            playersInfo.put(1, "MPV");
+            playersInfo.put(2, "Media3");
             playersInfo.put(10, "MX播放器");
             playersInfo.put(11, "Reex播放器");
             playersInfo.put(12, "Kodi播放器");
@@ -199,9 +114,9 @@ public class PlayerHelper {
     public static HashMap<Integer, Boolean> getPlayersExistInfo() {
         if (mPlayersExistInfo == null) {
             HashMap<Integer, Boolean> playersExist = new HashMap<>();
-            playersExist.put(0, false);
+            playersExist.put(0, true);
             playersExist.put(1, true);
-            playersExist.put(2, true);
+            playersExist.put(2, false);
             playersExist.put(10, MXPlayer.getPackageInfo() != null);
             playersExist.put(11, ReexPlayer.getPackageInfo() != null);
             playersExist.put(12, Kodi.getPackageInfo() != null);
@@ -222,86 +137,108 @@ public class PlayerHelper {
     }
 
     public static ArrayList<Integer> getExistPlayerTypes() {
+        ArrayList<Integer> existPlayerTypes = new ArrayList<>();
         HashMap<Integer, Boolean> playersExistInfo = getPlayersExistInfo();
-        ArrayList<Integer> existPlayers = new ArrayList<>();
-        for(Integer playerType : playersExistInfo.keySet()) {
-            if (playersExistInfo.get(playerType)) {
-                existPlayers.add(playerType);
+        for (int playType : playersExistInfo.keySet()) {
+            if (playersExistInfo.get(playType)) {
+                existPlayerTypes.add(playType);
             }
         }
-        return existPlayers;
+        return existPlayerTypes;
     }
 
-    public static Boolean runExternalPlayer(int playerType, Activity activity, String url, String title, String subtitle, HashMap<String, String> headers) {
-        return runExternalPlayer(playerType, activity, url, title, subtitle, headers);
+    public static ArrayList<Integer> getAllPlayerTypes() {
+        ArrayList<Integer> allPlayerTypes = new ArrayList<>();
+        allPlayerTypes.add(0);
+        allPlayerTypes.add(1);
+        allPlayerTypes.add(10);
+        allPlayerTypes.add(11);
+        allPlayerTypes.add(12);
+        allPlayerTypes.add(13);
+        allPlayerTypes.add(14);
+        return allPlayerTypes;
     }
 
-    public static Boolean runExternalPlayer(int playerType, Activity activity, String url, String title, String subtitle, HashMap<String, String> headers, long progress) {
-        boolean callResult = false;
-        switch (playerType) {
-            case 10: {
-                callResult = MXPlayer.run(activity, url, title, subtitle, headers);
-                break;
-            }
-            case 11: {
-                callResult = ReexPlayer.run(activity, url, title, subtitle, headers);
-                break;
-            }
-            case 12: {
-                callResult = Kodi.run(activity, url, title, subtitle, headers);
-                break;
-            }
-            case 13: {
-                callResult = RemoteTVBox.run(activity, url, title, subtitle, headers);
-                break;
-            }
-            case 14: {
-                callResult = VlcPlayer.run(activity, url, title, subtitle, progress);
-                break;
-            }
+    public static String getScaleName(int scaleType) {
+        switch (scaleType) {
+            case 1:
+                return "16:9";
+            case 2:
+                return "4:3";
+            case 3:
+                return "填充";
+            case 4:
+                return "原始";
+            case 5:
+                return "裁剪";
+            default:
+                return "默认";
         }
-        return callResult;
     }
 
     public static String getRenderName(int renderType) {
-        if (renderType == RENDER_SURFACE_VIEW) {
-            return "SurfaceView";
-        } else {
-            return "TextureView";
+        switch (renderType) {
+            case RENDER_SURFACE_VIEW:
+                return "SurfaceView";
+            case RENDER_TEXTURE_VIEW:
+            default:
+                return "TextureView";
         }
     }
 
-    public static String getScaleName(int screenScaleType) {
-        String scaleText = "默认";
-        switch (screenScaleType) {
-            case VideoView.SCREEN_SCALE_DEFAULT:
-                scaleText = "默认";
-                break;
-            case VideoView.SCREEN_SCALE_16_9:
-                scaleText = "16:9";
-                break;
-            case VideoView.SCREEN_SCALE_4_3:
-                scaleText = "4:3";
-                break;
-            case VideoView.SCREEN_SCALE_MATCH_PARENT:
-                scaleText = "填充";
-                break;
-            case VideoView.SCREEN_SCALE_ORIGINAL:
-                scaleText = "原始";
-                break;
-            case VideoView.SCREEN_SCALE_CENTER_CROP:
-                scaleText = "裁剪";
-                break;
-        }
-        return scaleText;
+    public static ArrayList<Integer> getAllScaleTypes() {
+        ArrayList<Integer> allScaleTypes = new ArrayList<>();
+        allScaleTypes.add(0);
+        allScaleTypes.add(1);
+        allScaleTypes.add(2);
+        allScaleTypes.add(3);
+        allScaleTypes.add(4);
+        allScaleTypes.add(5);
+        return allScaleTypes;
+    }
+
+    public static String getSpeedName(float speed) {
+        DecimalFormat df = new DecimalFormat("0.0#");
+        return df.format(speed) + "x";
     }
 
     public static String getDisplaySpeed(long speed) {
-        if(speed > 1048576)
-            return new DecimalFormat("#.00").format(speed / 1048576d) + "Mb/s";
-        else if(speed > 1024)
-            return (speed / 1024) + "Kb/s";
-        else
-            return speed > 0?speed + "B/s":"";
+        if (speed <= 0) return "";
+        if (speed >= 1024 * 1024) {
+            return String.format(java.util.Locale.getDefault(), "%.2f MB/s", speed / (1024f * 1024f));
+        } else if (speed >= 1024) {
+            return String.format(java.util.Locale.getDefault(), "%.2f KB/s", speed / 1024f);
+        } else {
+            return speed + " B/s";
+        }
+    }
+
+    public static boolean runExternalPlayer(int playType, Activity activity, String url, String title, String subtitle, HashMap<String, String> headers, long progress) {
+        switch (playType) {
+            case 10:
+                return MXPlayer.run(activity, url, title, subtitle, headers);
+            case 11:
+                return ReexPlayer.run(activity, url, title, subtitle, headers);
+            case 12:
+                return Kodi.run(activity, url, title, subtitle, headers);
+            case 13:
+                return RemoteTVBox.run(activity, url, title, subtitle, headers);
+            case 14:
+                return VlcPlayer.run(activity, url, title, subtitle, progress);
+            default:
+                return false;
+        }
+    }
+
+    public static boolean runThirdPlayer(int playType, Activity activity, String url, String title, JSONObject playHeader, long progress) {
+        HashMap<String, String> headers = new HashMap<>();
+        if (playHeader != null) {
+            java.util.Iterator<String> keys = playHeader.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                headers.put(key, playHeader.optString(key));
+            }
+        }
+        return runExternalPlayer(playType, activity, url, title, null, headers, progress);
     }
 }

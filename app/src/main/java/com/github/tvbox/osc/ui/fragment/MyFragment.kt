@@ -62,6 +62,7 @@ import com.github.tvbox.osc.ui.activity.SubscriptionActivity
 import com.github.tvbox.osc.ui.compose.GroupCard
 import com.github.tvbox.osc.ui.compose.PosterFileImage
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.isAppDarkTheme
 import com.github.tvbox.osc.util.DefaultConfig
 import com.github.tvbox.osc.util.MD5
 import com.github.tvbox.osc.util.UA
@@ -229,11 +230,11 @@ class MyFragment : Fragment() {
                 modifier = Modifier
                     .padding(start = 20.dp, top = 40.dp, bottom = 12.dp)
             )
-            Box(Modifier.padding(horizontal = 16.dp)) {
+            Box(Modifier.padding(horizontal = 14.dp)) {
                 HistoryCard(currentActivity)
             }
-            Spacer(Modifier.height(12.dp))
-            Box(Modifier.padding(horizontal = 16.dp)) {
+            Spacer(Modifier.height(14.dp))
+            Box(Modifier.padding(horizontal = 14.dp)) {
                 FunctionsCard(currentActivity, onGoToTab)
             }
         }
@@ -243,6 +244,7 @@ class MyFragment : Fragment() {
 
     @Composable
     private fun HistoryCard(currentActivity: android.app.Activity?) {
+        val isDark = isAppDarkTheme()
         GroupCard {
             Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 // 头部: 标题 + 右箭头, 点击进观看历史页
@@ -261,12 +263,10 @@ class MyFragment : Fragment() {
                         modifier = Modifier.weight(1f)
                     )
                     Icon(
-                        painterResource(R.drawable.ic_arrow_down),
+                        painterResource(R.drawable.ic_chevron_right),
                         contentDescription = "查看全部",
-                        tint = colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(16.dp)
-                            .rotate(-90f) // 向下箭头转为向右
+                        tint = if (isDark) colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else Color(0xFFC7C7CC),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
                 val items = historyItems.value
@@ -408,6 +408,7 @@ class MyFragment : Fragment() {
 
     @Composable
     private fun FuncButton(func: FuncEntry, modifier: Modifier) {
+        val isDark = isAppDarkTheme()
         Column(
             modifier = modifier
                 .clip(RoundedCornerShape(12.dp))
@@ -418,7 +419,10 @@ class MyFragment : Fragment() {
             Box(
                 modifier = Modifier
                     .size(52.dp)
-                    .background(colorScheme.surfaceContainerHigh, RoundedCornerShape(16.dp)),
+                    .background(
+                        if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF3F3F4),
+                        RoundedCornerShape(16.dp)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(

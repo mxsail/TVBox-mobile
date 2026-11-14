@@ -1,7 +1,10 @@
 package com.github.tvbox.osc.bean;
 
+import java.io.Serializable;
 
-public class Subscription {
+public class Subscription implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     public Subscription() {
     }
 

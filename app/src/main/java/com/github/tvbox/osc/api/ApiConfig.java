@@ -199,7 +199,8 @@ public class ApiConfig {
         String[] urls = spider.split(";md5;");
         String jarUrl = urls[0];
         String md5 = urls.length > 1 ? urls[1].trim() : "";
-        File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/csp.jar");
+        String jarKey = MD5.encode(jarUrl);
+        File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/csp_" + jarKey + ".jar");
 
         if (cache.exists() && shouldUseCachedJar(useCache, md5, cache)) {
             // 本方法由 HomeFragment 的后台任务线程调用, DexClassLoader(首次 dexopt 可达数百 ms)
@@ -211,7 +212,13 @@ public class ApiConfig {
             if (jarLoader.load(cache.getAbsolutePath())) {
                 callback.success();
             } else {
-                callback.error("本地爬虫包加载失败");
+                // 如果使用缓存加载失败，删除可能损坏或与当前源不兼容的旧缓存，尝试走网络重新下载
+                try {
+                    cache.setWritable(true);
+                    cache.delete();
+                } catch (Throwable ignored) {
+                }
+                loadJar(false, spider, callback);
             }
             return;
         }

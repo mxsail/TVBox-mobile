@@ -86,7 +86,7 @@ public class AppRoomSyncAdapter {
     private static List<SyncConfigGroup.SubscriptionItem> readSubscriptions() {
         List<SyncConfigGroup.SubscriptionItem> items = new ArrayList<>();
         try {
-            List<Subscription> subs = Hawk.get(HawkConfig.SUBSCRIPTIONS, new ArrayList<Subscription>());
+            List<Subscription> subs = com.github.tvbox.osc.util.SubscriptionManager.getSubscriptions();
             if (subs != null) {
                 for (Subscription sub : subs) {
                     if (sub == null) continue;
@@ -403,17 +403,28 @@ public class AppRoomSyncAdapter {
                     if (!TextUtils.isEmpty(cg.defaultParse)) {
                         Hawk.put(HawkConfig.DEFAULT_PARSE, cg.defaultParse);
                     }
-                    // 订阅源列表(勾选状态以本机为准, 同步只补条目)
+                    // 订阅源列表(合并本机与云端，保留本机勾选状态与新增源)
                     if (cg.subscriptions != null && !cg.subscriptions.isEmpty()) {
-                        List<Subscription> merged = new ArrayList<>();
+                        List<Subscription> localSubs = com.github.tvbox.osc.util.SubscriptionManager.getSubscriptions();
+                        String effectiveApi = Hawk.get(HawkConfig.API_URL, "");
+                        List<Subscription> merged = new ArrayList<>(localSubs);
                         for (SyncConfigGroup.SubscriptionItem item : cg.subscriptions) {
                             if (item == null || TextUtils.isEmpty(item.url)) continue;
-                            Subscription sub = new Subscription(item.name, item.url);
-                            sub.setChecked(false);
-                            sub.setTop(item.top);
-                            merged.add(sub);
+                            boolean exists = false;
+                            for (Subscription s : merged) {
+                                if (item.url.equals(s.getUrl())) {
+                                    exists = true;
+                                    break;
+                                }
+                            }
+                            if (!exists) {
+                                Subscription sub = new Subscription(item.name, item.url);
+                                sub.setChecked(item.url.equals(effectiveApi));
+                                sub.setTop(item.top);
+                                merged.add(sub);
+                            }
                         }
-                        Hawk.put(HawkConfig.SUBSCRIPTIONS, merged);
+                        com.github.tvbox.osc.util.SubscriptionManager.saveSubscriptions(merged);
                     }
                 }
             }

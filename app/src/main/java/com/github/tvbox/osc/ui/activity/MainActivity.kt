@@ -1,5 +1,9 @@
 package com.github.tvbox.osc.ui.activity
 
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
+import android.app.ActivityManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Rect
 import android.os.Bundle
@@ -159,7 +163,12 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
             }
         }
 
-        mBinding.composeRoot.post { window.setBackgroundDrawableResource(R.color.md_background) }
+        mBinding.composeRoot.post {
+            window.setBackgroundDrawableResource(R.color.md_background)
+            if (!intent.hasExtra(EXTRA_TAB)) {
+                resumeDetailActivityIfAlive()
+            }
+        }
     }
 
     @OptIn(ExperimentalFoundationApi::class)
@@ -196,7 +205,8 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
 
         val backdrop = rememberLayerBackdrop()
         val navInsetDp = with(LocalDensity.current) { navInsetState.intValue.toDp() }
-        val floating = floatingState.value
+        val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val floating = floatingState.value || isLandscape
         val bottomPadding = if (floating) (72.dp + navInsetDp) else (LiquidBarSpec.OccupiedHeightDp.dp + navInsetDp)
 
         val barOffsetY by animateDpAsState(
@@ -248,15 +258,14 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
             }
 
             // 2. 底栏
-            val barFilterVisible = currentTabState.intValue == 0 &&
-                homeFragment.categoryCount > 0 &&
-                homeFragment.hasCurrentCategoryFilters()
-
             val scrollFraction = pagerState.currentPage + pagerState.currentPageOffsetFraction
 
             LiquidBottomBar(
                 selectedIndex = pagerState.currentPage,
                 onTabSelected = { index ->
+                    if (index != 1 && currentTabState.intValue == 1) {
+                        liveFragment.userVisibleHint = false
+                    }
                     currentTabState.intValue = index
                     coroutineScope.launch {
                         pagerState.animateScrollToPage(index)
@@ -268,10 +277,6 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                 navInsetBottom = navInsetDp,
                 pageScrollFraction = scrollFraction,
                 backdrop = backdrop,
-                filterVisible = barFilterVisible,
-                onFilterClick = {
-                    homeFragment.showCurrentCategoryFilter(this@MainActivity)
-                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .offset(y = barOffsetY)
@@ -289,7 +294,8 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                         lastViewedTipState.value = null
                         val bundle = Bundle().apply {
                             putString("id", vod.id)
-                            putString("sourceKey", vod.sourceKey)
+                            putString("sourceKey", vod.sourceKey ?: "")
+                            putString("title", vod.name ?: "")
                         }
                         startActivity(
                             Intent(this@MainActivity, DetailActivity::class.java).putExtras(bundle)
@@ -316,12 +322,44 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         // (旧实现无条件 goToTab(0), 直播页切后台再回来会被跳回首页)
         if (intent.hasExtra(EXTRA_TAB)) {
             goToTab(intent.getIntExtra(EXTRA_TAB, 0))
+            return
         }
+        resumeDetailActivityIfAlive()
+    }
+
+    /**
+     * 当应用从桌面图标重新进入时，若后台仍保留着存活的播放详情页（如画中画关闭后停留在后台），
+     * 自动将该详情页拉至前台，恢复用户的观看界面。
+     */
+    private fun resumeDetailActivityIfAlive(): Boolean {
+        val detailActivity = ActivityUtils.getActivityList().find {
+            it is DetailActivity && !it.isFinishing && !it.isDestroyed
+        } ?: return false
+
+        try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            am?.moveTaskToFront(detailActivity.taskId, ActivityManager.MOVE_TASK_WITH_HOME)
+        } catch (th: Throwable) {
+            th.printStackTrace()
+        }
+
+        try {
+            val intent = Intent(this, DetailActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            startActivity(intent)
+        } catch (th: Throwable) {
+            th.printStackTrace()
+        }
+        return true
     }
 
     /** 切换底部 tab(直播标题栏返回/我的页入口/通知点击等统一入口) */
     fun goToTab(index: Int) {
         if (index < 0 || index >= 4) return
+        if (index != 1 && currentTabState.intValue == 1) {
+            liveFragment.userVisibleHint = false
+        }
         currentTabState.intValue = index
         if (index == 0) {
             homeFragment.showTopBar()

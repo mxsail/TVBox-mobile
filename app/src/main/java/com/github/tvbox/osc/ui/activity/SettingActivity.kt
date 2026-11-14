@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
@@ -25,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +48,7 @@ import com.github.tvbox.osc.ui.compose.MenuRow
 import com.github.tvbox.osc.ui.compose.SectionTitle
 import com.github.tvbox.osc.ui.compose.SwitchRow
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.isAppDarkTheme
 import com.github.tvbox.osc.ui.dialog.BackupDialog
 import com.github.tvbox.osc.ui.dialog.SelectDialog
 import com.github.tvbox.osc.util.FastClickCheckUtil
@@ -62,7 +65,6 @@ import com.lxj.xpopup.XPopup
 import com.orhanobut.hawk.Hawk
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
-import tv.danmaku.ijk.media.player.IjkMediaPlayer
 import java.io.File
 
 /**
@@ -79,8 +81,8 @@ class SettingActivity : BaseActivity() {
     private val liveSourceSummaryState = mutableStateOf("")
 
     private fun getSubscriptionSummary(): String {
-        val subs: List<com.github.tvbox.osc.bean.Subscription>? = Hawk.get(HawkConfig.SUBSCRIPTIONS, null)
-        return subs?.find { it.isChecked }?.name ?: "未设置"
+        val subs: List<com.github.tvbox.osc.bean.Subscription> = com.github.tvbox.osc.util.SubscriptionManager.getSubscriptions()
+        return subs.find { it.isChecked }?.name ?: "未设置"
     }
 
     private fun getLiveSourceSummary(): String {
@@ -227,16 +229,25 @@ class SettingActivity : BaseActivity() {
         var ijkCodecValue by remember { mutableStateOf(Hawk.get(HawkConfig.IJK_CODEC, "")) }
         var renderValue by remember { mutableStateOf(PlayerHelper.getRenderName(Hawk.get(HawkConfig.PLAY_RENDER, PlayerHelper.RENDER_TEXTURE_VIEW))) }
         var scaleValue by remember { mutableStateOf(PlayerHelper.getScaleName(Hawk.get(HawkConfig.PLAY_SCALE, 0))) }
-        var ijkCache by remember { mutableStateOf(Hawk.get(HawkConfig.IJK_CACHE_PLAY, false)) }
         var syncValue by remember { mutableStateOf(if (Hawk.get(HawkConfig.SYNC_ENABLED, false)) "已启用" else "未启用") }
         var dnsValue by remember { mutableStateOf(OkGoHelper.dnsHttpsList[Hawk.get(HawkConfig.DOH_URL, 0)]) }
         var historyValue by remember { mutableStateOf(HistoryHelper.getHistoryNumName(Hawk.get(HawkConfig.HISTORY_NUM, 0))) }
 
+        val isDark = isAppDarkTheme()
+        val pageBg = if (isDark) colorScheme.background else Color(0xFFF3F3F4)
+
         Scaffold(
-            containerColor = colorScheme.background,
+            containerColor = pageBg,
             topBar = {
-                TopAppBar(
-                    title = { Text("设置", fontSize = 16.sp) },
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            "设置",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colorScheme.onSurface
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = { onBackPressedDispatcher.onBackPressed() }) {
                             Icon(
@@ -246,7 +257,7 @@ class SettingActivity : BaseActivity() {
                             )
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = pageBg)
                 )
             }
         ) { padding ->
@@ -255,9 +266,9 @@ class SettingActivity : BaseActivity() {
                     .padding(padding)
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 14.dp)
             ) {
-                SectionTitle("常规")
+                Spacer(Modifier.height(8.dp))
                 GroupCard {
                     MenuRow(R.drawable.ic_palette_48, "外观设置", appearanceValue) { openAppearance() }
                     MenuRow(R.drawable.ic_home, "主页内容", homeRecValue) {
@@ -272,7 +283,7 @@ class SettingActivity : BaseActivity() {
                     }
                 }
 
-                SectionTitle("播放源管理")
+                Spacer(Modifier.height(14.dp))
                 GroupCard {
                     MenuRow(R.drawable.ic_database_48, "订阅源", subSourceSummaryState.value) {
                         jumpActivity(SubscriptionActivity::class.java)
@@ -282,7 +293,7 @@ class SettingActivity : BaseActivity() {
                     }
                 }
 
-                SectionTitle("播放与下载")
+                Spacer(Modifier.height(14.dp))
                 GroupCard {
                     MenuRow(R.drawable.ic_m3_play_arrow, "播放器", playValue) {
                         val players = PlayerHelper.getExistPlayerTypes()
@@ -320,14 +331,14 @@ class SettingActivity : BaseActivity() {
                             com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
                         }
                     }
-                    MenuRow(R.drawable.ic_memory_48, "IJK解码方式", ijkCodecValue) {
+                    MenuRow(R.drawable.ic_memory_48, "解码方式", ijkCodecValue) {
                         val ijkCodes = ApiConfig.get().ijkCodes
                         if (ijkCodes.isNullOrEmpty()) return@MenuRow
                         val ijkSel = Hawk.get(HawkConfig.IJK_CODEC, "")
                         var defaultPos = 0
                         ijkCodes.indices.forEach { if (ijkSel == ijkCodes[it].name) defaultPos = it }
                         val dialog = SelectDialog<IJKCode>(this@SettingActivity)
-                        dialog.setTip("请选择IJK解码")
+                        dialog.setTip("请选择解码方式")
                         dialog.setAdapter(object : SelectDialogInterface<IJKCode?> {
                             override fun click(value: IJKCode?, pos: Int) {
                                 value?.selected(true)
@@ -370,13 +381,9 @@ class SettingActivity : BaseActivity() {
                             com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
                         }
                     }
-                    SwitchRow(R.drawable.ic_cache_48, "IJK缓存", ijkCache) { newValue ->
-                        ijkCache = newValue
-                        Hawk.put(HawkConfig.IJK_CACHE_PLAY, newValue)
-                    }
                 }
 
-                SectionTitle("数据")
+                Spacer(Modifier.height(14.dp))
                 GroupCard {
                     MenuRow(R.drawable.ic_backup_48, "备份与恢复", null) { openBackup() }
                     MenuRow(R.drawable.ic_sync_48, "数据同步", syncValue) {
@@ -392,7 +399,6 @@ class SettingActivity : BaseActivity() {
                             Hawk.put(HawkConfig.DOH_URL, pos)
                             dnsValue = OkGoHelper.dnsHttpsList[pos]
                             OkGoHelper.updateDns()
-                            IjkMediaPlayer.toggleDotPort(pos > 0)
                         }
                     }
                     MenuRow(R.drawable.ic_history_48, "历史记录", historyValue) {
@@ -407,7 +413,7 @@ class SettingActivity : BaseActivity() {
                     }
                     MenuRow(R.drawable.ic_clear, "清空缓存", null) { confirmClearCache() }
                 }
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(28.dp))
             }
         }
     }

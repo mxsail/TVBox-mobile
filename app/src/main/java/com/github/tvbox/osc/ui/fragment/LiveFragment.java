@@ -166,8 +166,8 @@ public class LiveFragment extends BaseLazyFragment {
             uiState.setChannels(new ArrayList<>());
             showLoading();
         } else {
-            // 切换直播源完成：装载新频道列表并自动开播第一频道
-            initLiveChannelList();
+            // 切换直播源完成：直接从 ApiConfig 载入新频道列表，绝不在此递归触发 reload 造成死循环
+            updateLiveChannelListFromConfig(false);
         }
     }
 
@@ -475,7 +475,11 @@ public class LiveFragment extends BaseLazyFragment {
                 if (bgType == 1 && !isHostResumed()) {
                     startBackgroundPlayNotification();
                 } else {
-                    mVideoView.pause();
+                    if (playState == VideoView.STATE_PREPARING) {
+                        mVideoView.release();
+                    } else {
+                        mVideoView.pause();
+                    }
                     stopBackgroundPlayNotification();
                 }
             }
@@ -568,7 +572,11 @@ public class LiveFragment extends BaseLazyFragment {
         if (mVideoView != null) {
             if (resumeOnTabReenter) {
                 resumeOnTabReenter = false;
-                mVideoView.resume();
+                if (mVideoView.getCurrentPlayState() == VideoView.STATE_IDLE && currentLiveChannelIndex > -1) {
+                    playChannel(currentChannelGroupIndex, currentLiveChannelIndex, false);
+                } else {
+                    mVideoView.resume();
+                }
             } else if (mVideoView.getCurrentPlayState() == VideoView.STATE_IDLE && currentLiveChannelIndex > -1) {
                 playChannel(currentChannelGroupIndex, currentLiveChannelIndex, false);
             }
@@ -585,6 +593,9 @@ public class LiveFragment extends BaseLazyFragment {
     }
 
     private boolean playChannel(int channelGroupIndex, int liveChannelIndex, boolean changeSource) {
+        if (!getUserVisibleHint() || !currentVisibleState) {
+            return false;
+        }
         // 同频道同线路且播放器实际持有该频道时才短路; 进入直播页(播放器 IDLE)或
         // 上一次起播失败(ERROR)时不能被守卫拦下, 否则首频道不自动播、重复点击也不起播
         int playerState = mVideoView.getCurrentPlayState();
@@ -771,10 +782,36 @@ public class LiveFragment extends BaseLazyFragment {
         resetSettingHideTimer();
     }
 
+    private void updateLiveChannelListFromConfig(boolean showToastIfEmpty) {
+        List<LiveChannelGroup> all = ApiConfig.get().getChannelGroupList();
+        List<LiveChannelGroup> valid = new ArrayList<>();
+        for (LiveChannelGroup group : all) {
+            if (group.getLiveChannels() != null && !group.getLiveChannels().isEmpty()) valid.add(group);
+        }
+        if (valid.isEmpty() && !all.isEmpty() && all.get(0).getLiveChannels() != null) {
+            valid = new ArrayList<>(all);
+        }
+        if (valid.isEmpty()) {
+            if (showToastIfEmpty && getUserVisibleHint()) {
+                Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
+            }
+            showEmpty();
+        } else {
+            applyLiveChannelList(valid);
+        }
+    }
+
     private void initLiveChannelList() {
         if (com.github.tvbox.osc.util.live.LiveSourceManager.INSTANCE.isReloading()) {
             showLoading();
             return;
+        }
+        String liveUrl = Hawk.get(HawkConfig.LIVE_URL, "");
+        if (liveUrl != null && !liveUrl.isEmpty()) {
+            if (liveUrl.startsWith("clan") || liveUrl.startsWith("file") || liveUrl.startsWith("http")) {
+                loadProxyLives(liveUrl);
+                return;
+            }
         }
         List<LiveChannelGroup> all = ApiConfig.get().getChannelGroupList();
         List<LiveChannelGroup> list = new ArrayList<>();
@@ -788,20 +825,7 @@ public class LiveFragment extends BaseLazyFragment {
             showLoading();
             com.github.tvbox.osc.util.live.LiveSourceManager.INSTANCE.reloadLiveChannels(false, success -> {
                 if (getActivity() == null || getActivity().isFinishing()) return kotlin.Unit.INSTANCE;
-                List<LiveChannelGroup> reloaded = ApiConfig.get().getChannelGroupList();
-                List<LiveChannelGroup> valid = new ArrayList<>();
-                for (LiveChannelGroup group : reloaded) {
-                    if (group.getLiveChannels() != null && !group.getLiveChannels().isEmpty()) valid.add(group);
-                }
-                if (valid.isEmpty() && !reloaded.isEmpty() && reloaded.get(0).getLiveChannels() != null) {
-                    valid = new ArrayList<>(reloaded);
-                }
-                if (valid.isEmpty()) {
-                    Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
-                    showEmpty();
-                } else {
-                    applyLiveChannelList(valid);
-                }
+                updateLiveChannelListFromConfig(true);
                 return kotlin.Unit.INSTANCE;
             });
             return;
@@ -823,7 +847,9 @@ public class LiveFragment extends BaseLazyFragment {
             Uri parsedUrl = Uri.parse(url);
             extUrl = new String(Base64.decode(parsedUrl.getQueryParameter("ext"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP), "UTF-8");
         } catch (Throwable th) {
-            Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
+            if (getUserVisibleHint()) {
+                Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
+            }
             showEmpty();
             return;
         }
@@ -838,7 +864,9 @@ public class LiveFragment extends BaseLazyFragment {
 
     private void applyProxyLives(String bodyText) {
         if (bodyText == null) {
-            Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
+            if (getUserVisibleHint()) {
+                Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
+            }
             showEmpty();
             return;
         }
@@ -850,7 +878,9 @@ public class LiveFragment extends BaseLazyFragment {
         ApiConfig.get().loadLives(livesArray);
         List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
         if (list.isEmpty()) {
-            Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
+            if (getUserVisibleHint()) {
+                Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
+            }
             showEmpty();
             return;
         }

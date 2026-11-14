@@ -10,7 +10,7 @@ android {
     compileSdk 37
 
     defaultConfig {
-        applicationId 'com.kertou.tvplayer'
+        applicationId 'com.ecbud.player'
         minSdk 24
         targetSdk 34
         versionCode 39
@@ -63,7 +63,7 @@ android {
 
     buildTypes {
         debug {
-            debuggable false
+            debuggable true
             def store = file('../kertou-tvplayer.jks')
             if (store.exists()) {
                 signingConfig signingConfigs.config

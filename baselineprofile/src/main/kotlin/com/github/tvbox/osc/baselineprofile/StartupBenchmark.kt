@@ -18,7 +18,7 @@ class StartupBenchmark {
 
     @Test
     fun startup() = baselineProfileRule.collect(
-        packageName = "com.kertou.tvplayer",
+        packageName = "com.ecbud.player",
         includeInStartupProfile = true,
         maxIterations = 5,
         stableIterations = 2

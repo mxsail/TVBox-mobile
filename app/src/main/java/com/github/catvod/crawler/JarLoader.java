@@ -48,7 +48,7 @@ public class JarLoader {
                 // Android 14+ (API 34+) 强制要求: 动态加载的代码文件必须标记为只读, 否则 DexClassLoader 抛出 SecurityException
                 jarFile.setReadOnly();
             }
-            File cacheDir = new File(App.getInstance().getCacheDir().getAbsolutePath() + "/catvod_csp");
+            File cacheDir = new File(App.getInstance().getCacheDir().getAbsolutePath() + "/catvod_csp_" + key);
             if (!cacheDir.exists())
                 cacheDir.mkdirs();
             DexClassLoader classLoader = new DexClassLoader(jar, cacheDir.getAbsolutePath(), null, App.getInstance().getClassLoader());

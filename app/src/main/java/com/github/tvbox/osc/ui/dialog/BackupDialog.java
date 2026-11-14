@@ -112,6 +112,8 @@ public class BackupDialog extends BaseDialog {
                                 sharedPreferences.edit().putString(key, value).commit();
                             }
                         }
+                        // 订阅主存储在独立 SP，清掉旧缓存，重启时从恢复出来的 Hawk 数据重建
+                        com.github.tvbox.osc.util.SubscriptionManager.invalidateMainStore();
                         Toast.makeText(getContext(), "恢复成功,即将重启应用!", Toast.LENGTH_SHORT).show();
                         new Handler().postDelayed(() -> AppUtils.relaunchApp(true),2000);
                     } else {

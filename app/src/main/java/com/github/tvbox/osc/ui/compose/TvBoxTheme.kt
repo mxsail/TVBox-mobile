@@ -65,6 +65,11 @@ fun TvBoxTheme(content: @Composable () -> Unit) {
             onSurfaceVariant = Color(ctx.themeIntAttr(R.attr.colorOnSurfaceVariant)),
             outline = Color(ctx.themeIntAttr(R.attr.colorOutline)),
             outlineVariant = Color(ctx.themeIntAttr(R.attr.colorOutlineVariant)),
+            surfaceContainerLowest = Color(ctx.themeIntAttr(R.attr.colorSurfaceContainerLowest)),
+            surfaceContainerLow = Color(ctx.themeIntAttr(R.attr.colorSurfaceContainerLow)),
+            surfaceContainer = Color(ctx.themeIntAttr(R.attr.colorSurfaceContainer)),
+            surfaceContainerHigh = Color(ctx.themeIntAttr(R.attr.colorSurfaceContainerHigh)),
+            surfaceContainerHighest = Color(ctx.themeIntAttr(R.attr.colorSurfaceContainerHighest)),
         )
     } else {
         lightColorScheme(
@@ -74,14 +79,19 @@ fun TvBoxTheme(content: @Composable () -> Unit) {
             onPrimaryContainer = Color(ctx.themeIntAttr(R.attr.colorOnPrimaryContainer)),
             secondaryContainer = Color(ctx.themeIntAttr(R.attr.colorSecondaryContainer)),
             onSecondaryContainer = Color(ctx.themeIntAttr(R.attr.colorOnSecondaryContainer)),
-            background = Color(ctx.themeIntAttr(android.R.attr.colorBackground)),
+            background = Color(0xFFF3F3F4),
             onBackground = Color(ctx.themeIntAttr(R.attr.colorOnBackground)),
-            surface = Color(ctx.themeIntAttr(R.attr.colorSurface)),
+            surface = Color(0xFFF3F3F4),
             onSurface = Color(ctx.themeIntAttr(R.attr.colorOnSurface)),
             surfaceVariant = Color(ctx.themeIntAttr(R.attr.colorSurfaceVariant)),
             onSurfaceVariant = Color(ctx.themeIntAttr(R.attr.colorOnSurfaceVariant)),
             outline = Color(ctx.themeIntAttr(R.attr.colorOutline)),
             outlineVariant = Color(ctx.themeIntAttr(R.attr.colorOutlineVariant)),
+            surfaceContainerLowest = Color.White,
+            surfaceContainerLow = Color.White,
+            surfaceContainer = Color.White,
+            surfaceContainerHigh = Color(ctx.themeIntAttr(R.attr.colorSurfaceContainerHigh)),
+            surfaceContainerHighest = Color(ctx.themeIntAttr(R.attr.colorSurfaceContainerHighest)),
         )
     }
     // 自定义字体桥接: 用户导入的 .ttf/.otf 同时作用于 Compose 文本
@@ -125,19 +135,26 @@ fun SectionTitle(text: String) {
     )
 }
 
-/** M3 卡片分组容器(行竖排) */
+/** M3 卡片分组容器(行竖排) - HyperOS 风格 */
 @Composable
-fun GroupCard(content: @Composable () -> Unit) {
+fun GroupCard(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val isDark = isAppDarkTheme()
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        shape = RoundedCornerShape(16.dp)
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) MaterialTheme.colorScheme.surfaceContainerLow else Color.White
+        ),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column { content() }
     }
 }
 
-/** 列表行: 图标+标题+(右侧当前值+chevron), 与 View 版 M3MenuRow 同构 */
+/** 列表行: 图标+标题+(右侧当前值+chevron), 与 View 版 M3MenuRow 同构 (HyperOS 风格) */
 @Composable
 fun MenuRow(
     icon: Int,
@@ -145,67 +162,72 @@ fun MenuRow(
     value: String? = null,
     onClick: (() -> Unit)? = null
 ) {
+    val isDark = isAppDarkTheme()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = onClick != null) { onClick?.invoke() }
-            .padding(start = 20.dp, end = 16.dp, top = 15.dp, bottom = 15.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             painterResource(icon),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(22.dp)
         )
         Text(
             title,
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier
-                .padding(start = 20.dp)
+                .padding(start = 16.dp)
                 .weight(1f)
         )
         if (value != null) {
             Text(
                 value,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF8E8E93),
                 fontSize = 14.sp,
                 maxLines = 1,
-                modifier = Modifier.padding(end = 6.dp)
+                modifier = Modifier.padding(end = 4.dp)
             )
+        }
+        if (onClick != null) {
             Icon(
-                painterResource(R.drawable.icon_pre),
+                painterResource(R.drawable.ic_chevron_right),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.size(22.dp)
+                tint = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else Color(0xFFC7C7CC),
+                modifier = Modifier.size(16.dp)
             )
         }
     }
 }
 
-/** 开关列表行 */
+/** 开关列表行 (HyperOS 风格) */
 @Composable
 fun SwitchRow(icon: Int, title: String, checked: Boolean, onToggle: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onToggle(!checked) }
-            .padding(start = 20.dp, end = 16.dp, top = 15.dp, bottom = 15.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             painterResource(icon),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(22.dp)
         )
         Text(
             title,
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier
-                .padding(start = 20.dp)
+                .padding(start = 16.dp)
                 .weight(1f)
         )
         Switch(checked = checked, onCheckedChange = { onToggle(it) })

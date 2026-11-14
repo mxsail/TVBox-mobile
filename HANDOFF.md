@@ -5,9 +5,9 @@
 
 ## 1. 项目概览
 
-**TVBox-Mobile**：TVBox 的竖屏 Android fork，兼容 TVBox 数据源（订阅/爬虫 spider），内置离线缓存（下载）引擎、直播、投屏，UI 为 Material 3（支持 Android 12+ 壁纸动态取色）。
+**幕界 (TVBox-Mobile)**：TVBox 的竖屏 Android fork，兼容 TVBox 数据源（订阅/爬虫 spider），内置离线缓存（下载）引擎、直播、投屏，UI 为 Material 3（支持 Android 12+ 壁纸动态取色）。
 
-- 包名（applicationId）：`com.kertou.tvplayer`
+- 包名（applicationId）：`com.ecbud.player`
 - 源码 namespace（R 类/Manifest package）：`com.github.tvbox.osc`（与 applicationId 分离，勿混淆；uiautomator dump 显示的 package 是 namespace，resource-id 前缀是 applicationId）
 - 当前版本：**3.1.1 (versionCode 39)**
 - GitHub：https://github.com/kertou/TVBox-mobile （origin=kertou/TVBox-mobile，upstream=XiaoRanLiu3119/TVBoxOS-Mobile）

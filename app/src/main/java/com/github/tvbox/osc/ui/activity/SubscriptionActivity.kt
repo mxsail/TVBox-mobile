@@ -43,6 +43,7 @@ import com.github.tvbox.osc.base.BaseActivity
 import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.bean.Source
 import com.github.tvbox.osc.bean.Subscription
+import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.dialog.ChooseSourceDialog
 import com.github.tvbox.osc.ui.dialog.SubsTipDialog
@@ -70,7 +71,7 @@ class SubscriptionActivity : BaseActivity() {
 
     private var mBeforeUrl = Hawk.get(HawkConfig.API_URL, "")
     private var mSelectedUrl = ""
-    private val mSubscriptions: MutableList<Subscription> = Hawk.get(HawkConfig.SUBSCRIPTIONS, ArrayList())
+    private val mSubscriptions: MutableList<Subscription> = ArrayList()
     private val mSources: MutableList<Source> = ArrayList()
 
     /** 列表 UI 快照(Subscription 为可变 POJO, 每次操作后重建快照驱动重组) */
@@ -87,10 +88,43 @@ class SubscriptionActivity : BaseActivity() {
     }
 
     override fun init() {
+        loadDataFromStorage()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        loadDataFromStorage()
+    }
+
+    private fun loadDataFromStorage() {
+        mSubscriptions.clear()
+        mSubscriptions.addAll(com.github.tvbox.osc.util.SubscriptionManager.getSubscriptions())
+        val currentApiUrl = Hawk.get(HawkConfig.API_URL, "")
+        if (mSelectedUrl.isEmpty()) {
+            mSelectedUrl = currentApiUrl
+        }
+        var foundSelected = false
         mSubscriptions.forEach { item: Subscription ->
-            if (item.isChecked) mSelectedUrl = item.url
+            if (item.isChecked) {
+                mSelectedUrl = item.url
+                foundSelected = true
+            }
+        }
+        if (!foundSelected && !currentApiUrl.isNullOrEmpty()) {
+            mSubscriptions.find { it.url == currentApiUrl }?.let {
+                it.isChecked = true
+                mSelectedUrl = it.url
+            }
         }
         refresh()
+    }
+
+    private fun saveSubscriptions() {
+        com.github.tvbox.osc.util.SubscriptionManager.setSelectedApiUrl(mSelectedUrl)
+        com.github.tvbox.osc.util.SubscriptionManager.saveSubscriptions(mSubscriptions)
+        if (mBeforeUrl != mSelectedUrl) {
+            com.tvbox.sync.adapter.AppRoomSyncAdapter.recordContentConfigUpsert()
+        }
     }
 
     private fun refresh() {
@@ -220,6 +254,7 @@ class SubscriptionActivity : BaseActivity() {
                                         val u = obj["url"].asString.trim { it <= ' ' }
                                         mSubscriptions.add(Subscription(n, u))
                                     }
+                                    saveSubscriptions()
                                 }
                             } else if (storeHouse != null && storeHouse.isJsonArray) { // 多仓
                                 val storeHouseList = storeHouse.asJsonArray
@@ -287,6 +322,7 @@ class SubscriptionActivity : BaseActivity() {
         } else {
             mSubscriptions.add(Subscription(name, url).setChecked(false))
         }
+        saveSubscriptions()
     }
 
     // ---------------- 列表操作 ----------------
@@ -296,6 +332,7 @@ class SubscriptionActivity : BaseActivity() {
             mSubscriptions[i].setChecked(i == positionInData)
         }
         mSelectedUrl = mSubscriptions[positionInData].url
+        saveSubscriptions()
         refresh()
     }
 
@@ -312,6 +349,7 @@ class SubscriptionActivity : BaseActivity() {
             .setNegativeButton("取消", null)
             .setPositiveButton("确定") { _, _ ->
                 mSubscriptions.removeAt(pos)
+                saveSubscriptions()
                 refresh()
             }
             .show()
@@ -333,6 +371,7 @@ class SubscriptionActivity : BaseActivity() {
                 when (which) {
                     0 -> {
                         item.isTop = !item.isTop
+                        saveSubscriptions()
                         refresh()
                     }
                     1 -> {
@@ -345,6 +384,7 @@ class SubscriptionActivity : BaseActivity() {
                                         ToastUtils.showShort("名称过长")
                                     } else {
                                         item.name = trimmed
+                                        saveSubscriptions()
                                         refresh()
                                     }
                                 }
@@ -361,21 +401,16 @@ class SubscriptionActivity : BaseActivity() {
             .show()
     }
 
-    // ---------------- 生命周期语义(沿用旧版) ----------------
-
-    override fun onPause() {
-        super.onPause()
-        Hawk.put(HawkConfig.API_URL, mSelectedUrl)
-        Hawk.put<List<Subscription>?>(HawkConfig.SUBSCRIPTIONS, mSubscriptions)
-        if (mBeforeUrl != mSelectedUrl) {
-            com.tvbox.sync.adapter.AppRoomSyncAdapter.recordContentConfigUpsert()
-        }
-    }
+    // ---------------- 生命周期语义 ----------------
 
     override fun finish() {
+        // 所有增删改都已即时落盘，退出时不再用内存列表覆盖存储：
+        // onResume 一旦读取失败返回空列表，这里的写回会把订阅全部清空。
         if (!TextUtils.isEmpty(mSelectedUrl) && mBeforeUrl != mSelectedUrl) {
-            val intent = Intent(this, MainActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
+            val intent = Intent(this, MainActivity::class.java).apply {
+                putExtra(IntentKey.CACHE_CONFIG_CHANGED, true)
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
             startActivity(intent)
             overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
         }
@@ -442,7 +477,7 @@ class SubscriptionActivity : BaseActivity() {
                     modifier = Modifier
                         .padding(padding)
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = 14.dp)
                 ) {
                     itemsIndexed(rows.value) { _, row ->
                         val selected = row.checked
@@ -452,14 +487,15 @@ class SubscriptionActivity : BaseActivity() {
                                 .padding(vertical = 5.dp)
                                 .then(
                                     if (selected) Modifier.border(
-                                        1.5.dp, colorScheme.primary, RoundedCornerShape(16.dp)
+                                        1.5.dp, colorScheme.primary, RoundedCornerShape(18.dp)
                                     ) else Modifier
                                 ),
                             colors = CardDefaults.cardColors(
                                 containerColor = if (selected) colorScheme.secondaryContainer
                                 else colorScheme.surfaceContainerLow
                             ),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(18.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                         ) {
                             Row(
                                 modifier = Modifier

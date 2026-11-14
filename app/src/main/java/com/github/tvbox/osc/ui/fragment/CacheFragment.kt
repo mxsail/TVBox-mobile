@@ -140,7 +140,7 @@ class CacheFragment : Fragment() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -169,8 +169,8 @@ class CacheFragment : Fragment() {
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottomPadding),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = bottomPadding),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     state = listState,
                     modifier = Modifier
                         .weight(1f)
@@ -180,7 +180,8 @@ class CacheFragment : Fragment() {
                         val supporting = listOfNotNull(card.note, card.sizeText).joinToString(" · ")
                         Card(
                             colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(18.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                         ) {
                             Row(
                                 modifier = Modifier

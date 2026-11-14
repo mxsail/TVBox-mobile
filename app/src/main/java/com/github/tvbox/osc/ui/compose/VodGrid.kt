@@ -18,7 +18,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
@@ -234,8 +236,8 @@ fun VodGridScreen(
     Scaffold(
         containerColor = colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(title, fontSize = 16.sp) },
+            CenterAlignedTopAppBar(
+                title = { Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -279,7 +281,7 @@ fun VodGridScreen(
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier

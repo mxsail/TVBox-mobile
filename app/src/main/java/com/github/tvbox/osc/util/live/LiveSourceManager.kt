@@ -159,21 +159,28 @@ object LiveSourceManager {
 
     /** 核心重载逻辑：网络/本地拉取 -> 容灾缓存 -> TxtSubscribe解析 -> 载入 ApiConfig -> 派发事件 */
     fun reloadLiveChannels(force: Boolean = false, callback: ((Boolean) -> Unit)? = null) {
+        if (isReloading) {
+            callback?.invoke(false)
+            return
+        }
         isReloading = true
         scope.launch {
-            val selectedUrl = getSelectedSourceUrl()
-            val success: Boolean
+            try {
+                val selectedUrl = getSelectedSourceUrl()
+                val success: Boolean
 
-            if (selectedUrl == LiveSource.FOLLOW_SUBSCRIPTION || selectedUrl.isEmpty()) {
-                success = loadFromCurrentSubscription()
-            } else {
-                success = loadFromCustomSource(selectedUrl)
-            }
-            isReloading = false
+                if (selectedUrl == LiveSource.FOLLOW_SUBSCRIPTION || selectedUrl.isEmpty()) {
+                    success = loadFromCurrentSubscription()
+                } else {
+                    success = loadFromCustomSource(selectedUrl)
+                }
 
-            withContext(Dispatchers.Main) {
-                EventBus.getDefault().post(LiveSourceChangedEvent(selectedUrl, false))
-                callback?.invoke(success)
+                withContext(Dispatchers.Main) {
+                    EventBus.getDefault().post(LiveSourceChangedEvent(selectedUrl, false))
+                    callback?.invoke(success)
+                }
+            } finally {
+                isReloading = false
             }
         }
     }

@@ -51,6 +51,7 @@ public class App extends MultiDexApplication {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        com.github.tvbox.osc.player.util.PlayerApp.init(this);
         initParams();
         // Material You 动态取色(Android 12+ 跟随壁纸, 低版本无操作保持品牌蓝)。
         // 是否生效由 ThemeManager 按用户设置逐 Activity 裁决: 选了预设色板时不套动态覆盖层
@@ -139,7 +140,7 @@ public class App extends MultiDexApplication {
                     subscriptions.add(new Subscription("订阅: "+(i+1), apis[i]));
                 }
             }
-            Hawk.put(HawkConfig.SUBSCRIPTIONS,subscriptions);
+            com.github.tvbox.osc.util.SubscriptionManager.saveSubscriptions(subscriptions);
         }
     }
 

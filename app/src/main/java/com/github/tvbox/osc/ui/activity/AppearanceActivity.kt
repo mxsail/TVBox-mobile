@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -286,8 +287,8 @@ class AppearanceActivity : BaseActivity() {
         Scaffold(
             containerColor = colorScheme.background,
             topBar = {
-                TopAppBar(
-                    title = { Text("外观设置", fontSize = 16.sp) },
+                CenterAlignedTopAppBar(
+                    title = { Text("外观设置", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
                             Icon(
@@ -308,7 +309,7 @@ class AppearanceActivity : BaseActivity() {
                     .padding(padding)
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 14.dp)
             ) {
                 SectionTitle("预览")
                 PreviewCard(
@@ -366,7 +367,8 @@ class AppearanceActivity : BaseActivity() {
                         .fillMaxWidth()
                         .padding(top = 8.dp),
                     colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(18.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(Modifier.padding(vertical = 8.dp)) {
                         val rows = presets.chunked(5)
@@ -852,7 +854,8 @@ class AppearanceActivity : BaseActivity() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(18.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column { content() }
         }

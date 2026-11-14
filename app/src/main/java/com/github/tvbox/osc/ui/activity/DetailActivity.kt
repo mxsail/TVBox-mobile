@@ -148,6 +148,7 @@ class DetailActivity : BaseActivity() {
     private var hydratedFromSnapshot = false
     private var isCurrentlyInPip by mutableStateOf(false)
     private var wasFullscreenBeforePip = false
+    private var wasInPipMode = false
     private val pendingDownloadTasks = ArrayList<DownloadEpisode>()
 
     private var searchTitle = ""
@@ -184,6 +185,7 @@ class DetailActivity : BaseActivity() {
     }
 
     override fun onResume() {
+        wasInPipMode = false
         super.onResume()
         vodPlayerManager?.onResume()
         if (vodPlayerManager?.controller != null &&
@@ -199,7 +201,19 @@ class DetailActivity : BaseActivity() {
         vodPlayerManager?.onPause()
     }
 
+    override fun onStop() {
+        super.onStop()
+        if (wasInPipMode) {
+            wasInPipMode = false
+            vodPlayerManager?.pauseForPipDismiss()
+            playServerSwitch(false)
+            NotificationUtils.cancelAll()
+        }
+    }
+
     override fun onDestroy() {
+        playServerSwitch(false)
+        NotificationUtils.cancelAll()
         super.onDestroy()
         vodPlayerManager?.onDestroy()
         vodPlayerManager = null
@@ -440,6 +454,7 @@ class DetailActivity : BaseActivity() {
             } else {
                 if (!hydratedFromSnapshot) {
                     uiState = uiState.copy(hasEmptyPlaylist = true)
+                    ToastUtils.showShort("未找到该数据源或正在加载中")
                 }
             }
         }
@@ -874,6 +889,7 @@ class DetailActivity : BaseActivity() {
     }
 
     private fun prepareForPip() {
+        wasInPipMode = true
         isCurrentlyInPip = true
         window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.BLACK))
         window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
@@ -949,6 +965,7 @@ class DetailActivity : BaseActivity() {
     private fun handlePipModeChanged(isInPip: Boolean) {
         this.isCurrentlyInPip = isInPip
         if (isInPip) {
+            wasInPipMode = true
             wasFullscreenBeforePip = fullWindows
             prepareForPip()
             window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.BLACK))
@@ -963,7 +980,13 @@ class DetailActivity : BaseActivity() {
             registerActionReceiver(true)
         } else {
             vodPlayerManager?.controller?.setInPipMode(false)
-            registerActionReceiver(false)
+            if (isFinishing) {
+                wasInPipMode = false
+                vodPlayerManager?.pauseForPipDismiss()
+                playServerSwitch(false)
+                NotificationUtils.cancelAll()
+                return
+            }
             if (wasFullscreenBeforePip) {
                 fullWindows = true
                 vodPlayerManager?.changedLandscape(true)
@@ -1022,7 +1045,10 @@ class DetailActivity : BaseActivity() {
         if (!tryHydrateFromSnapshot()) {
             loadDetail(vodId, sourceKey)
         } else {
-            loadDetail(vodId, sourceKey)
+            // 已从快照恢复播放，仅当数据源有效时才尝试刷新
+            if (ApiConfig.get().getSource(sourceKey) != null || ApiConfig.get().homeSourceBean != null) {
+                loadDetail(vodId, sourceKey)
+            }
         }
     }
 

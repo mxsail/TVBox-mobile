@@ -73,6 +73,7 @@ public class LivePlayerManager {
             String ijkCodec = currentPlayerConfig.getString("ijk");
             switch (playerType) {
                 case 0:
+                case 2:
                     playerTypeIndex = 0;
                     break;
                 case 1:
@@ -80,9 +81,6 @@ public class LivePlayerManager {
                         playerTypeIndex = 1;
                     else
                         playerTypeIndex = 2;
-                    break;
-                case 2:
-                    playerTypeIndex = 3;
                     break;
             }
         } catch (JSONException e) {
@@ -106,7 +104,7 @@ public class LivePlayerManager {
             switch (playerType) {
                 case 0:
                     playerConfig.put("pl", 0);
-                    playerConfig.put("ijk", "软解码");
+                    playerConfig.put("ijk", "硬解码");
                     break;
                 case 1:
                     playerConfig.put("pl", 1);
@@ -114,10 +112,6 @@ public class LivePlayerManager {
                     break;
                 case 2:
                     playerConfig.put("pl", 1);
-                    playerConfig.put("ijk", "软解码");
-                    break;
-                case 3:
-                    playerConfig.put("pl", 2);
                     playerConfig.put("ijk", "软解码");
                     break;
             }

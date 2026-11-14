@@ -19,9 +19,9 @@
     <color name="md_on_error">#ffffff</color>
     <color name="md_error_container">#ffdad6</color>
     <color name="md_on_error_container">#93000a</color>
-    <color name="md_background">#faf8ff</color>
+    <color name="md_background">#f3f3f4</color>
     <color name="md_on_background">#1a1b21</color>
-    <color name="md_surface">#faf8ff</color>
+    <color name="md_surface">#f3f3f4</color>
     <color name="md_on_surface">#1a1b21</color>
     <color name="md_surface_variant">#e2e1ec</color>
     <color name="md_on_surface_variant">#45464f</color>
@@ -31,10 +31,10 @@
     <color name="md_inverse_on_surface">#f1f0f7</color>
     <color name="md_inverse_primary">#b5c4ff</color>
     <color name="md_surface_dim">#dad9e0</color>
-    <color name="md_surface_bright">#faf8ff</color>
+    <color name="md_surface_bright">#ffffff</color>
     <color name="md_surface_container_lowest">#ffffff</color>
-    <color name="md_surface_container_low">#f4f3fa</color>
-    <color name="md_surface_container">#eeedf4</color>
+    <color name="md_surface_container_low">#ffffff</color>
+    <color name="md_surface_container">#ffffff</color>
     <color name="md_surface_container_high">#e9e7ef</color>
     <color name="md_surface_container_highest">#e3e1e9</color>
     <color name="md_scrim">#000000</color>

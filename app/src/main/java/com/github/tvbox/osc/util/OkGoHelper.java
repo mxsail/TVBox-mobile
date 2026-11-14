@@ -31,7 +31,7 @@ import okhttp3.ConnectionSpec;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.dnsoverhttps.DnsOverHttps;
-import xyz.doikki.videoplayer.exo.ExoMediaSourceHelper;
+import com.github.tvbox.osc.player.util.PlayerApp;
 
 public class OkGoHelper {
     public static final long DEFAULT_MILLISECONDS = 10000;      //默认的超时时间
@@ -60,7 +60,7 @@ public class OkGoHelper {
         }
         builder.dns(dnsOverHttps);
 
-        ExoMediaSourceHelper.getInstance(App.getInstance()).setOkClient(builder.build());
+        PlayerApp.setOkHttpClient(builder.build());
     }
 
     public static okhttp3.Dns dnsOverHttps = okhttp3.Dns.SYSTEM;

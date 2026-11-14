@@ -8,10 +8,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -164,7 +169,9 @@ class HomeFragment : Fragment() {
 
     fun hasCurrentCategoryFilters(): Boolean {
         val curSort = mDisplaySortList.getOrNull(selectedTabState.intValue)
-        return curSort?.let { gridControllers[it.id]?.hasFilters() } ?: false
+        return curSort?.let {
+            gridControllers[it.id]?.hasFilters() ?: (!it.filters.isNullOrEmpty())
+        } ?: false
     }
 
     fun showCurrentCategoryFilter(context: android.content.Context) {
@@ -575,7 +582,7 @@ class HomeFragment : Fragment() {
                     Box(
                         Modifier
                             .weight(1f)
-                            .padding(start = 10.dp, end = 10.dp)
+                            .padding(start = 10.dp)
                             .height(36.dp)
                             .clip(RoundedCornerShape(percent = 50))
                             .background(colorScheme.surfaceContainerHigh)
@@ -603,6 +610,49 @@ class HomeFragment : Fragment() {
                             )
                         }
                     }
+
+                    // 分类筛选入口: 仅在当前选中的分类支持筛选时展开, 位于搜索框与历史按钮之间
+                    val hasFilters = remember(selectedTabState.intValue, categoriesState.value) {
+                        hasCurrentCategoryFilters()
+                    }
+                    AnimatedVisibility(
+                        visible = hasFilters,
+                        enter = expandHorizontally(
+                            animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+                            expandFrom = Alignment.End
+                        ) + scaleIn(
+                            animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+                            initialScale = 0.8f
+                        ) + fadeIn(animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f)),
+                        exit = shrinkHorizontally(
+                            animationSpec = spring(dampingRatio = 1f, stiffness = 400f),
+                            shrinkTowards = Alignment.End
+                        ) + scaleOut(
+                            animationSpec = tween(150),
+                            targetScale = 0.8f
+                        ) + fadeOut(animationSpec = tween(150))
+                    ) {
+                        Box(
+                            Modifier
+                                .padding(start = 10.dp)
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(percent = 50))
+                                .background(colorScheme.surfaceContainerHigh)
+                                .clickable {
+                                    val act = activity ?: return@clickable
+                                    showCurrentCategoryFilter(act)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_filter_list),
+                                contentDescription = "筛选",
+                                tint = colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
                     // 观看历史入口
                     Box(
                         Modifier

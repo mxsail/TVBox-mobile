@@ -85,13 +85,25 @@ public class SourceViewModel extends ViewModel {
 
     public static final ExecutorService spThreadPool = Executors.newSingleThreadExecutor();
 
+    private SourceBean resolveSourceBean(String sourceKey) {
+        SourceBean sb = ApiConfig.get().getSource(sourceKey);
+        if (sb == null) {
+            sb = ApiConfig.get().getHomeSourceBean();
+        }
+        return sb;
+    }
+
     // homeContent
     public void getSort(String sourceKey) {
         if (sourceKey == null) {
             sortResult.postValue(null);
             return;
         }
-        SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
+        final SourceBean sourceBean = resolveSourceBean(sourceKey);
+        if (sourceBean == null) {
+            sortResult.postValue(null);
+            return;
+        }
         int type = sourceBean.getType();
         if (type == 3) {
             Runnable waitResponse = new Runnable() {
@@ -434,7 +446,11 @@ public class SourceViewModel extends ViewModel {
     }
     // detailContent
     public void getDetail(String sourceKey, String id) {
-        SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
+        final SourceBean sourceBean = resolveSourceBean(sourceKey);
+        if (sourceBean == null) {
+            detailResult.postValue(null);
+            return;
+        }
         int type = sourceBean.getType();
         if (type == 3) {
             spThreadPool.execute(new Runnable() {
@@ -490,7 +506,11 @@ public class SourceViewModel extends ViewModel {
     }
     // searchContent
     public void getSearch(String sourceKey, String wd) {
-        SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
+        final SourceBean sourceBean = resolveSourceBean(sourceKey);
+        if (sourceBean == null) {
+            searchResult.postValue(null);
+            return;
+        }
         int type = sourceBean.getType();
         if (type == 3) {
             try {
@@ -574,7 +594,11 @@ public class SourceViewModel extends ViewModel {
     }
     // searchContent
     public void getQuickSearch(String sourceKey, String wd) {
-        SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
+        final SourceBean sourceBean = resolveSourceBean(sourceKey);
+        if (sourceBean == null) {
+            quickSearchResult.postValue(null);
+            return;
+        }
         int type = sourceBean.getType();
         if (type == 3) {
             try {
@@ -653,7 +677,11 @@ public class SourceViewModel extends ViewModel {
     // playerContent
     public void getPlay(String sourceKey, String playFlag, String progressKey, String url, String subtitleKey) {
         final int seq = playRequestSeq.incrementAndGet();
-        SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
+        final SourceBean sourceBean = resolveSourceBean(sourceKey);
+        if (sourceBean == null) {
+            playResult.postValue(null);
+            return;
+        }
         int type = sourceBean.getType();
         if (type == 3) {
             spThreadPool.execute(new Runnable() {

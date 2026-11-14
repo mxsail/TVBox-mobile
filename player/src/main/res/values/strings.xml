@@ -1,8 +1,17 @@
 <resources>
-    <string name="app_name">ijkPlayer</string>
+    <string name="app_name">Player</string>
 
+    <string name="core_error_audio_effect_unsupported">当前播放模式不支持音频设置</string>
+    <string name="core_error_audio_effect_tunnel">隧道模式下不支持音频设置</string>
+    <string name="core_error_audio_effect_passthrough">直通音频不支持音频设置</string>
+    <string name="core_error_audio_effect_apply">无法应用音频设置</string>
+    <string name="core_error_video_effect_unsupported">当前播放模式不支持画面设置</string>
+    <string name="core_error_video_effect_decode">画面设置需要硬件视频解码</string>
+    <string name="core_error_video_effect_drm">DRM 视频不支持画面设置</string>
+    <string name="core_error_video_effect_tunnel">隧道模式下不支持画面设置</string>
+    <string name="core_error_video_effect_dolby_vision_passthrough">杜比视界直通不支持画面设置</string>
 
-    // EXO Player
+    <!-- EXO Player -->
     <string name="exo_track_selection_title_video">视频</string>
     <string name="exo_track_selection_title_audio">音频</string>
     <string name="exo_track_selection_title_text">文字</string>
@@ -21,5 +30,4 @@
     <string name="exo_track_role_closed_captions">字幕</string>
     <string name="exo_track_bitrate">%1$.2f Mbps</string>
     <string name="exo_item_list">%1$s，%2$s</string>
-
 </resources>

@@ -121,7 +121,7 @@ class MovieFoldersActivity : BaseActivity() {
                     modifier = Modifier
                         .padding(padding)
                         .fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     items(folders.value) { folder ->
                         Card(
@@ -134,7 +134,8 @@ class MovieFoldersActivity : BaseActivity() {
                                     jumpActivity(VideoListActivity::class.java, bundle)
                                 },
                             colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(18.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                         ) {
                             Row(
                                 modifier = Modifier.padding(10.dp),
