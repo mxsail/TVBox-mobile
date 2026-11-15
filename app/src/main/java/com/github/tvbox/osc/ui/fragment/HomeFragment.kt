@@ -34,10 +34,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Text
+import com.github.tvbox.osc.ui.compose.HomeFilterPanel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
@@ -116,6 +118,7 @@ class HomeFragment : Fragment() {
     private val categoriesState = mutableStateOf<List<String>>(listOf("主页"))
     private val materialState = mutableStateOf(ThemeManager.material())
     private val isTabsExpandedState = mutableStateOf(false)
+    private val isFilterExpandedState = mutableStateOf(false)
     private val sourceNameState = mutableStateOf("")
     private val pageLoadState = mutableStateOf(LoadState.None)
 
@@ -124,8 +127,9 @@ class HomeFragment : Fragment() {
     val gridControllers = java.util.concurrent.ConcurrentHashMap<String, com.github.tvbox.osc.ui.compose.GridCategoryController>()
 
     fun collapseTabsIfExpanded(): Boolean {
-        if (isTabsExpandedState.value) {
+        if (isTabsExpandedState.value || isFilterExpandedState.value) {
             setTabsExpanded(false)
+            setFilterExpanded(false)
             return true
         }
         return false
@@ -133,7 +137,18 @@ class HomeFragment : Fragment() {
 
     private fun setTabsExpanded(expanded: Boolean) {
         isTabsExpandedState.value = expanded
-        if (expanded) topBarVisibleState.value = true // 展开分类面板时先呼出顶栏
+        if (expanded) {
+            isFilterExpandedState.value = false
+            topBarVisibleState.value = true // 展开分类面板时先呼出顶栏
+        }
+    }
+
+    private fun setFilterExpanded(expanded: Boolean) {
+        isFilterExpandedState.value = expanded
+        if (expanded) {
+            isTabsExpandedState.value = false
+            topBarVisibleState.value = true // 展开筛选面板时先呼出顶栏
+        }
     }
 
     // 顶栏(数据源/搜索)显隐: 内容区上滑收起、下滑/到顶呼出, 与底栏联动
@@ -632,24 +647,53 @@ class HomeFragment : Fragment() {
                             targetScale = 0.8f
                         ) + fadeOut(animationSpec = tween(150))
                     ) {
+                        val isFilterOpen = isFilterExpandedState.value
+                        val curSort = mDisplaySortList.getOrNull(selectedTabState.intValue)
+                        val filterCount = curSort?.filterSelectCount() ?: 0
+                        val isFilterActive = filterCount > 0
+
+                        val btnBg = if (isFilterOpen) {
+                            colorScheme.primary
+                        } else if (isFilterActive) {
+                            colorScheme.primaryContainer
+                        } else {
+                            colorScheme.surfaceContainerHigh
+                        }
+
+                        val iconTint = if (isFilterOpen) {
+                            colorScheme.onPrimary
+                        } else if (isFilterActive) {
+                            colorScheme.onPrimaryContainer
+                        } else {
+                            colorScheme.onSurface
+                        }
+
                         Box(
                             Modifier
                                 .padding(start = 10.dp)
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(percent = 50))
-                                .background(colorScheme.surfaceContainerHigh)
+                                .background(btnBg)
                                 .clickable {
-                                    val act = activity ?: return@clickable
-                                    showCurrentCategoryFilter(act)
+                                    setFilterExpanded(!isFilterExpandedState.value)
                                 },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 painterResource(R.drawable.ic_filter_list),
                                 contentDescription = "筛选",
-                                tint = colorScheme.onSurface,
+                                tint = iconTint,
                                 modifier = Modifier.size(18.dp)
                             )
+                            if (filterCount > 0 && !isFilterOpen) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 4.dp, end = 4.dp)
+                                        .size(6.dp)
+                                        .background(colorScheme.primary, CircleShape)
+                                )
+                            }
                         }
                     }
 
@@ -694,6 +738,8 @@ class HomeFragment : Fragment() {
                             .collectLatest { page ->
                                 if (!isProgrammaticScroll) {
                                     selectedTabState.intValue = page
+                                    setTabsExpanded(false)
+                                    setFilterExpanded(false)
                                 }
                             }
                     }
@@ -747,20 +793,24 @@ class HomeFragment : Fragment() {
                             }
                         }
                     }
-                    // 分类展开时的内容区压暗遮罩(淡入, 点击收起)
+                    // 分类或筛选展开时的内容区柔和遮罩(淡入, 点击收起全部展开项)
+                    val isAnyExpanded = isTabsExpandedState.value || isFilterExpandedState.value
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = isTabsExpandedState.value,
-                        enter = fadeIn(tween(240)),
-                        exit = fadeOut(tween(200))
+                        visible = isAnyExpanded,
+                        enter = fadeIn(tween(200)),
+                        exit = fadeOut(tween(180))
                     ) {
                         Box(
                             Modifier
                                 .fillMaxSize()
-                                .background(Color(0x73000000))
+                                .background(colorScheme.scrim.copy(alpha = 0.28f))
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
-                                ) { setTabsExpanded(false) }
+                                ) {
+                                    setTabsExpanded(false)
+                                    setFilterExpanded(false)
+                                }
                         )
                     }
                     // 顶部分类栏(常态单行滚动 / 展开全量 chips)。
@@ -771,6 +821,8 @@ class HomeFragment : Fragment() {
                         selectedIndex = selectedTabState.intValue,
                         onTabSelected = { pos ->
                             selectedTabState.intValue = pos
+                            setTabsExpanded(false)
+                            setFilterExpanded(false)
                             coroutineScope.launch {
                                 isProgrammaticScroll = true
                                 try {
@@ -788,6 +840,38 @@ class HomeFragment : Fragment() {
                         pagerState = categoryPagerState,
                         isProgrammaticScroll = isProgrammaticScroll
                     )
+
+                    // 顶部分类高级筛选下拉面板 (M3 Expressive 纯 Compose)
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isFilterExpandedState.value,
+                        enter = expandVertically(
+                            animationSpec = spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                            )
+                        ) + fadeIn(tween(180)),
+                        exit = shrinkVertically(
+                            animationSpec = spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                            )
+                        ) + fadeOut(tween(150)),
+                        modifier = Modifier.padding(top = 38.dp)
+                    ) {
+                        val curSort = mDisplaySortList.getOrNull(selectedTabState.intValue)
+                        if (curSort != null && !curSort.filters.isNullOrEmpty()) {
+                            val ctrl = gridControllers[curSort.id]
+                            HomeFilterPanel(
+                                sortData = curSort,
+                                onFilterChanged = {
+                                    ctrl?.refresh()
+                                },
+                                onCollapse = {
+                                    setFilterExpanded(false)
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }

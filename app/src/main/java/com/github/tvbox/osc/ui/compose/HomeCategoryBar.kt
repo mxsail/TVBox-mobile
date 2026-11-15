@@ -102,9 +102,9 @@ fun HomeCategoryBar(
         label = "expandRotation"
     )
 
-    // 面板底部圆角形变: 常态 0dp -> 展开 20dp (使用 NoBouncy 阻尼并强制 coerceAtLeast(0.dp)，彻底根除负圆角崩溃)
+    // 面板底部圆角形变: 常态 0dp -> 展开 24dp (M3 Expressive 大圆角规范)
     val bottomCornerRadius by animateDpAsState(
-        targetValue = if (isExpanded) 20.dp else 0.dp,
+        targetValue = if (isExpanded) 24.dp else 0.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow
