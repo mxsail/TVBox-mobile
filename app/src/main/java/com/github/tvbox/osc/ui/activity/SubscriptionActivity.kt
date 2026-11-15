@@ -3,20 +3,35 @@ package com.github.tvbox.osc.ui.activity
 import android.content.Intent
 import android.text.TextUtils
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
@@ -29,8 +44,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -427,6 +447,20 @@ class SubscriptionActivity : BaseActivity() {
     @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
     @Composable
     private fun SubscriptionScreen() {
+        val isFabVisible = remember { mutableStateOf(true) }
+        val nestedScrollConnection = remember {
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    if (available.y < -12f) {
+                        isFabVisible.value = false
+                    } else if (available.y > 12f) {
+                        isFabVisible.value = true
+                    }
+                    return Offset.Zero
+                }
+            }
+        }
+
         Scaffold(
             containerColor = colorScheme.background,
             topBar = {
@@ -449,16 +483,30 @@ class SubscriptionActivity : BaseActivity() {
                                 tint = colorScheme.onSurface
                             )
                         }
-                        IconButton(onClick = { showAddDialog() }) {
-                            Icon(
-                                painterResource(R.drawable.ic_add_24),
-                                contentDescription = "添加订阅",
-                                tint = colorScheme.onSurface
-                            )
-                        }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
                 )
+            },
+            floatingActionButton = {
+                AnimatedVisibility(
+                    visible = isFabVisible.value,
+                    enter = scaleIn() + fadeIn(),
+                    exit = scaleOut() + fadeOut()
+                ) {
+                    FloatingActionButton(
+                        onClick = { showAddDialog() },
+                        containerColor = colorScheme.primaryContainer,
+                        contentColor = colorScheme.onPrimaryContainer,
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp)
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_add_24),
+                            contentDescription = "添加订阅",
+                            tint = colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
             }
         ) { padding ->
             if (rows.value.isEmpty()) {
@@ -466,18 +514,60 @@ class SubscriptionActivity : BaseActivity() {
                     modifier = Modifier
                         .padding(padding)
                         .fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Spacer(Modifier.weight(1f))
-                    Text("暂无订阅, 点右上角添加", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                    Spacer(Modifier.weight(1f))
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .background(colorScheme.surfaceContainerHigh, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_inbox_24),
+                            contentDescription = null,
+                            tint = colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                    Text(
+                        "暂无订阅源",
+                        color = colorScheme.onSurface,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                    Text(
+                        "添加订阅源以获取丰富的影视与直播内容",
+                        color = colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 6.dp, bottom = 20.dp)
+                    )
+                    Button(
+                        onClick = { showAddDialog() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colorScheme.primary,
+                            contentColor = colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_add_24),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("立即添加", fontSize = 14.sp)
+                    }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .padding(padding)
                         .fillMaxSize()
-                        .padding(horizontal = 14.dp)
+                        .nestedScroll(nestedScrollConnection)
+                        .padding(horizontal = 14.dp),
+                    contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
                     itemsIndexed(rows.value) { _, row ->
                         val selected = row.checked

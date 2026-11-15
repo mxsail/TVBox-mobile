@@ -4,9 +4,15 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,11 +20,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
@@ -30,8 +41,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -254,6 +270,19 @@ class LiveSourceActivity : BaseActivity() {
     private fun LiveSourceScreen() {
         val isFollowSelected = selectedUrlState.value == LiveSource.FOLLOW_SUBSCRIPTION || selectedUrlState.value.isEmpty()
         val rows = rowsState.value
+        val isFabVisible = remember { mutableStateOf(true) }
+        val nestedScrollConnection = remember {
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    if (available.y < -12f) {
+                        isFabVisible.value = false
+                    } else if (available.y > 12f) {
+                        isFabVisible.value = true
+                    }
+                    return Offset.Zero
+                }
+            }
+        }
 
         Scaffold(
             containerColor = colorScheme.background,
@@ -269,24 +298,38 @@ class LiveSourceActivity : BaseActivity() {
                             )
                         }
                     },
-                    actions = {
-                        IconButton(onClick = { showAddDialog() }) {
-                            Icon(
-                                painterResource(R.drawable.ic_add_24),
-                                contentDescription = "添加直播源",
-                                tint = colorScheme.onSurface
-                            )
-                        }
-                    },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
                 )
+            },
+            floatingActionButton = {
+                AnimatedVisibility(
+                    visible = isFabVisible.value,
+                    enter = scaleIn() + fadeIn(),
+                    exit = scaleOut() + fadeOut()
+                ) {
+                    FloatingActionButton(
+                        onClick = { showAddDialog() },
+                        containerColor = colorScheme.primaryContainer,
+                        contentColor = colorScheme.onPrimaryContainer,
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp)
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_add_24),
+                            contentDescription = "添加直播源",
+                            tint = colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
             }
         ) { padding ->
             LazyColumn(
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
-                    .padding(horizontal = 14.dp)
+                    .nestedScroll(nestedScrollConnection)
+                    .padding(horizontal = 14.dp),
+                contentPadding = PaddingValues(bottom = 88.dp)
             ) {
                 // 1. 顶部常驻单选项：跟随当前订阅源
                 item {
@@ -356,14 +399,31 @@ class LiveSourceActivity : BaseActivity() {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 32.dp),
+                                .padding(vertical = 24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                "暂无自定义直播源，可点击右上角添加",
+                                "暂无自定义直播源",
                                 color = colorScheme.onSurfaceVariant,
-                                fontSize = 13.sp
+                                fontSize = 14.sp
                             )
+                            Spacer(Modifier.height(12.dp))
+                            Button(
+                                onClick = { showAddDialog() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = colorScheme.primary,
+                                    contentColor = colorScheme.onPrimary
+                                ),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Icon(
+                                    painterResource(R.drawable.ic_add_24),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("添加直播源", fontSize = 14.sp)
+                            }
                         }
                     }
                 } else {

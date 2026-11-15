@@ -79,6 +79,7 @@ class SettingActivity : BaseActivity() {
 
     private val subSourceSummaryState = mutableStateOf("")
     private val liveSourceSummaryState = mutableStateOf("")
+    private val backupSyncSummaryState = mutableStateOf("")
 
     private fun getSubscriptionSummary(): String {
         val subs: List<com.github.tvbox.osc.bean.Subscription> = com.github.tvbox.osc.util.SubscriptionManager.getSubscriptions()
@@ -89,10 +90,15 @@ class SettingActivity : BaseActivity() {
         return com.github.tvbox.osc.util.live.LiveSourceManager.getSelectedSourceName()
     }
 
+    private fun getBackupSyncSummary(): String {
+        return if (Hawk.get(HawkConfig.SYNC_ENABLED, false)) "云端同步已开启" else "本地备份与恢复"
+    }
+
     override fun onResume() {
         super.onResume()
         subSourceSummaryState.value = getSubscriptionSummary()
         liveSourceSummaryState.value = getLiveSourceSummary()
+        backupSyncSummaryState.value = getBackupSyncSummary()
     }
 
     override fun getLayoutResID(): Int = -1
@@ -128,27 +134,8 @@ class SettingActivity : BaseActivity() {
         jumpActivity(AppearanceActivity::class.java)
     }
 
-    private fun openBackup() {
-        if (XXPermissions.isGranted(this, Permission.MANAGE_EXTERNAL_STORAGE)) {
-            BackupDialog(this).show()
-        } else {
-            XXPermissions.with(this)
-                .permission(Permission.MANAGE_EXTERNAL_STORAGE)
-                .request(object : OnPermissionCallback {
-                    override fun onGranted(permissions: List<String>, all: Boolean) {
-                        if (all) BackupDialog(this@SettingActivity).show()
-                    }
-
-                    override fun onDenied(permissions: List<String>, never: Boolean) {
-                        if (never) {
-                            ToastUtils.showLong("获取存储权限失败,请在系统设置中开启")
-                            XXPermissions.startPermissionActivity(this@SettingActivity, permissions)
-                        } else {
-                            ToastUtils.showShort("获取存储权限失败")
-                        }
-                    }
-                })
-        }
+    private fun openBackupRestore() {
+        jumpActivity(BackupRestoreActivity::class.java)
     }
 
     private fun confirmClearCache() {
@@ -229,7 +216,6 @@ class SettingActivity : BaseActivity() {
         var ijkCodecValue by remember { mutableStateOf(Hawk.get(HawkConfig.IJK_CODEC, "")) }
         var renderValue by remember { mutableStateOf(PlayerHelper.getRenderName(Hawk.get(HawkConfig.PLAY_RENDER, PlayerHelper.RENDER_TEXTURE_VIEW))) }
         var scaleValue by remember { mutableStateOf(PlayerHelper.getScaleName(Hawk.get(HawkConfig.PLAY_SCALE, 0))) }
-        var syncValue by remember { mutableStateOf(if (Hawk.get(HawkConfig.SYNC_ENABLED, false)) "已启用" else "未启用") }
         var dnsValue by remember { mutableStateOf(OkGoHelper.dnsHttpsList[Hawk.get(HawkConfig.DOH_URL, 0)]) }
         var historyValue by remember { mutableStateOf(HistoryHelper.getHistoryNumName(Hawk.get(HawkConfig.HISTORY_NUM, 0))) }
 
@@ -385,14 +371,7 @@ class SettingActivity : BaseActivity() {
 
                 Spacer(Modifier.height(14.dp))
                 GroupCard {
-                    MenuRow(R.drawable.ic_backup_48, "备份与恢复", null) { openBackup() }
-                    MenuRow(R.drawable.ic_sync_48, "数据同步", syncValue) {
-                        val dialog = com.github.tvbox.osc.ui.dialog.SyncDialog(this@SettingActivity)
-                        dialog.setOnDismissListener {
-                            syncValue = if (Hawk.get(HawkConfig.SYNC_ENABLED, false)) "已启用" else "未启用"
-                        }
-                        dialog.show()
-                    }
+                    MenuRow(R.drawable.ic_backup_48, "备份与恢复", backupSyncSummaryState.value) { openBackupRestore() }
                     MenuRow(R.drawable.ic_dns_48, "安全DNS", dnsValue) {
                         val dohUrl = Hawk.get(HawkConfig.DOH_URL, 0)
                         showSelect("请选择安全DNS", OkGoHelper.dnsHttpsList, dohUrl) { pos ->
