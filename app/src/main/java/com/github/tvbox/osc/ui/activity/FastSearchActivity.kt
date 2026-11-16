@@ -530,13 +530,28 @@ class FastSearchActivity : BaseActivity() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 搜索胶囊主容器 (36dp 高度，18dp 圆角 / percent = 50)
+                // 独立返回按钮 (无背景纯图标，触控水波纹反馈)
+                IconButton(
+                    onClick = { finish() },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_arrow_back),
+                        contentDescription = "返回",
+                        tint = colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(Modifier.width(4.dp))
+
+                // 搜索胶囊主容器 (36dp 高度，18dp 圆角 / percent = 50，复用首页 surfaceContainerHigh)
                 Surface(
                     shape = RoundedCornerShape(percent = 50),
-                    color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4),
+                    color = colorScheme.surfaceContainerHigh,
                     modifier = Modifier
                         .weight(1f)
                         .height(36.dp)
@@ -544,17 +559,17 @@ class FastSearchActivity : BaseActivity() {
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 4.dp),
+                            .padding(start = 12.dp, end = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = { finish() }, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = "返回",
-                                tint = colorScheme.onSurface,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                        Icon(
+                            painterResource(R.drawable.ic_search_18),
+                            contentDescription = null,
+                            tint = colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+
+                        Spacer(Modifier.width(6.dp))
 
                         BasicTextField(
                             value = inputText.value,
@@ -578,8 +593,7 @@ class FastSearchActivity : BaseActivity() {
                             keyboardActions = KeyboardActions(onSearch = { search(inputText.value) }),
                             modifier = Modifier
                                 .weight(1f)
-                                .focusRequester(focusRequester)
-                                .padding(horizontal = 4.dp),
+                                .focusRequester(focusRequester),
                             decorationBox = { innerTextField ->
                                 Box(contentAlignment = Alignment.CenterStart) {
                                     if (inputText.value.isEmpty()) {
@@ -641,7 +655,7 @@ class FastSearchActivity : BaseActivity() {
                 } else if (isFilterActive) {
                     colorScheme.primaryContainer
                 } else {
-                    if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4)
+                    colorScheme.surfaceContainerHigh
                 }
 
                 val iconTint = if (isFilterOpen) {
@@ -819,7 +833,7 @@ class FastSearchActivity : BaseActivity() {
                         allSources.forEach { source ->
                             val isSelected = checkedKeys.contains(source.key)
                             val chipBg = if (isSelected) colorScheme.primaryContainer
-                            else if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4)
+                            else colorScheme.surfaceContainerHigh
                             val textColor = if (isSelected) colorScheme.onPrimaryContainer
                             else colorScheme.onSurfaceVariant
 
@@ -941,7 +955,7 @@ class FastSearchActivity : BaseActivity() {
                         )
                         Surface(
                             shape = CircleShape,
-                            color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4),
+                            color = colorScheme.surfaceContainerHigh,
                             modifier = Modifier
                                 .clip(CircleShape)
                                 .clickable { clearAllHistory() }
@@ -976,7 +990,7 @@ class FastSearchActivity : BaseActivity() {
                         historyWords.value.forEach { word ->
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
-                                color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF4F4F6)
+                                color = colorScheme.surfaceContainerHigh
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -1026,7 +1040,7 @@ class FastSearchActivity : BaseActivity() {
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = if (isTop3) colorScheme.primaryContainer.copy(alpha = if (isDark) 0.35f else 0.6f)
-                                else if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF4F4F6),
+                                else colorScheme.surfaceContainerHigh,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable { search(word) }
