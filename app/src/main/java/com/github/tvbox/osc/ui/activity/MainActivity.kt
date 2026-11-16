@@ -51,6 +51,7 @@ import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.databinding.ActivityMainBinding
 import com.github.tvbox.osc.event.AppearanceChangedEvent
+import com.github.tvbox.osc.event.RefreshEvent
 import com.github.tvbox.osc.ui.compose.LastViewedTip
 import com.github.tvbox.osc.ui.compose.LiquidBarSpec
 import com.github.tvbox.osc.ui.compose.LiquidBottomBar
@@ -194,6 +195,9 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                     // 缓存 tab 的可见性接线(Compose 壳绕过了 FragmentPagerAdapter 的派发):
                     // 驱动 userVisible, 下载进度/删除后回到本 tab 才会重查数据库刷新数量
                     cacheFragment.setUserVisibleHint(settled == 2)
+                    if (settled == 3) {
+                        myFragment.loadHistory(this@MainActivity)
+                    }
                     if (settled == 0) {
                         homeFragment.showTopBar()
                     } else {
@@ -456,6 +460,13 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         when (event.type) {
             AppearanceChangedEvent.TYPE_STYLE -> applyBarStyle()
             AppearanceChangedEvent.TYPE_RECREATE -> recreate()
+        }
+    }
+
+    override fun refresh(event: RefreshEvent) {
+        super.refresh(event)
+        if (event.type == RefreshEvent.TYPE_HISTORY_REFRESH) {
+            myFragment.loadHistory(this)
         }
     }
 

@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
@@ -57,7 +58,11 @@ import com.github.tvbox.osc.api.ApiConfig
 import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.cache.CacheManager
 import com.github.tvbox.osc.cache.RoomDataManger
+import com.github.tvbox.osc.event.RefreshEvent
 import com.github.tvbox.osc.ui.activity.AboutActivity
+import org.greenrobot.eventbus.EventBus
+import org.greenrobot.eventbus.Subscribe
+import org.greenrobot.eventbus.ThreadMode
 import com.github.tvbox.osc.ui.activity.BackupRestoreActivity
 import com.github.tvbox.osc.ui.activity.CollectActivity
 import com.github.tvbox.osc.ui.activity.DetailActivity
@@ -225,6 +230,21 @@ class MyFragment : Fragment() {
 
         LaunchedEffect(Unit) {
             loadHistory(currentContext)
+        }
+
+        DisposableEffect(Unit) {
+            val subscriber = object {
+                @Subscribe(threadMode = ThreadMode.MAIN)
+                fun onRefresh(event: RefreshEvent) {
+                    if (event.type == RefreshEvent.TYPE_HISTORY_REFRESH) {
+                        loadHistory(currentContext)
+                    }
+                }
+            }
+            EventBus.getDefault().register(subscriber)
+            onDispose {
+                EventBus.getDefault().unregister(subscriber)
+            }
         }
 
         Column(

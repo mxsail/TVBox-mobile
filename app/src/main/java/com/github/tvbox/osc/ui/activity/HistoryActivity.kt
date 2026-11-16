@@ -8,6 +8,7 @@ import com.github.tvbox.osc.api.ApiConfig
 import com.github.tvbox.osc.base.BaseActivity
 import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.cache.RoomDataManger
+import com.github.tvbox.osc.event.RefreshEvent
 import com.github.tvbox.osc.ui.compose.VodCard
 import com.github.tvbox.osc.ui.compose.VodGridScreen
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -55,6 +56,18 @@ class HistoryActivity : BaseActivity() {
     }
 
     override fun init() {
+    }
+
+    override fun onResume() {
+        super.onResume()
+        initData()
+    }
+
+    override fun refresh(event: RefreshEvent) {
+        super.refresh(event)
+        if (event.type == RefreshEvent.TYPE_HISTORY_REFRESH) {
+            initData()
+        }
     }
 
     private fun initData() {
