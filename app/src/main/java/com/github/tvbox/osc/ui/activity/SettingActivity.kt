@@ -22,6 +22,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -31,8 +32,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.recyclerview.widget.DiffUtil
 import com.blankj.utilcode.util.ToastUtils
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.api.ApiConfig
@@ -41,27 +40,20 @@ import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.bean.IJKCode
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.event.AppearanceChangedEvent
-import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter
-import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
 import com.github.tvbox.osc.ui.compose.GroupCard
+import com.github.tvbox.osc.ui.compose.M3ConfirmDialog
+import com.github.tvbox.osc.ui.compose.M3SingleChoiceBottomSheet
 import com.github.tvbox.osc.ui.compose.MenuRow
 import com.github.tvbox.osc.ui.compose.SectionTitle
 import com.github.tvbox.osc.ui.compose.SwitchRow
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.compose.isAppDarkTheme
-import com.github.tvbox.osc.ui.dialog.BackupDialog
-import com.github.tvbox.osc.ui.dialog.SelectDialog
 import com.github.tvbox.osc.util.FastClickCheckUtil
 import com.github.tvbox.osc.util.FileUtils
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.HistoryHelper
 import com.github.tvbox.osc.util.OkGoHelper
 import com.github.tvbox.osc.util.PlayerHelper
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.hjq.permissions.OnPermissionCallback
-import com.hjq.permissions.Permission
-import com.hjq.permissions.XXPermissions
-import com.lxj.xpopup.XPopup
 import com.orhanobut.hawk.Hawk
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
@@ -69,8 +61,7 @@ import java.io.File
 
 /**
  * 设置页(Compose): 常规/播放与缓存/数据 三组配置。
- * 选择交互沿用既有 View 版弹窗(SelectDialog/LiveApiDialog/BackupDialog/SyncDialog),
- * 通过 Compose↔View 互操作调用, 避免同轮重写全部弹窗。
+ * 配置项选择弹窗与确认弹窗已全面升级为 Material Design 3 Expressive 风格的底部抽屉与对话框。
  */
 class SettingActivity : BaseActivity() {
 
@@ -112,39 +103,12 @@ class SettingActivity : BaseActivity() {
     override fun init() {
     }
 
-    // ---------------- 交互(互操作调用既有弹窗) ----------------
-
-    private fun showSelect(
-        tip: String,
-        options: List<String>,
-        defaultPos: Int,
-        onPick: (Int) -> Unit
-    ) {
-        val dialog = SelectDialog<String>(this)
-        dialog.setTip(tip)
-        dialog.setAdapter(object : SelectDialogInterface<String?> {
-            override fun click(value: String?, pos: Int) = onPick(pos)
-
-            override fun getDisplay(name: String?): String = name ?: ""
-        }, SelectDialogAdapter.stringDiff, ArrayList(options), defaultPos)
-        dialog.show()
-    }
-
     private fun openAppearance() {
         jumpActivity(AppearanceActivity::class.java)
     }
 
     private fun openBackupRestore() {
         jumpActivity(BackupRestoreActivity::class.java)
-    }
-
-    private fun confirmClearCache() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("提示")
-            .setMessage("确定清空吗？")
-            .setNegativeButton("取消", null)
-            .setPositiveButton("确定") { _, _ -> clearCache() }
-            .show()
     }
 
     private fun clearCache() {
@@ -219,6 +183,24 @@ class SettingActivity : BaseActivity() {
         var dnsValue by remember { mutableStateOf(OkGoHelper.dnsHttpsList[Hawk.get(HawkConfig.DOH_URL, 0)]) }
         var historyValue by remember { mutableStateOf(HistoryHelper.getHistoryNumName(Hawk.get(HawkConfig.HISTORY_NUM, 0))) }
 
+        // M3 抽屉与弹窗状态
+        var sheetTitle by remember { mutableStateOf("") }
+        var sheetOptions by remember { mutableStateOf<List<String>>(emptyList()) }
+        var sheetSelectedPos by remember { mutableIntStateOf(0) }
+        var onSheetPick by remember { mutableStateOf<(Int) -> Unit>({}) }
+        var isSheetVisible by remember { mutableStateOf(false) }
+
+        var ijkCodesSheetVisible by remember { mutableStateOf(false) }
+        var clearCacheDialogVisible by remember { mutableStateOf(false) }
+
+        fun showM3Select(title: String, options: List<String>, selectedPos: Int, onPick: (Int) -> Unit) {
+            sheetTitle = title
+            sheetOptions = options
+            sheetSelectedPos = selectedPos
+            onSheetPick = onPick
+            isSheetVisible = true
+        }
+
         val isDark = isAppDarkTheme()
         val pageBg = if (isDark) colorScheme.background else Color(0xFFF3F3F4)
 
@@ -258,7 +240,7 @@ class SettingActivity : BaseActivity() {
                 GroupCard {
                     MenuRow(R.drawable.ic_palette_48, "外观设置", appearanceValue) { openAppearance() }
                     MenuRow(R.drawable.ic_home, "主页内容", homeRecValue) {
-                        showSelect("主页内容显示", listOf("豆瓣热播", "站点推荐", "关闭"), Hawk.get(HawkConfig.HOME_REC, 0)) { pos ->
+                        showM3Select("主页内容显示", listOf("豆瓣热播", "站点推荐", "关闭"), Hawk.get(HawkConfig.HOME_REC, 0)) { pos ->
                             Hawk.put(HawkConfig.HOME_REC, pos)
                             homeRecValue = homeRecName(pos)
                         }
@@ -287,7 +269,7 @@ class SettingActivity : BaseActivity() {
                         val playerType = Hawk.get(HawkConfig.PLAY_TYPE, 0)
                         var defaultPos = 0
                         players.indices.forEach { if (players[it] == playerType) defaultPos = it }
-                        showSelect("请选择默认播放器", names, defaultPos) { pos ->
+                        showM3Select("请选择默认播放器", names, defaultPos) { pos ->
                             Hawk.put(HawkConfig.PLAY_TYPE, players[pos])
                             playValue = PlayerHelper.getPlayerName(players[pos])
                             PlayerHelper.init()
@@ -304,14 +286,14 @@ class SettingActivity : BaseActivity() {
                     MenuRow(R.drawable.ic_speed_48, "长按倍速", speedValue) {
                         val types = listOf("2.0", "3.0", "4.0", "5.0", "6.0", "8.0", "10.0")
                         val defaultPos = types.indexOf(Hawk.get(HawkConfig.VIDEO_SPEED, 2.0f).toString())
-                        showSelect("请选择倍速", types, if (defaultPos < 0) 0 else defaultPos) { pos ->
+                        showM3Select("请选择倍速", types, if (defaultPos < 0) 0 else defaultPos) { pos ->
                             Hawk.put(HawkConfig.VIDEO_SPEED, types[pos].toFloat())
                             speedValue = types[pos]
                         }
                     }
                     MenuRow(R.drawable.ic_m3_pip, "后台播放", bgPlayValue) {
                         val types = listOf("关闭", "开启", "画中画")
-                        showSelect("后台播放", types, Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0)) { pos ->
+                        showM3Select("后台播放", types, Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0)) { pos ->
                             Hawk.put(HawkConfig.BACKGROUND_PLAY_TYPE, pos)
                             bgPlayValue = types[pos]
                             com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
@@ -319,27 +301,9 @@ class SettingActivity : BaseActivity() {
                     }
                     MenuRow(R.drawable.ic_memory_48, "解码方式", ijkCodecValue) {
                         val ijkCodes = ApiConfig.get().ijkCodes
-                        if (ijkCodes.isNullOrEmpty()) return@MenuRow
-                        val ijkSel = Hawk.get(HawkConfig.IJK_CODEC, "")
-                        var defaultPos = 0
-                        ijkCodes.indices.forEach { if (ijkSel == ijkCodes[it].name) defaultPos = it }
-                        val dialog = SelectDialog<IJKCode>(this@SettingActivity)
-                        dialog.setTip("请选择解码方式")
-                        dialog.setAdapter(object : SelectDialogInterface<IJKCode?> {
-                            override fun click(value: IJKCode?, pos: Int) {
-                                value?.selected(true)
-                                ijkCodecValue = value?.name ?: ""
-                            }
-
-                            override fun getDisplay(code: IJKCode?): String = code?.name ?: ""
-                        }, object : DiffUtil.ItemCallback<IJKCode>() {
-                            override fun areItemsTheSame(oldItem: IJKCode, newItem: IJKCode): Boolean =
-                                oldItem === newItem
-
-                            override fun areContentsTheSame(oldItem: IJKCode, newItem: IJKCode): Boolean =
-                                oldItem.name.contentEquals(newItem.name)
-                        }, ijkCodes, defaultPos)
-                        dialog.show()
+                        if (!ijkCodes.isNullOrEmpty()) {
+                            ijkCodesSheetVisible = true
+                        }
                     }
                     MenuRow(R.drawable.ic_material_48, "渲染方式", renderValue) {
                         val renderTypes = PlayerHelper.getRenderTypes()
@@ -347,7 +311,7 @@ class SettingActivity : BaseActivity() {
                         val currentRender = Hawk.get(HawkConfig.PLAY_RENDER, PlayerHelper.RENDER_TEXTURE_VIEW)
                         var defaultPos = renderTypes.indexOf(currentRender)
                         if (defaultPos < 0) defaultPos = 0
-                        showSelect("请选择默认渲染方式", renderNames, defaultPos) { pos ->
+                        showM3Select("请选择默认渲染方式", renderNames, defaultPos) { pos ->
                             val selectedType = renderTypes[pos]
                             Hawk.put(HawkConfig.PLAY_RENDER, selectedType)
                             renderValue = PlayerHelper.getRenderName(selectedType)
@@ -357,7 +321,7 @@ class SettingActivity : BaseActivity() {
                     }
                     MenuRow(R.drawable.ic_scale_48, "画面缩放", scaleValue) {
                         val scales = (0..5).toList()
-                        showSelect(
+                        showM3Select(
                             "请选择画面缩放",
                             scales.map { PlayerHelper.getScaleName(it) },
                             Hawk.get(HawkConfig.PLAY_SCALE, 0)
@@ -374,14 +338,14 @@ class SettingActivity : BaseActivity() {
                     MenuRow(R.drawable.ic_backup_48, "备份与恢复", backupSyncSummaryState.value) { openBackupRestore() }
                     MenuRow(R.drawable.ic_dns_48, "安全DNS", dnsValue) {
                         val dohUrl = Hawk.get(HawkConfig.DOH_URL, 0)
-                        showSelect("请选择安全DNS", OkGoHelper.dnsHttpsList, dohUrl) { pos ->
+                        showM3Select("请选择安全DNS", OkGoHelper.dnsHttpsList, dohUrl) { pos ->
                             Hawk.put(HawkConfig.DOH_URL, pos)
                             dnsValue = OkGoHelper.dnsHttpsList[pos]
                             OkGoHelper.updateDns()
                         }
                     }
                     MenuRow(R.drawable.ic_history_48, "历史记录", historyValue) {
-                        showSelect(
+                        showM3Select(
                             "保留历史记录数量",
                             listOf(0, 1, 2).map { HistoryHelper.getHistoryNumName(it) },
                             Hawk.get(HawkConfig.HISTORY_NUM, 0)
@@ -390,10 +354,51 @@ class SettingActivity : BaseActivity() {
                             historyValue = HistoryHelper.getHistoryNumName(pos)
                         }
                     }
-                    MenuRow(R.drawable.ic_clear, "清空缓存", null) { confirmClearCache() }
+                    MenuRow(R.drawable.ic_clear, "清空缓存", null) { clearCacheDialogVisible = true }
                 }
                 Spacer(Modifier.height(28.dp))
             }
         }
+
+        // ---------------- M3 Expressive Sheets & Dialogs ----------------
+        M3SingleChoiceBottomSheet(
+            visible = isSheetVisible,
+            title = sheetTitle,
+            options = sheetOptions,
+            selectedPos = sheetSelectedPos,
+            onDismissRequest = { isSheetVisible = false },
+            onSelected = { pos, _ ->
+                onSheetPick(pos)
+            }
+        )
+
+        val ijkCodes = ApiConfig.get().ijkCodes ?: emptyList()
+        val currentIjkCodeName = Hawk.get(HawkConfig.IJK_CODEC, "")
+        val ijkSelectedPos = ijkCodes.indexOfFirst { it.name == currentIjkCodeName }.let { if (it < 0) 0 else it }
+
+        M3SingleChoiceBottomSheet(
+            visible = ijkCodesSheetVisible,
+            title = "请选择解码方式",
+            options = ijkCodes,
+            selectedPos = ijkSelectedPos,
+            getDisplayName = { it.name ?: "" },
+            onDismissRequest = { ijkCodesSheetVisible = false },
+            onSelected = { _, item ->
+                item.selected(true)
+                ijkCodecValue = item.name ?: ""
+            }
+        )
+
+        M3ConfirmDialog(
+            visible = clearCacheDialogVisible,
+            title = "清空缓存",
+            message = "确定要清理本地缓存数据吗？此操作不会影响已保存的历史记录和配置。",
+            confirmText = "清空",
+            cancelText = "取消",
+            isDestructive = true,
+            iconRes = R.drawable.ic_clear,
+            onDismissRequest = { clearCacheDialogVisible = false },
+            onConfirm = { clearCache() }
+        )
     }
 }
