@@ -10,6 +10,14 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.TextView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -24,10 +32,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -42,11 +53,13 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -91,7 +104,6 @@ import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.compose.VodCard
 import com.github.tvbox.osc.ui.compose.VodCardItem
 import com.github.tvbox.osc.ui.dialog.DoubanSuggestDialog
-import com.github.tvbox.osc.ui.dialog.SearchCheckboxDialog
 import com.github.tvbox.osc.ui.dialog.SearchSuggestionsDialog
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.SearchHelper
@@ -146,6 +158,8 @@ class FastSearchActivity : BaseActivity() {
     private val sourceTabs = mutableStateOf(listOf("全部显示" to ""))
     private val selectedTabKey = mutableStateOf("")
     private val isSourceTabsExpanded = mutableStateOf(false)
+    private val isFilterExpandedState = mutableStateOf(false)
+    private val checkedKeysState = mutableStateOf<Set<String>>(emptySet())
     private val showSuggestPage = mutableStateOf(true) // true=历史/热词页 false=结果页
     private val loadState = mutableIntStateOf(1) // 1=初始 2=内容 3=空
     private val historyWords = mutableStateOf<List<String>>(emptyList())
@@ -173,6 +187,10 @@ class FastSearchActivity : BaseActivity() {
     }
 
     override fun onBackHandled() {
+        if (isFilterExpandedState.value) {
+            closeFilterAndApply()
+            return
+        }
         if (isSourceTabsExpanded.value) {
             isSourceTabsExpanded.value = false
             return
@@ -200,21 +218,32 @@ class FastSearchActivity : BaseActivity() {
         }
     }
 
-    // ---------------- 数据流(与旧版一致) ----------------
+    // ---------------- 数据流与搜索源过滤 ----------------
 
-    private fun filterSearchSource() {
-        val allSourceBean = ApiConfig.get().sourceBeanList
-        if (allSourceBean.isNotEmpty()) {
-            val searchAbleSource: MutableList<SourceBean> = ArrayList()
-            for (sourceBean in allSourceBean) {
-                if (sourceBean.isSearchable) searchAbleSource.add(sourceBean)
-            }
-            SearchCheckboxDialog(this, searchAbleSource, mCheckSources).show()
+    private fun closeFilterAndApply() {
+        val allSearchable = ApiConfig.get().sourceBeanList.filter { it.isSearchable }
+        if (checkedKeysState.value.isEmpty()) {
+            ToastUtils.showShort("未选择搜索源，已自动恢复全选")
+            checkedKeysState.value = allSearchable.map { it.key }.toSet()
+        }
+        val oldKeys = mCheckSources?.keys ?: allSearchable.map { it.key }.toSet()
+        val changed = oldKeys != checkedKeysState.value
+        val isAll = checkedKeysState.value.size == allSearchable.size
+        val map = HashMap<String, String>()
+        checkedKeysState.value.forEach { map[it] = "1" }
+        mCheckSources = map
+        SearchHelper.putCheckedSources(map, isAll)
+        isFilterExpandedState.value = false
+
+        if (changed && !showSuggestPage.value && !searchTitle.isNullOrEmpty()) {
+            search(searchTitle)
         }
     }
 
     private fun initData() {
         mCheckSources = SearchHelper.getSourcesForSearch()
+        val allSearchable = ApiConfig.get().sourceBeanList.filter { it.isSearchable }
+        checkedKeysState.value = mCheckSources?.keys?.toSet() ?: allSearchable.map { it.key }.toSet()
         if (intent != null && intent.hasExtra("title")) {
             val title = intent.getStringExtra("title")
             if (!TextUtils.isEmpty(title)) {
@@ -480,6 +509,9 @@ class FastSearchActivity : BaseActivity() {
     private fun FastSearchScreen() {
         val isDark = isAppDarkTheme()
         val focusRequester = remember { FocusRequester() }
+        val allSearchableSources = remember {
+            ApiConfig.get().sourceBeanList.filter { it.isSearchable }
+        }
 
         LaunchedEffect(Unit) {
             if (inputText.value.isEmpty()) {
@@ -494,33 +526,33 @@ class FastSearchActivity : BaseActivity() {
                 .background(colorScheme.background)
                 .statusBarsPadding()
         ) {
-            // M3 Expressive SearchBar 胶囊顶栏
+            // M3 Expressive SearchBar 顶栏 (对齐首页 36dp 紧凑精致规范)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 搜索胶囊主容器 (52dp 饱满 Expressive 高度，26dp 连续平滑方圆)
+                // 搜索胶囊主容器 (36dp 高度，18dp 圆角 / percent = 50)
                 Surface(
-                    shape = RoundedCornerShape(26.dp),
+                    shape = RoundedCornerShape(percent = 50),
                     color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4),
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp)
+                        .height(36.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 6.dp),
+                            .padding(horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = { finish() }, modifier = Modifier.size(40.dp)) {
+                        IconButton(onClick = { finish() }, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 painterResource(R.drawable.ic_arrow_back),
                                 contentDescription = "返回",
                                 tint = colorScheme.onSurface,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 
@@ -538,7 +570,7 @@ class FastSearchActivity : BaseActivity() {
                             singleLine = true,
                             textStyle = TextStyle(
                                 color = colorScheme.onSurface,
-                                fontSize = 15.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Normal
                             ),
                             cursorBrush = SolidColor(colorScheme.primary),
@@ -547,14 +579,16 @@ class FastSearchActivity : BaseActivity() {
                             modifier = Modifier
                                 .weight(1f)
                                 .focusRequester(focusRequester)
-                                .padding(horizontal = 6.dp),
+                                .padding(horizontal = 4.dp),
                             decorationBox = { innerTextField ->
                                 Box(contentAlignment = Alignment.CenterStart) {
                                     if (inputText.value.isEmpty()) {
                                         Text(
                                             "搜索电影、电视剧、综艺…",
                                             color = colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                                            fontSize = 14.sp
+                                            fontSize = 13.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                     innerTextField()
@@ -570,13 +604,13 @@ class FastSearchActivity : BaseActivity() {
                                     suggestWords.value = emptyList()
                                     showSuggestPage.value = true
                                 },
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(28.dp)
                             ) {
                                 Icon(
                                     painterResource(R.drawable.ic_clear),
                                     contentDescription = "清空输入",
                                     tint = colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
@@ -584,13 +618,13 @@ class FastSearchActivity : BaseActivity() {
                         // 搜索按钮
                         IconButton(
                             onClick = { search(inputText.value) },
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 painterResource(R.drawable.ic_search_18),
                                 contentDescription = "搜索",
                                 tint = colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
@@ -598,30 +632,241 @@ class FastSearchActivity : BaseActivity() {
 
                 Spacer(Modifier.width(8.dp))
 
-                // 右侧搜索源过滤按钮 (48dp 圆形)
-                Surface(
-                    shape = CircleShape,
-                    color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4),
+                // 右侧搜索源筛选按钮 (36dp 圆形，与首页完全一致的变色与状态指示)
+                val isFilterOpen = isFilterExpandedState.value
+                val isFilterActive = checkedKeysState.value.size < allSearchableSources.size && checkedKeysState.value.isNotEmpty()
+
+                val btnBg = if (isFilterOpen) {
+                    colorScheme.primary
+                } else if (isFilterActive) {
+                    colorScheme.primaryContainer
+                } else {
+                    if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4)
+                }
+
+                val iconTint = if (isFilterOpen) {
+                    colorScheme.onPrimary
+                } else if (isFilterActive) {
+                    colorScheme.onPrimaryContainer
+                } else {
+                    colorScheme.onSurface
+                }
+
+                Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
-                        .clickable { filterSearchSource() }
+                        .background(btnBg)
+                        .clickable {
+                            if (isFilterOpen) {
+                                closeFilterAndApply()
+                            } else {
+                                isFilterExpandedState.value = true
+                            }
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            painterResource(R.drawable.ic_filter_list),
-                            contentDescription = "搜索源过滤",
-                            tint = colorScheme.onSurface,
-                            modifier = Modifier.size(22.dp)
+                    Icon(
+                        painterResource(R.drawable.ic_filter_list),
+                        contentDescription = "搜索源配置",
+                        tint = iconTint,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    if (isFilterActive && !isFilterOpen) {
+                        Box(
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 4.dp, end = 4.dp)
+                                .size(6.dp)
+                                .background(colorScheme.primary, CircleShape)
                         )
                     }
                 }
             }
 
-            if (showSuggestPage.value) {
-                SuggestPage()
-            } else {
-                ResultPage()
+            Box(Modifier.fillMaxSize()) {
+                // 1. 底层主体: 联想历史页 or 结果页
+                if (showSuggestPage.value) {
+                    SuggestPage()
+                } else {
+                    ResultPage()
+                }
+
+                // 2. 中层遮罩: 筛选面板展开时柔和渐变暗色遮罩
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isFilterExpandedState.value,
+                    enter = fadeIn(tween(200)),
+                    exit = fadeOut(tween(180))
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(colorScheme.scrim.copy(alpha = 0.28f))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                closeFilterAndApply()
+                            }
+                    )
+                }
+
+                // 3. 顶层: 顶部向下平滑展开的搜索源配置面板 (M3 Expressive 风格)
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isFilterExpandedState.value,
+                    enter = expandVertically(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + fadeIn(tween(180)),
+                    exit = shrinkVertically(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + fadeOut(tween(150))
+                ) {
+                    SearchSourceFilterPanel(
+                        allSources = allSearchableSources,
+                        checkedKeys = checkedKeysState.value,
+                        onToggleKey = { key ->
+                            val cur = checkedKeysState.value
+                            checkedKeysState.value = if (cur.contains(key)) cur - key else cur + key
+                        },
+                        onSelectAll = {
+                            checkedKeysState.value = allSearchableSources.map { it.key }.toSet()
+                        },
+                        onClearAll = {
+                            checkedKeysState.value = emptySet()
+                        },
+                        onClose = {
+                            closeFilterAndApply()
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    /** 顶部平滑下拉展开的搜索源配置面板 (Material Design 3 Expressive) */
+    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+    @Composable
+    private fun SearchSourceFilterPanel(
+        allSources: List<SourceBean>,
+        checkedKeys: Set<String>,
+        onToggleKey: (String) -> Unit,
+        onSelectAll: () -> Unit,
+        onClearAll: () -> Unit,
+        onClose: () -> Unit
+    ) {
+        val isDark = isAppDarkTheme()
+        val drawerShape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clipToBounds()
+                .padding(bottom = 12.dp)
+                .shadow(elevation = 10.dp, shape = drawerShape)
+                .background(color = colorScheme.surfaceContainer, shape = drawerShape)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp)
+            ) {
+                // 标题栏: "搜索源配置" + 已选数量徽章
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "搜索源配置",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorScheme.onSurface
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        shape = CircleShape,
+                        color = colorScheme.primaryContainer.copy(alpha = 0.6f)
+                    ) {
+                        Text(
+                            text = "已选 ${checkedKeys.size}/${allSources.size}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                // 搜索源 Chips 流式布局（高度限制，支持滑动）
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 240.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        allSources.forEach { source ->
+                            val isSelected = checkedKeys.contains(source.key)
+                            val chipBg = if (isSelected) colorScheme.primaryContainer
+                            else if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4)
+                            val textColor = if (isSelected) colorScheme.onPrimaryContainer
+                            else colorScheme.onSurfaceVariant
+
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(chipBg)
+                                    .clickable { onToggleKey(source.key) }
+                                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = source.name,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = textColor
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(
+                    color = colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+                Spacer(Modifier.height(4.dp))
+
+                // 底部操作栏: "全选" / "清空" / "完成"
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onSelectAll) {
+                        Text("全选", fontSize = 12.sp, color = colorScheme.primary)
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    TextButton(onClick = onClearAll) {
+                        Text("清空", fontSize = 12.sp, color = colorScheme.outline)
+                    }
+
+                    Spacer(Modifier.weight(1f))
+
+                    TextButton(onClick = onClose) {
+                        Text("完成", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colorScheme.primary)
+                    }
+                }
             }
         }
     }
