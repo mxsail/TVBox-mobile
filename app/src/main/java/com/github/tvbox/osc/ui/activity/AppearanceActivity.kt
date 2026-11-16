@@ -50,6 +50,14 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import com.github.tvbox.osc.ui.compose.GroupCard
+import com.github.tvbox.osc.ui.compose.MenuRow
+import com.github.tvbox.osc.ui.compose.SectionTitle
+import com.github.tvbox.osc.ui.compose.SwitchRow
+import com.github.tvbox.osc.ui.compose.SliderRow
+import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.isAppDarkTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -116,10 +124,13 @@ class AppearanceActivity : BaseActivity() {
     override fun getLayoutResID(): Int = -1
 
     override fun initVb() {
-        // Compose 页面直接接管内容视图(外观页为纯静态配置列表, 适合 Compose)
         val composeView = androidx.compose.ui.platform.ComposeView(this)
         setContentView(composeView)
-        composeView.setContent { AppearanceScreen() }
+        composeView.setContent {
+            TvBoxTheme {
+                AppearanceScreen()
+            }
+        }
     }
 
     override fun init() {
@@ -196,75 +207,9 @@ class AppearanceActivity : BaseActivity() {
     /** 从当前 Activity 主题取色桥接 Compose 色板: 动态取色/预设覆盖层自动生效 */
     private fun themeInt(attr: Int): Int = MaterialColors.getColor(this, attr, 0)
 
-    @Composable
-    private fun AppearanceScreen() {
-        val ctx = this
-        val dark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-            Configuration.UI_MODE_NIGHT_YES
-        // 桥接既有主题色(动态取色/8 预设覆盖层都在 View 主题上生效)
-        val scheme = if (dark) {
-            darkColorScheme(
-                primary = Color(themeInt(androidx.appcompat.R.attr.colorPrimary)),
-                onPrimary = Color(themeInt(R.attr.colorOnPrimary)),
-                primaryContainer = Color(themeInt(R.attr.colorPrimaryContainer)),
-                onPrimaryContainer = Color(themeInt(R.attr.colorOnPrimaryContainer)),
-                secondaryContainer = Color(themeInt(R.attr.colorSecondaryContainer)),
-                onSecondaryContainer = Color(themeInt(R.attr.colorOnSecondaryContainer)),
-                background = Color(themeInt(android.R.attr.colorBackground)),
-                onBackground = Color(themeInt(R.attr.colorOnBackground)),
-                surface = Color(themeInt(R.attr.colorSurface)),
-                onSurface = Color(themeInt(R.attr.colorOnSurface)),
-                surfaceVariant = Color(themeInt(R.attr.colorSurfaceVariant)),
-                onSurfaceVariant = Color(themeInt(R.attr.colorOnSurfaceVariant)),
-                outline = Color(themeInt(R.attr.colorOutline)),
-                outlineVariant = Color(themeInt(R.attr.colorOutlineVariant)),
-            )
-        } else {
-            lightColorScheme(
-                primary = Color(themeInt(androidx.appcompat.R.attr.colorPrimary)),
-                onPrimary = Color(themeInt(R.attr.colorOnPrimary)),
-                primaryContainer = Color(themeInt(R.attr.colorPrimaryContainer)),
-                onPrimaryContainer = Color(themeInt(R.attr.colorOnPrimaryContainer)),
-                secondaryContainer = Color(themeInt(R.attr.colorSecondaryContainer)),
-                onSecondaryContainer = Color(themeInt(R.attr.colorOnSecondaryContainer)),
-                background = Color(themeInt(android.R.attr.colorBackground)),
-                onBackground = Color(themeInt(R.attr.colorOnBackground)),
-                surface = Color(themeInt(R.attr.colorSurface)),
-                onSurface = Color(themeInt(R.attr.colorOnSurface)),
-                surfaceVariant = Color(themeInt(R.attr.colorSurfaceVariant)),
-                onSurfaceVariant = Color(themeInt(R.attr.colorOnSurfaceVariant)),
-                outline = Color(themeInt(R.attr.colorOutline)),
-                outlineVariant = Color(themeInt(R.attr.colorOutlineVariant)),
-            )
-        }
-        // 自定义字体桥接(导入字体同时作用于 Compose 文本)
-        val fontFile = Hawk.get(HawkConfig.FONT_PATH, "")
-        val typography = MaterialTheme.typography.let { base ->
-            val family = if (fontFile.isNotEmpty() && File(fontFile).exists()) {
-                try {
-                    FontFamily(android.graphics.Typeface.createFromFile(File(fontFile)))
-                } catch (e: Exception) {
-                    FontFamily.Default
-                }
-            } else FontFamily.Default
-            base.copy(
-                titleLarge = base.titleLarge.copy(fontFamily = family),
-                titleMedium = base.titleMedium.copy(fontFamily = family),
-                bodyLarge = base.bodyLarge.copy(fontFamily = family),
-                bodyMedium = base.bodyMedium.copy(fontFamily = family),
-                labelLarge = base.labelLarge.copy(fontFamily = family),
-                labelMedium = base.labelMedium.copy(fontFamily = family),
-            )
-        }
-
-        MaterialTheme(colorScheme = scheme, typography = typography) {
-            AppearanceScreenContent()
-        }
-    }
-
     @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
     @Composable
-    private fun AppearanceScreenContent() {
+    private fun AppearanceScreen() {
         var themeMode by remember { mutableStateOf(Hawk.get(HawkConfig.THEME_TAG, 0)) }
         var themeColor by remember { mutableStateOf(ThemeManager.colorScheme()) }
         var material by remember { mutableStateOf(ThemeManager.material()) }
@@ -279,12 +224,21 @@ class AppearanceActivity : BaseActivity() {
         var barAutoHide by remember { mutableStateOf(Hawk.get(HawkConfig.BAR_AUTO_HIDE, false)) }
 
         val presets = ThemeManager.PRESETS
+        val isDark = isAppDarkTheme()
+        val pageBg = if (isDark) colorScheme.background else Color(0xFFF3F3F4)
 
         Scaffold(
-            containerColor = colorScheme.background,
+            containerColor = pageBg,
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text("外观设置", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+                    title = {
+                        Text(
+                            "外观设置",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colorScheme.onSurface
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
                             Icon(
@@ -294,9 +248,7 @@ class AppearanceActivity : BaseActivity() {
                             )
                         }
                     },
-                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                        containerColor = colorScheme.background
-                    )
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = pageBg)
                 )
             }
         ) { padding ->
@@ -358,13 +310,8 @@ class AppearanceActivity : BaseActivity() {
                     )
                 }
                 // 色板
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
-                    shape = RoundedCornerShape(18.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                GroupCard(
+                    modifier = Modifier.padding(top = 8.dp)
                 ) {
                     Column(Modifier.padding(vertical = 8.dp)) {
                         val rows = presets.chunked(5)
@@ -420,8 +367,8 @@ class AppearanceActivity : BaseActivity() {
                     ) {
                         MATERIAL_OPTIONS.forEach { (code, label, desc) ->
                             val isSelected = material == code
-                            val tileBg = if (isSelected) colorScheme.primaryContainer else colorScheme.surfaceContainerHigh
-                            val tileBorder = if (isSelected) colorScheme.primary else colorScheme.outlineVariant.copy(alpha = 0.3f)
+                            val tileBg = if (isSelected) colorScheme.primaryContainer else if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF3F3F4)
+                            val tileBorder = if (isSelected) colorScheme.primary else if (isDark) colorScheme.outlineVariant.copy(alpha = 0.3f) else Color(0xFFE5E5EA)
                             val contentColor = if (isSelected) colorScheme.onPrimaryContainer else colorScheme.onSurface
                             val descColor = if (isSelected) colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else colorScheme.onSurfaceVariant
                             val iconRes = if (code == ThemeManager.MATERIAL_LIQUID) R.drawable.ic_material_48 else R.drawable.ic_palette_48
@@ -895,201 +842,6 @@ class AppearanceActivity : BaseActivity() {
                     .background(liquidBg, shape)
                     .border(1.dp, strokeBrush, shape)
             }
-        }
-    }
-
-    @Composable
-    private fun SectionTitle(text: String) {
-        Row(
-            modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp, 14.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(colorScheme.primary)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text,
-                color = colorScheme.primary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp
-            )
-        }
-    }
-
-    @Composable
-    private fun GroupCard(content: @Composable () -> Unit) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
-            shape = RoundedCornerShape(22.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        ) {
-            Column { content() }
-        }
-    }
-
-    @Composable
-    private fun MenuRow(icon: Int, title: String, value: String? = null, onClick: (() -> Unit)? = null) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = onClick != null) { onClick?.invoke() }
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(colorScheme.primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painterResource(icon),
-                    contentDescription = null,
-                    tint = colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Text(
-                title,
-                color = colorScheme.onSurface,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .padding(start = 14.dp)
-                    .weight(1f)
-            )
-            if (value != null) {
-                Text(
-                    value,
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    modifier = Modifier.padding(end = 4.dp)
-                )
-                Icon(
-                    painterResource(R.drawable.icon_pre),
-                    contentDescription = null,
-                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-    }
-
-    @Composable
-    private fun SwitchRow(
-        icon: Int,
-        title: String,
-        checked: Boolean,
-        subtitle: String? = null,
-        enabled: Boolean = true,
-        onToggle: (Boolean) -> Unit
-    ) {
-        val alpha = if (enabled) 1f else 0.42f
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = enabled) { onToggle(!checked) }
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (checked && enabled) colorScheme.primary.copy(alpha = 0.14f)
-                        else colorScheme.surfaceContainerHighest.copy(alpha = alpha)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painterResource(icon),
-                    contentDescription = null,
-                    tint = if (checked && enabled) colorScheme.primary else colorScheme.onSurfaceVariant.copy(alpha = alpha),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Column(
-                modifier = Modifier
-                    .padding(start = 14.dp)
-                    .weight(1f)
-            ) {
-                Text(
-                    title,
-                    color = colorScheme.onSurface.copy(alpha = alpha),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                if (subtitle != null) {
-                    Text(
-                        subtitle,
-                        color = colorScheme.onSurfaceVariant.copy(alpha = alpha),
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
-            }
-            Switch(
-                checked = checked,
-                enabled = enabled,
-                onCheckedChange = if (enabled) onToggle else null
-            )
-        }
-    }
-
-    @Composable
-    private fun SliderRow(
-        title: String,
-        value: Float,
-        valueRange: ClosedFloatingPointRange<Float>,
-        displayValue: String,
-        onValueChange: (Float) -> Unit
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(title, color = colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(colorScheme.primaryContainer)
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        displayValue,
-                        color = colorScheme.onPrimaryContainer,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-            Slider(
-                value = value,
-                onValueChange = onValueChange,
-                valueRange = valueRange,
-                colors = SliderDefaults.colors(
-                    thumbColor = colorScheme.primary,
-                    activeTrackColor = colorScheme.primary,
-                    inactiveTrackColor = colorScheme.surfaceVariant
-                ),
-                modifier = Modifier.padding(top = 2.dp)
-            )
         }
     }
 

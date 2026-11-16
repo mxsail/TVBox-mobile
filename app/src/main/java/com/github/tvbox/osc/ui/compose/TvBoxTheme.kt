@@ -207,30 +207,98 @@ fun MenuRow(
 
 /** 开关列表行 (HyperOS 风格) */
 @Composable
-fun SwitchRow(icon: Int, title: String, checked: Boolean, onToggle: (Boolean) -> Unit) {
+fun SwitchRow(
+    icon: Int,
+    title: String,
+    checked: Boolean,
+    subtitle: String? = null,
+    enabled: Boolean = true,
+    onToggle: (Boolean) -> Unit
+) {
+    val isDark = isAppDarkTheme()
+    val alpha = if (enabled) 1f else 0.42f
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onToggle(!checked) }
-            .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
+            .clickable(enabled = enabled) { onToggle(!checked) }
+            .padding(start = 16.dp, end = 16.dp, top = if (subtitle != null) 12.dp else 10.dp, bottom = if (subtitle != null) 12.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             painterResource(icon),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
             modifier = Modifier.size(22.dp)
         )
-        Text(
-            title,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
+        Column(
             modifier = Modifier
                 .padding(start = 16.dp)
                 .weight(1f)
+        ) {
+            Text(
+                title,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    color = (if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF8E8E93)).copy(alpha = alpha),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+        Switch(checked = checked, enabled = enabled, onCheckedChange = if (enabled) onToggle else null)
+    }
+}
+
+/** 滑块列表行 */
+@Composable
+fun SliderRow(
+    title: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    displayValue: String,
+    onValueChange: (Float) -> Unit
+) {
+    val isDark = isAppDarkTheme()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                title,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                displayValue,
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        androidx.compose.material3.Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            colors = androidx.compose.material3.SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant else Color(0xFFE5E5EA)
+            ),
+            modifier = Modifier.padding(top = 2.dp)
         )
-        Switch(checked = checked, onCheckedChange = { onToggle(it) })
     }
 }
 
