@@ -69,6 +69,7 @@ import com.github.tvbox.osc.base.App
 import com.github.tvbox.osc.base.BaseActivity
 import com.github.tvbox.osc.data.AppDataManager
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.TvBoxTopBar
 import com.github.tvbox.osc.util.FileUtils
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.OkGoHelper
@@ -280,18 +281,9 @@ class BackupRestoreActivity : BaseActivity() {
         Scaffold(
             containerColor = colorScheme.background,
             topBar = {
-                TopAppBar(
-                    title = { Text("备份与恢复", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) },
-                    navigationIcon = {
-                        IconButton(onClick = { finish() }) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = "返回",
-                                tint = colorScheme.onSurface
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
+                TvBoxTopBar(
+                    title = "备份与恢复",
+                    onBack = { finish() }
                 )
             }
         ) { padding ->

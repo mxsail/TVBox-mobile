@@ -250,17 +250,9 @@ fun VodGridScreen(
     Scaffold(
         containerColor = colorScheme.background,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = "返回",
-                            tint = colorScheme.onSurface
-                        )
-                    }
-                },
+            TvBoxTopBar(
+                title = title,
+                onBack = onBack,
                 actions = {
                     if (onClear != null && cards.isNotEmpty()) {
                         IconButton(onClick = onClear) {
@@ -271,8 +263,7 @@ fun VodGridScreen(
                             )
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
+                }
             )
         }
     ) { padding ->

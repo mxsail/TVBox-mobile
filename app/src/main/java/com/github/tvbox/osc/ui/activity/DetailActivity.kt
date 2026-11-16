@@ -198,6 +198,7 @@ class DetailActivity : BaseActivity() {
 
     override fun onPause() {
         super.onPause()
+        uiState = uiState.copy(isPlaying = false)
         vodPlayerManager?.onPause()
     }
 
@@ -394,6 +395,10 @@ class DetailActivity : BaseActivity() {
                                     showCacheSelectDialog()
                                 }
 
+                                override fun onCastClick() {
+                                    showCastDialog()
+                                }
+
                                 override fun onCollectClick() {
                                     val info = vodInfo ?: return
                                     val isCollected = RoomDataManger.isVodCollect(sourceKey, vodId)
@@ -429,7 +434,23 @@ class DetailActivity : BaseActivity() {
                                 }
 
                                 override fun onDismissAllEpisodesSheet() {
-                                    uiState = uiState.copy(showAllEpisodesSheet = false)
+                                    uiState = uiState.copy(
+            showAllEpisodesSheet = false,
+            showVideoDetailSheet = false
+        )
+                                }
+
+                                override fun onOpenVideoDetailSheet() {
+                                    uiState = uiState.copy(showVideoDetailSheet = true)
+                                }
+
+                                override fun onDismissVideoDetailSheet() {
+                                    uiState = uiState.copy(showVideoDetailSheet = false)
+                                }
+
+                                override fun onCopyVodUrl() {
+                                    com.blankj.utilcode.util.ClipboardUtils.copyText(getCurrentVodUrl())
+                                    ToastUtils.showShort("已复制")
                                 }
                             }
                         )
@@ -530,11 +551,18 @@ class DetailActivity : BaseActivity() {
         val metaSummary = metadataParts.joinToString("   ")
 
         val isCollected = RoomDataManger.isVodCollect(sourceKey, vodId)
+        val cleanDes = if (!info.des.isNullOrEmpty()) {
+            info.des.replace(Regex("<.*?>"), "").replace(Regex("\\s+"), " ").trim()
+        } else ""
 
         uiState = uiState.copy(
             title = if (info.name.isNullOrEmpty()) "暂无信息" else info.name,
             sourceName = sourceName,
             subInfo = metaSummary,
+            des = cleanDes,
+            actor = info.actor?.trim() ?: "",
+            director = info.director?.trim() ?: "",
+            pic = info.pic ?: "",
             isCollected = isCollected,
             isPrivateBrowsing = Hawk.get(HawkConfig.PRIVATE_BROWSING, false)
         )
@@ -777,6 +805,7 @@ class DetailActivity : BaseActivity() {
 
     fun onPlaybackStarted() {
         playbackStarted = true
+        uiState = uiState.copy(isPlaying = true)
         updatePipParams()
         playServerSwitch(true)
         if (pendingDownloadTasks.isNotEmpty()) {
@@ -895,7 +924,10 @@ class DetailActivity : BaseActivity() {
         window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
         findViewById<android.view.View>(android.R.id.content)?.setBackgroundColor(android.graphics.Color.BLACK)
         mAllSeriesRightDialog?.dismiss()
-        uiState = uiState.copy(showAllEpisodesSheet = false)
+        uiState = uiState.copy(
+            showAllEpisodesSheet = false,
+            showVideoDetailSheet = false
+        )
         vodPlayerManager?.hideAllDialogSuccess()
         vodPlayerManager?.controller?.setInPipMode(true)
     }
@@ -1230,7 +1262,10 @@ class DetailActivity : BaseActivity() {
             return
         }
         if (uiState.showAllEpisodesSheet) {
-            uiState = uiState.copy(showAllEpisodesSheet = false)
+            uiState = uiState.copy(
+            showAllEpisodesSheet = false,
+            showVideoDetailSheet = false
+        )
             return
         }
         if (vodPlayerManager?.hideAllDialogSuccess() == true) {

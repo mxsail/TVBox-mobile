@@ -57,6 +57,7 @@ import com.github.tvbox.osc.ui.compose.SectionTitle
 import com.github.tvbox.osc.ui.compose.SwitchRow
 import com.github.tvbox.osc.ui.compose.SliderRow
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.TvBoxTopBar
 import com.github.tvbox.osc.ui.compose.isAppDarkTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -230,25 +231,9 @@ class AppearanceActivity : BaseActivity() {
         Scaffold(
             containerColor = pageBg,
             topBar = {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Text(
-                            "外观设置",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colorScheme.onSurface
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { finish() }) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = "返回",
-                                tint = colorScheme.onSurface
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = pageBg)
+                TvBoxTopBar(
+                    title = "外观设置",
+                    onBack = { finish() }
                 )
             }
         ) { padding ->

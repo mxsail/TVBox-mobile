@@ -58,6 +58,7 @@ import com.github.tvbox.osc.event.DownloadEvent
 import com.github.tvbox.osc.ui.adapter.DownloadAdapter
 import com.github.tvbox.osc.ui.compose.PosterImage
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.TvBoxTopBar
 import com.github.tvbox.osc.ui.compose.isAppDarkTheme
 import com.github.tvbox.osc.util.Utils
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -418,19 +419,9 @@ class DownloadActivity : BaseActivity() {
         Scaffold(
             containerColor = colorScheme.background,
             topBar = {
-                TopAppBar(
-                    title = {
-                        Text(titleState.value, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { finish() }) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = "返回",
-                                tint = colorScheme.onSurface
-                            )
-                        }
-                    },
+                TvBoxTopBar(
+                    title = titleState.value,
+                    onBack = { finish() },
                     actions = {
                         IconButton(onClick = { confirmDeleteSeries(detailGroupKey, detailSeriesName) }) {
                             Icon(
@@ -439,8 +430,7 @@ class DownloadActivity : BaseActivity() {
                                 tint = colorScheme.error
                             )
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
+                    }
                 )
             }
         ) { padding ->

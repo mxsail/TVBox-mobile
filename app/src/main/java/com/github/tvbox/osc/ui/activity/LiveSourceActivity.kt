@@ -59,6 +59,7 @@ import com.github.tvbox.osc.R
 import com.github.tvbox.osc.base.BaseActivity
 import com.github.tvbox.osc.bean.LiveSource
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.TvBoxTopBar
 import com.github.tvbox.osc.ui.dialog.SubsciptionDialog
 import com.github.tvbox.osc.util.live.LiveSourceManager
 import com.github.tvbox.osc.view.MaterialBarHelper
@@ -287,18 +288,9 @@ class LiveSourceActivity : BaseActivity() {
         Scaffold(
             containerColor = colorScheme.background,
             topBar = {
-                TopAppBar(
-                    title = { Text("直播源", fontSize = 16.sp) },
-                    navigationIcon = {
-                        IconButton(onClick = { finish() }) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = "返回",
-                                tint = colorScheme.onSurface
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
+                TvBoxTopBar(
+                    title = "直播源",
+                    onBack = { finish() }
                 )
             },
             floatingActionButton = {

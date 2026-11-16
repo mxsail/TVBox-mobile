@@ -17,10 +17,10 @@
         android:layout_height="wrap_content"
         android:layout_gravity="top"
         android:background="@drawable/player_scrim_top"
-        android:paddingStart="12dp"
-        android:paddingTop="0dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="0dp"
+        android:paddingStart="16dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp"
         android:visibility="gone"
         tools:visibility="visible">
 
@@ -35,22 +35,24 @@
                 android:id="@+id/back_btn"
                 style="@style/PlayerIconButton"
                 android:contentDescription="@string/back"
+                android:padding="6dp"
                 android:src="@drawable/ic_arrow_back"
                 app:tint="@color/white" />
 
-            <!-- 只保留标题:与返回按钮垂直居中对齐,字号与底部时间文字统一为 14sp -->
+            <!-- 只保留标题:与返回按钮垂直居中对齐,字号与底部时间文字统一为 15sp -->
             <TextView
                 android:id="@+id/tv_info_name1"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
-                android:layout_marginStart="2dp"
+                android:layout_marginStart="4dp"
                 android:ellipsize="marquee"
                 android:marqueeRepeatLimit="marquee_forever"
-                android:maxWidth="260dp"
+                android:maxWidth="280dp"
                 android:singleLine="true"
                 android:textColor="@color/white"
-                android:textSize="14sp"
+                android:textSize="15sp"
+                android:textStyle="bold"
                 tools:text="剧集名称" />
         </LinearLayout>
 
@@ -99,12 +101,13 @@
                     android:id="@+id/battery"
                     android:layout_width="26dp"
                     android:layout_height="14dp"
-                    android:layout_marginEnd="4dp" />
+                    android:layout_marginEnd="6dp" />
             </LinearLayout>
 
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/pip"
                 style="@style/PlayerIconButton"
+                android:padding="10.5dp"
                 android:contentDescription="@string/pip"
                 android:src="@drawable/ic_m3_pip"
                 app:tint="@color/white" />
@@ -112,6 +115,7 @@
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/cast"
                 style="@style/PlayerIconButton"
+                android:padding="10.5dp"
                 android:contentDescription="@string/cast"
                 android:src="@drawable/ic_m3_cast"
                 app:tint="@color/white" />
@@ -119,6 +123,7 @@
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/setting"
                 style="@style/PlayerIconButton"
+                android:padding="10.5dp"
                 android:contentDescription="@string/setting"
                 android:src="@drawable/ic_m3_settings"
                 app:tint="@color/white" />
@@ -159,7 +164,10 @@
         android:background="@drawable/player_scrim_bottom"
         android:gravity="center_vertical"
         android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
         android:paddingTop="8dp"
+        android:paddingBottom="12dp"
         android:visibility="gone"
         tools:visibility="visible">
 
@@ -168,7 +176,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="4dp"
-            android:layout_marginHorizontal="12dp"
             android:orientation="horizontal"
             android:visibility="gone"
             tools:visibility="visible">
@@ -199,8 +206,6 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="0dp"
-            android:layout_marginHorizontal="12dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
@@ -228,28 +233,28 @@
                 android:paddingRight="6dp"
                 android:text="00:00"
                 android:textColor="@color/white"
-                android:textSize="14sp"
+                android:textSize="13sp"
                  />
 
             <SeekBar
                 android:id="@+id/seekBar"
                 android:layout_width="0dp"
-                android:layout_height="36dp"
+                android:layout_height="38dp"
                 android:layout_gravity="center"
                 android:layout_weight="1"
                 android:background="@null"
                 android:focusable="false"
                 android:focusableInTouchMode="false"
                 android:max="1000"
-                android:maxHeight="4dp"
-                android:minHeight="4dp"
+                android:maxHeight="3.5dp"
+                android:minHeight="3.5dp"
                 android:paddingStart="8dp"
                 android:paddingEnd="8dp"
                 android:paddingTop="0dp"
                 android:paddingBottom="0dp"
-                android:progressDrawable="@drawable/player_seek_track"
-                android:thumb="@drawable/player_seek_thumb"
-                android:thumbOffset="6dp" />
+                android:progressDrawable="@drawable/player_seek_track_m3"
+                android:thumb="@drawable/player_seek_thumb_m3"
+                android:thumbOffset="5dp" />
 
             <TextView
                 android:id="@+id/total_time"
@@ -259,7 +264,7 @@
                 android:paddingLeft="6dp"
                 android:text="00:00"
                 android:textColor="@color/white"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:layout_marginEnd="2dp"
                  />
 
@@ -275,17 +280,18 @@
                 android:id="@+id/choose_series"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_player_pill"
+                android:background="@drawable/shape_player_pill_stroke"
                 android:gravity="center"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="5dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="4dp"
                 android:textColor="@color/white"
-                android:textSize="14sp"
+                android:textSize="13sp"
+                android:textStyle="bold"
                 android:visibility="gone"
                 tools:visibility="visible"
                 android:text="选集"
                 android:layout_marginStart="4dp"
-                android:layout_marginEnd="2dp"
+                android:layout_marginEnd="4dp"
                 />
 
             <androidx.appcompat.widget.AppCompatImageView
@@ -502,12 +508,12 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@drawable/bg_player_pill"
+        android:background="@drawable/shape_player_hud_pill"
         android:focusable="false"
         android:focusableInTouchMode="false"
         android:gravity="center"
-        android:paddingHorizontal="24dp"
-        android:paddingVertical="14dp"
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="10dp"
         android:tag="vod_control_slide_info"
         android:textAlignment="gravity"
         tools:visibility="visible"
@@ -522,14 +528,14 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:orientation="vertical"
-        android:background="@drawable/bg_player_pill"
+        android:background="@drawable/shape_player_hud_pill"
         android:visibility="gone"
         tools:visibility="visible">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="32dp"
+            android:paddingHorizontal="24dp"
             android:paddingVertical="10dp"
             android:gravity="center"
             android:orientation="vertical">
@@ -585,10 +591,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center|top"
-        android:layout_marginTop="50dp"
-        android:background="@drawable/bg_player_pill"
-        android:paddingHorizontal="20dp"
-        android:paddingVertical="10dp"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/shape_player_hud_pill"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="6dp"
         android:gravity="center_vertical"
         android:visibility="gone"
         tools:visibility="visible">

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 沉浸式流体进度条滑块: 静止 10dp 精致小圆点, 按压拖拽时放大至 16dp 并带柔和光晕 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <size
+                        android:width="22dp"
+                        android:height="22dp" />
+                    <solid android:color="#33FFFFFF" />
+                </shape>
+            </item>
+            <item
+                android:bottom="3dp"
+                android:left="3dp"
+                android:right="3dp"
+                android:top="3dp">
+                <shape android:shape="oval">
+                    <size
+                        android:width="16dp"
+                        android:height="16dp" />
+                    <solid android:color="#FFFFFF" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <size
+                android:width="10dp"
+                android:height="10dp" />
+            <solid android:color="#FFFFFF" />
+        </shape>
+    </item>
+</selector>

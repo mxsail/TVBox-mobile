@@ -34,6 +34,7 @@ import com.github.tvbox.osc.ui.compose.GroupCard
 import com.github.tvbox.osc.ui.compose.MenuRow
 import com.github.tvbox.osc.ui.compose.SectionTitle
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.TvBoxTopBar
 import com.github.tvbox.osc.util.HeavyTaskUtil
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.json.JSONObject
@@ -127,18 +128,9 @@ class AboutActivity : BaseActivity() {
         Scaffold(
             containerColor = colorScheme.background,
             topBar = {
-                CenterAlignedTopAppBar(
-                    title = { Text("关于", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        IconButton(onClick = { finish() }) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = "返回",
-                                tint = colorScheme.onSurface
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
+                TvBoxTopBar(
+                    title = "关于",
+                    onBack = { finish() }
                 )
             }
         ) { padding ->

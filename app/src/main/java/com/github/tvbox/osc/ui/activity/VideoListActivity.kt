@@ -57,6 +57,7 @@ import com.github.tvbox.osc.bean.VideoInfo
 import com.github.tvbox.osc.constant.CacheConst
 import com.github.tvbox.osc.event.RefreshEvent
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.TvBoxTopBar
 import com.github.tvbox.osc.util.Utils
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
@@ -179,18 +180,9 @@ class VideoListActivity : BaseActivity() {
         Scaffold(
             containerColor = colorScheme.background,
             topBar = {
-                TopAppBar(
-                    title = { Text(mBucketDisplayName, fontSize = 16.sp, maxLines = 1) },
-                    navigationIcon = {
-                        IconButton(onClick = { onBackPressedDispatcher.onBackPressed() }) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = "返回",
-                                tint = colorScheme.onSurface
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
+                TvBoxTopBar(
+                    title = mBucketDisplayName,
+                    onBack = { onBackPressedDispatcher.onBackPressed() }
                 )
             },
             bottomBar = {

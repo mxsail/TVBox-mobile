@@ -65,6 +65,7 @@ import com.github.tvbox.osc.bean.Source
 import com.github.tvbox.osc.bean.Subscription
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.TvBoxTopBar
 import com.github.tvbox.osc.ui.dialog.ChooseSourceDialog
 import com.github.tvbox.osc.ui.dialog.SubsTipDialog
 import com.github.tvbox.osc.ui.dialog.SubsciptionDialog
@@ -464,17 +465,9 @@ class SubscriptionActivity : BaseActivity() {
         Scaffold(
             containerColor = colorScheme.background,
             topBar = {
-                TopAppBar(
-                    title = { Text("订阅源", fontSize = 16.sp) },
-                    navigationIcon = {
-                        IconButton(onClick = { finish() }) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = "返回",
-                                tint = colorScheme.onSurface
-                            )
-                        }
-                    },
+                TvBoxTopBar(
+                    title = "订阅源",
+                    onBack = { finish() },
                     actions = {
                         IconButton(onClick = { showUseTip() }) {
                             Icon(
@@ -483,8 +476,7 @@ class SubscriptionActivity : BaseActivity() {
                                 tint = colorScheme.onSurface
                             )
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = colorScheme.background)
+                    }
                 )
             },
             floatingActionButton = {
