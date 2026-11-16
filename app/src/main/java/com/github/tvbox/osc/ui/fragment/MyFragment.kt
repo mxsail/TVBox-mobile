@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,25 +20,29 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import com.github.tvbox.osc.ui.compose.ObserveBarHideDeltas
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -46,12 +51,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
+import com.blankj.utilcode.util.AppUtils
 import com.github.tvbox.osc.R
+import com.github.tvbox.osc.api.ApiConfig
 import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.cache.CacheManager
 import com.github.tvbox.osc.cache.RoomDataManger
 import com.github.tvbox.osc.ui.activity.AboutActivity
+import com.github.tvbox.osc.ui.activity.BackupRestoreActivity
 import com.github.tvbox.osc.ui.activity.CollectActivity
 import com.github.tvbox.osc.ui.activity.DetailActivity
 import com.github.tvbox.osc.ui.activity.HistoryActivity
@@ -60,12 +67,15 @@ import com.github.tvbox.osc.ui.activity.MainActivity
 import com.github.tvbox.osc.ui.activity.SettingActivity
 import com.github.tvbox.osc.ui.activity.SubscriptionActivity
 import com.github.tvbox.osc.ui.compose.GroupCard
+import com.github.tvbox.osc.ui.compose.ObserveBarHideDeltas
 import com.github.tvbox.osc.ui.compose.PosterFileImage
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.compose.isAppDarkTheme
 import com.github.tvbox.osc.util.DefaultConfig
+import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.MD5
 import com.github.tvbox.osc.util.UA
+import com.orhanobut.hawk.Hawk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,8 +83,10 @@ import me.jessyan.autosize.AutoSize
 import java.io.File
 
 /**
- * 我的页(Compose): 观看历史卡片(横向海报墙, 右下角已播放时间, 下方名称+集数) +
- * 常用功能卡片(图标按钮网格)。头部点击进观看历史页。
+ * 我的页(Material Design 3 Expressive):
+ * 1. 沉浸式 Hero 头部卡片: 应用 Logo + 名称版本 +「当前主源」/「数据同步」Expressive 胶囊
+ * 2. 观看历史卡片: 14dp 平滑圆角横向海报墙 + 渐变高对比度已播胶囊 +「全部 >」胶囊与 Expressive 空态
+ * 3. 常用功能 2 列大卡片磁贴 (Feature Tiles): 18dp 圆角、色彩强调底座、主副标题说明
  */
 class MyFragment : Fragment() {
 
@@ -220,22 +232,204 @@ class MyFragment : Fragment() {
                 .fillMaxSize()
                 .background(colorScheme.background)
                 .verticalScroll(scrollState)
+                .statusBarsPadding()
                 .padding(bottom = bottomPadding)
         ) {
-            Text(
-                stringResource(R.string.app_name),
-                color = colorScheme.onSurface,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .padding(start = 20.dp, top = 40.dp, bottom = 12.dp)
-            )
-            Box(Modifier.padding(horizontal = 14.dp)) {
-                HistoryCard(currentActivity)
+            // 1. M3 Expressive Hero 头部卡片
+            Box(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                HeroCard(currentActivity)
             }
-            Spacer(Modifier.height(14.dp))
+
+            // 2. 观看历史卡片
             Box(Modifier.padding(horizontal = 14.dp)) {
-                FunctionsCard(currentActivity, onGoToTab)
+                HistoryCard(currentActivity, onGoToTab)
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // 3. 常用功能 2 列 Expressive 磁贴
+            Box(Modifier.padding(horizontal = 14.dp)) {
+                FunctionsTilesCard(currentActivity, onGoToTab)
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+
+    // ---------------- 卡片0: M3 Expressive Hero 头部 ----------------
+
+    @Composable
+    private fun HeroCard(currentActivity: android.app.Activity?) {
+        val isDark = isAppDarkTheme()
+        val homeSource = ApiConfig.get().homeSourceBean?.name?.takeIf { it.isNotBlank() } ?: "未配置"
+        val syncEnabled = Hawk.get(HawkConfig.SYNC_ENABLED, false)
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isDark) colorScheme.surfaceContainerLow else Color.White
+            ),
+            shape = RoundedCornerShape(22.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                // 上半部分: Logo + 应用名/版本 + 设置快捷入口
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // App Logo 底座
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.app_icon),
+                            contentDescription = "App Icon",
+                            modifier = Modifier.size(42.dp)
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 14.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(R.string.app_name),
+                                color = colorScheme.onSurface,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Surface(
+                                shape = CircleShape,
+                                color = colorScheme.primaryContainer.copy(alpha = 0.7f)
+                            ) {
+                                Text(
+                                    "v${AppUtils.getAppVersionName()}",
+                                    color = colorScheme.primary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            "随时随地畅享影音视界",
+                            color = colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 3.dp)
+                        )
+                    }
+
+                    // 右上角: 进关于页
+                    IconButton(
+                        onClick = { jumpActivity(currentActivity, AboutActivity::class.java) },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_about_48),
+                            contentDescription = "关于应用",
+                            tint = colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                // 下半部分: M3 Expressive 状态胶囊 (主源 + 数据同步)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // 主源胶囊
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = colorScheme.surfaceContainerHigh,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { jumpActivity(currentActivity, SubscriptionActivity::class.java) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_database_48),
+                                contentDescription = null,
+                                tint = colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "当前主源",
+                                    color = colorScheme.onSurfaceVariant,
+                                    fontSize = 10.sp
+                                )
+                                Text(
+                                    homeSource,
+                                    color = colorScheme.onSurface,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    // 同步状态胶囊
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (syncEnabled) colorScheme.primaryContainer.copy(alpha = 0.5f) else colorScheme.surfaceContainerHigh,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { jumpActivity(currentActivity, BackupRestoreActivity::class.java) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_sync_48),
+                                contentDescription = null,
+                                tint = if (syncEnabled) colorScheme.primary else colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "数据同步",
+                                    color = colorScheme.onSurfaceVariant,
+                                    fontSize = 10.sp
+                                )
+                                Text(
+                                    if (syncEnabled) "WebDAV已开启" else "未开启同步",
+                                    color = if (syncEnabled) colorScheme.primary else colorScheme.onSurface,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -243,60 +437,134 @@ class MyFragment : Fragment() {
     // ---------------- 卡片1: 观看历史 ----------------
 
     @Composable
-    private fun HistoryCard(currentActivity: android.app.Activity?) {
+    private fun HistoryCard(currentActivity: android.app.Activity?, onGoToTab: ((Int) -> Unit)?) {
         val isDark = isAppDarkTheme()
+        val items = historyItems.value
         GroupCard {
-            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                // 头部: 标题 + 右箭头, 点击进观看历史页
+            Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                // 头部: 标题 + 数量徽章 + 右侧「全部 >」胶囊
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { jumpActivity(currentActivity, HistoryActivity::class.java) }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         "观看历史",
                         color = colorScheme.onSurface,
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
+                        fontWeight = FontWeight.Bold
                     )
-                    Icon(
-                        painterResource(R.drawable.ic_chevron_right),
-                        contentDescription = "查看全部",
-                        tint = if (isDark) colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else Color(0xFFC7C7CC),
-                        modifier = Modifier.size(16.dp)
-                    )
+                    if (!items.isNullOrEmpty()) {
+                        Spacer(Modifier.width(6.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = colorScheme.surfaceContainerHigh
+                        ) {
+                            Text(
+                                "${items.size}",
+                                color = colorScheme.primary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    // 全部胶囊
+                    Surface(
+                        shape = CircleShape,
+                        color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF3F3F4),
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable { jumpActivity(currentActivity, HistoryActivity::class.java) }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                "全部",
+                                color = colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Icon(
+                                painterResource(R.drawable.ic_chevron_right),
+                                contentDescription = "查看全部",
+                                tint = colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
                 }
-                val items = historyItems.value
+
                 when {
-                    // 加载中: 海报骨架占位, 避免首访出现整块空白
+                    // 加载中: 海报骨架占位
                     items == null -> Row(
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         repeat(3) {
                             Box(
                                 modifier = Modifier
-                                    .width(104.dp)
-                                    .aspectRatio(0.75f)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .width(108.dp)
+                                    .aspectRatio(0.72f)
+                                    .clip(RoundedCornerShape(14.dp))
                                     .background(colorScheme.surfaceContainerHigh)
                             )
                         }
                     }
-                    items.isEmpty() -> Text(
-                        "暂无观看记录",
-                        color = colorScheme.onSurfaceVariant,
-                        fontSize = 13.sp,
+
+                    // 空态: Expressive 空态提示卡 +「去逛逛」引导
+                    items.isEmpty() -> Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 24.dp)
-                    )
+                            .padding(vertical = 24.dp, horizontal = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_history_48),
+                                contentDescription = null,
+                                tint = colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Text(
+                            "暂无观看记录",
+                            color = colorScheme.onSurface,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                        Text(
+                            "在首页挑选心仪的影视剧集开启观看吧",
+                            color = colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        FilledTonalButton(
+                            onClick = { onGoToTab?.invoke(0) ?: goMainTab(currentActivity, 0) },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text("去发现好片", fontSize = 12.sp)
+                        }
+                    }
+
+                    // 历史记录横向海报墙
                     else -> LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(items) { entry ->
                             HistoryPoster(currentActivity, entry)
@@ -311,8 +579,8 @@ class MyFragment : Fragment() {
     private fun HistoryPoster(currentActivity: android.app.Activity?, entry: HistoryEntry) {
         Column(
             modifier = Modifier
-                .width(104.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .width(108.dp)
+                .clip(RoundedCornerShape(14.dp))
                 .clickable {
                     val bundle = Bundle().apply {
                         putString("id", entry.vod.id)
@@ -324,34 +592,44 @@ class MyFragment : Fragment() {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(0.75f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .aspectRatio(0.72f)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(colorScheme.surfaceContainerHigh)
             ) {
                 PosterFileImage(entry.posterFile, entry.vod.pic, Modifier.fillMaxSize())
                 entry.progressText?.let { progress ->
-                    // 右下角: 已播放时间
-                    Text(
-                        progress,
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        maxLines = 1,
+                    // 右下角: 播放进度精致胶囊
+                    Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(5.dp)
-                            .background(Color(0x99000000), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                    )
+                            .padding(6.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0x99000000), Color(0xCC000000))
+                                ),
+                                RoundedCornerShape(6.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            progress,
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
-            // 名称 + 集数(若有)
+            // 名称 + 集数
             Text(
                 entry.vod.name,
                 color = colorScheme.onSurface,
                 fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 5.dp)
+                modifier = Modifier.padding(top = 6.dp)
             )
             if (!entry.vod.playNote.isNullOrEmpty()) {
                 Text(
@@ -366,38 +644,82 @@ class MyFragment : Fragment() {
         }
     }
 
-    // ---------------- 卡片2: 常用功能 ----------------
+    // ---------------- 卡片2: 常用功能 2 列 Expressive 磁贴 ----------------
 
-    private data class FuncEntry(val icon: Int, val label: String, val action: () -> Unit)
+    private data class FeatureTile(
+        val icon: Int,
+        val title: String,
+        val subtitle: String,
+        val accentColor: Color,
+        val action: () -> Unit
+    )
 
     @Composable
-    private fun FunctionsCard(currentActivity: android.app.Activity?, onGoToTab: ((Int) -> Unit)?) {
-        val funcs = listOf(
-            FuncEntry(R.drawable.ic_collect_48, "我的收藏") { jumpActivity(currentActivity, CollectActivity::class.java) },
-            FuncEntry(R.drawable.ic_download_nav, "我的下载") { onGoToTab?.invoke(2) ?: goMainTab(currentActivity, 2) },
-            FuncEntry(R.drawable.ic_database_48, "订阅源") { jumpActivity(currentActivity, SubscriptionActivity::class.java) },
-            FuncEntry(R.drawable.ic_live_tv_48, "直播源") { jumpActivity(currentActivity, LiveSourceActivity::class.java) },
-            FuncEntry(R.drawable.ic_settings, "设置") { jumpActivity(currentActivity, SettingActivity::class.java) },
-            FuncEntry(R.drawable.ic_about_48, "关于") { jumpActivity(currentActivity, AboutActivity::class.java) }
+    private fun FunctionsTilesCard(currentActivity: android.app.Activity?, onGoToTab: ((Int) -> Unit)?) {
+        val tiles = listOf(
+            FeatureTile(
+                icon = R.drawable.ic_collect_48,
+                title = "我的收藏",
+                subtitle = "常看与心仪剧集",
+                accentColor = Color(0xFFE91E63)
+            ) { jumpActivity(currentActivity, CollectActivity::class.java) },
+            FeatureTile(
+                icon = R.drawable.ic_download_nav,
+                title = "我的下载",
+                subtitle = "离线离网本地缓存",
+                accentColor = Color(0xFF1E88E5)
+            ) { onGoToTab?.invoke(2) ?: goMainTab(currentActivity, 2) },
+            FeatureTile(
+                icon = R.drawable.ic_database_48,
+                title = "订阅源",
+                subtitle = "多源站点接口配置",
+                accentColor = Color(0xFF43A047)
+            ) { jumpActivity(currentActivity, SubscriptionActivity::class.java) },
+            FeatureTile(
+                icon = R.drawable.ic_live_tv_48,
+                title = "直播源",
+                subtitle = "电视网络直播列表",
+                accentColor = Color(0xFFFB8C00)
+            ) { jumpActivity(currentActivity, LiveSourceActivity::class.java) },
+            FeatureTile(
+                icon = R.drawable.ic_sync_48,
+                title = "备份与同步",
+                subtitle = "WebDAV/快照管理",
+                accentColor = Color(0xFF8E24AA)
+            ) { jumpActivity(currentActivity, BackupRestoreActivity::class.java) },
+            FeatureTile(
+                icon = R.drawable.ic_settings,
+                title = "系统设置",
+                subtitle = "播放内核与偏好",
+                accentColor = Color(0xFF546E7A)
+            ) { jumpActivity(currentActivity, SettingActivity::class.java) }
         )
+
         GroupCard {
-            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 14.dp)
+            ) {
                 Text(
                     "常用功能",
                     color = colorScheme.onSurface,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(start = 2.dp, bottom = 12.dp)
                 )
-                funcs.chunked(4).forEach { row ->
+
+                // 2 列网格
+                tiles.chunked(2).forEachIndexed { index, rowTiles ->
+                    if (index > 0) Spacer(Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        row.forEach { func ->
-                            FuncButton(func, Modifier.weight(1f))
+                        rowTiles.forEach { tile ->
+                            FeatureTileItem(tile, Modifier.weight(1f))
                         }
-                        repeat(4 - row.size) {
+                        if (rowTiles.size == 1) {
                             Spacer(Modifier.weight(1f))
                         }
                     }
@@ -407,38 +729,61 @@ class MyFragment : Fragment() {
     }
 
     @Composable
-    private fun FuncButton(func: FuncEntry, modifier: Modifier) {
+    private fun FeatureTileItem(tile: FeatureTile, modifier: Modifier) {
         val isDark = isAppDarkTheme()
-        Column(
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = if (isDark) colorScheme.surfaceContainerHigh.copy(alpha = 0.6f) else Color(0xFFF7F7F8),
             modifier = modifier
-                .clip(RoundedCornerShape(12.dp))
-                .clickable { func.action() }
-                .padding(vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .clip(RoundedCornerShape(16.dp))
+                .clickable { tile.action() }
         ) {
-            Box(
+            Row(
                 modifier = Modifier
-                    .size(52.dp)
-                    .background(
-                        if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF3F3F4),
-                        RoundedCornerShape(16.dp)
-                    ),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    painterResource(func.icon),
-                    contentDescription = func.label,
-                    tint = colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
+                // 图标底座 (带有柔和彩色高亮)
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(tile.accentColor.copy(alpha = if (isDark) 0.22f else 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(tile.icon),
+                        contentDescription = tile.title,
+                        tint = if (isDark) tile.accentColor.copy(alpha = 0.9f) else tile.accentColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 10.dp)
+                ) {
+                    Text(
+                        tile.title,
+                        color = colorScheme.onSurface,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        tile.subtitle,
+                        color = colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
             }
-            Text(
-                func.label,
-                color = colorScheme.onSurface,
-                fontSize = 12.sp,
-                maxLines = 1,
-                modifier = Modifier.padding(top = 6.dp)
-            )
         }
     }
 }
+

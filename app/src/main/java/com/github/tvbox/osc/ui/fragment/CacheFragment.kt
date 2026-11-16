@@ -8,12 +8,15 @@ import android.view.ViewGroup
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,18 +27,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,9 +56,11 @@ import com.github.tvbox.osc.download.DownloadStorage
 import com.github.tvbox.osc.download.DownloadTaskManager
 import com.github.tvbox.osc.event.DownloadEvent
 import com.github.tvbox.osc.ui.activity.DownloadActivity
+import com.github.tvbox.osc.ui.activity.MainActivity
 import com.github.tvbox.osc.ui.adapter.DownloadAdapter
 import com.github.tvbox.osc.ui.compose.ObserveBarHideDeltas
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.isAppDarkTheme
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.orhanobut.hawk.Hawk
 import org.greenrobot.eventbus.EventBus
@@ -81,12 +90,18 @@ class CacheFragment : Fragment() {
         val name: String,
         val pic: String,
         val note: String?,
-        val sizeText: String?
+        val sizeText: String?,
+        val isDownloading: Boolean = false,
+        val doneCount: Int = 0,
+        val totalCount: Int = 0
     )
 
     /** 网格数据(后台线程构建, 主线程更新) */
     private val cards = mutableStateOf<List<CacheCard>>(emptyList())
-    private val storageText = mutableStateOf("已占用: …")
+    private val storageText = mutableStateOf("0MB")
+    private val usedBytesState = mutableStateOf(0L)
+    private val freeBytesState = mutableStateOf(0L)
+    private val totalBytesState = mutableStateOf(0L)
     private var lastReloadTime = 0L
     private var eventBusRegistered = false
     private var userVisible = false
@@ -131,45 +146,75 @@ class CacheFragment : Fragment() {
         }
         val currentContext = androidx.compose.ui.platform.LocalContext.current
         val currentActivity = (activity ?: currentContext as? android.app.Activity)
+        val isDark = isAppDarkTheme()
+
         Column(
             Modifier
                 .fillMaxSize()
                 .background(colorScheme.background)
                 .statusBarsPadding()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    storageText.value,
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp,
-                    modifier = Modifier.weight(1f)
+            // 顶部 M3 Expressive 存储空间 Hero 卡片
+            Box(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                StorageHeroCard(
+                    cardsCount = cards.value.size,
+                    usedText = storageText.value,
+                    freeBytes = freeBytesState.value,
+                    usedBytes = usedBytesState.value,
+                    totalBytes = totalBytesState.value,
+                    onClearAll = { currentActivity?.let { confirmClearAll(it) } }
                 )
-                IconButton(onClick = { currentActivity?.let { confirmClearAll(it) } }) {
-                    Icon(
-                        androidx.compose.ui.res.painterResource(R.drawable.ic_delete_outline_24),
-                        contentDescription = "清空下载",
-                        tint = colorScheme.onSurface
-                    )
-                }
             }
+
             if (cards.value.isEmpty()) {
+                // Expressive 空态
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .weight(1f),
+                        .weight(1f)
+                        .padding(horizontal = 24.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("暂无下载", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .background(colorScheme.surfaceContainerHigh),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            androidx.compose.ui.res.painterResource(R.drawable.ic_download_nav),
+                            contentDescription = null,
+                            tint = colorScheme.primary,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                    Text(
+                        "暂无离线内容",
+                        color = colorScheme.onSurface,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                    Text(
+                        "在影视详情页面点击「缓存」即可离线观看",
+                        color = colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    FilledTonalButton(
+                        onClick = { (activity as? MainActivity)?.goToTab(0) },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text("去发现好片", fontSize = 13.sp)
+                    }
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = bottomPadding),
+                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 2.dp, bottom = bottomPadding),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     state = listState,
                     modifier = Modifier
@@ -179,7 +224,9 @@ class CacheFragment : Fragment() {
                     items(cards.value, key = { it.groupKey }) { card ->
                         val supporting = listOfNotNull(card.note, card.sizeText).joinToString(" · ")
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDark) colorScheme.surfaceContainerLow else Color.White
+                            ),
                             shape = RoundedCornerShape(18.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                         ) {
@@ -197,18 +244,19 @@ class CacheFragment : Fragment() {
                                             currentActivity?.let { confirmDeleteSeries(it, card.groupKey, card.name) }
                                         }
                                     )
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    .padding(horizontal = 12.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // 左侧海报(2:3)
+                                // 左侧海报(2:3 优雅比例与平滑圆角)
                                 com.github.tvbox.osc.ui.compose.PosterImage(
                                     card.pic,
                                     Modifier
-                                        .width(62.dp)
-                                        .height(86.dp)
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .width(66.dp)
+                                        .height(92.dp)
+                                        .clip(RoundedCornerShape(14.dp))
                                         .background(colorScheme.surfaceContainerHigh)
                                 )
+
                                 Column(
                                     modifier = Modifier
                                         .weight(1f)
@@ -218,10 +266,67 @@ class CacheFragment : Fragment() {
                                         card.name,
                                         color = colorScheme.onSurface,
                                         fontSize = 15.sp,
-                                        fontWeight = FontWeight.Medium,
+                                        fontWeight = FontWeight.SemiBold,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
                                     )
+
+                                    // Expressive 状态胶囊徽标
+                                    Row(
+                                        modifier = Modifier.padding(top = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (card.isDownloading) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = colorScheme.primaryContainer
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                ) {
+                                                    Icon(
+                                                        androidx.compose.ui.res.painterResource(R.drawable.ic_download_nav),
+                                                        contentDescription = null,
+                                                        tint = colorScheme.primary,
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Text(
+                                                        "下载中 ${card.doneCount}/${card.totalCount}",
+                                                        color = colorScheme.onPrimaryContainer,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                }
+                                            }
+                                        } else if (card.totalCount > 0 && card.doneCount == card.totalCount) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF0F0F2)
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                ) {
+                                                    Icon(
+                                                        androidx.compose.ui.res.painterResource(R.drawable.ic_check_circle),
+                                                        contentDescription = null,
+                                                        tint = colorScheme.primary,
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Text(
+                                                        "已完成 ${card.doneCount}集",
+                                                        color = colorScheme.onSurfaceVariant,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     if (supporting.isNotEmpty()) {
                                         Text(
                                             supporting,
@@ -229,21 +334,152 @@ class CacheFragment : Fragment() {
                                             fontSize = 12.sp,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(top = 5.dp)
+                                            modifier = Modifier.padding(top = 4.dp)
                                         )
                                     }
                                 }
+
                                 Icon(
-                                    androidx.compose.ui.res.painterResource(R.drawable.icon_pre),
+                                    androidx.compose.ui.res.painterResource(R.drawable.ic_chevron_right),
                                     contentDescription = null,
-                                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                                     modifier = Modifier
                                         .padding(start = 8.dp)
-                                        .size(22.dp)
+                                        .size(18.dp)
                                 )
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun StorageHeroCard(
+        cardsCount: Int,
+        usedText: String,
+        freeBytes: Long,
+        usedBytes: Long,
+        totalBytes: Long,
+        onClearAll: () -> Unit
+    ) {
+        val isDark = isAppDarkTheme()
+        val progress = if (totalBytes > 0) (usedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0.01f, 1f) else 0.05f
+
+        Card(
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isDark) colorScheme.surfaceContainerLow else Color.White
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            androidx.compose.ui.res.painterResource(R.drawable.ic_cache_48),
+                            contentDescription = null,
+                            tint = colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "离线缓存空间",
+                            color = colorScheme.onSurface,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        val freeText = if (freeBytes > 0) "可用 " + DownloadStorage.formatSize(freeBytes) else ""
+                        Text(
+                            "已缓存 $usedText" + (if (freeText.isNotEmpty()) " · $freeText" else ""),
+                            color = colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(top = 1.dp)
+                        )
+                    }
+                    if (cardsCount > 0) {
+                        Surface(
+                            shape = CircleShape,
+                            color = colorScheme.errorContainer.copy(alpha = 0.18f),
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable { onClearAll() }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Icon(
+                                    androidx.compose.ui.res.painterResource(R.drawable.ic_delete_outline_24),
+                                    contentDescription = "清空全部",
+                                    tint = colorScheme.error,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(3.dp))
+                                Text(
+                                    "清空",
+                                    color = colorScheme.error,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // 双色平滑圆角进度条
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(colorScheme.surfaceContainerHighest)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(fraction = progress)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(colorScheme.primary)
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "共 $cardsCount 部离线视频",
+                        color = colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        "长按剧集卡片可单独删除",
+                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontSize = 10.sp
+                    )
                 }
             }
         }
@@ -374,13 +610,17 @@ class CacheFragment : Fragment() {
                     else -> done++
                 }
             }
+            val isDownloading = downloading > 0 || resolving > 0 || waiting > 0
             items.add(
                 CacheCard(
                     groupKey = entry.key,
                     name = displayNameOf(eps[0]),
                     pic = eps[0].vodPic ?: "",
                     note = buildNote(done, eps.size, waiting, resolving, downloading, paused, failed),
-                    sizeText = sizeText
+                    sizeText = sizeText,
+                    isDownloading = isDownloading,
+                    doneCount = done,
+                    totalCount = eps.size
                 )
             )
         }
@@ -432,7 +672,15 @@ class CacheFragment : Fragment() {
     }
 
     private fun applyTotalUsed(total: Long) {
-        runOnUi { storageText.value = "已占用: " + DownloadStorage.formatSize(total) }
+        val base = DownloadStorage.baseDir()
+        val free = try { base.usableSpace } catch (_: Throwable) { 0L }
+        val diskTotal = try { base.totalSpace } catch (_: Throwable) { 0L }
+        runOnUi {
+            usedBytesState.value = total
+            freeBytesState.value = free
+            totalBytesState.value = diskTotal
+            storageText.value = DownloadStorage.formatSize(total)
+        }
     }
 
     private fun runOnUi(action: () -> Unit) {

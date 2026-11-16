@@ -25,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -37,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -171,40 +173,51 @@ fun VodCardItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.75f)
-                // clip 必须在 background 之前: 海报是 AndroidView(ImageView), 不裁剪会
-                // 以方角盖住圆角背景 → 卡片看起来没圆角、行间视觉上挤在一起
                 .clip(RoundedCornerShape(16.dp))
                 .background(colorScheme.surfaceContainer)
         ) {
             PosterImage(card.pic, Modifier.fillMaxSize())
             if (card.badge.isNotEmpty()) {
-                Text(
-                    card.badge,
-                    color = colorScheme.onPrimaryContainer,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .padding(4.dp)
-                        .background(colorScheme.surfaceContainerHigh, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 5.dp, vertical = 3.dp)
-                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = colorScheme.secondaryContainer.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(6.dp)
+                ) {
+                    Text(
+                        card.badge,
+                        color = colorScheme.onSecondaryContainer,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
+                    )
+                }
             }
             if (!card.note.isNullOrEmpty()) {
-                // 评分: 海报右下角小胶囊
-                Text(
-                    card.note,
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                // 评分/集数: 海报右下角微磨砂渐变胶囊
+                Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(6.dp)
-                        .widthIn(max = 96.dp)
-                        .background(Color(0x99000000), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                )
+                        .widthIn(max = 100.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0x99000000), Color(0xCC000000))
+                            ),
+                            RoundedCornerShape(6.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.5.dp)
+                ) {
+                    Text(
+                        card.note,
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
         // 名称移到卡片下方
@@ -212,9 +225,10 @@ fun VodCardItem(
             card.name,
             color = colorScheme.onSurface,
             fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 5.dp, start = 2.dp, end = 2.dp)
+            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp)
         )
     }
 }

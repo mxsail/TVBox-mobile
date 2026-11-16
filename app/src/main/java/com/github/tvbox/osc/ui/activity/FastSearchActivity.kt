@@ -16,6 +16,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,9 +25,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -33,28 +36,37 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.github.tvbox.osc.ui.compose.isAppDarkTheme
 import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -138,10 +150,8 @@ class FastSearchActivity : BaseActivity() {
     private val loadState = mutableIntStateOf(1) // 1=初始 2=内容 3=空
     private val historyWords = mutableStateOf<List<String>>(emptyList())
     private val hotWords = mutableStateOf<List<String>>(emptyList())
+    private val suggestWords = mutableStateOf<List<String>>(emptyList())
     private val inputText = mutableStateOf("")
-
-    private var mSearchSuggestionsDialog: SearchSuggestionsDialog? = null
-    private var searchEditText: EditText? = null
 
     override fun getLayoutResID(): Int = -1
 
@@ -249,6 +259,10 @@ class FastSearchActivity : BaseActivity() {
 
     /** 联想搜索 */
     private fun getSuggest(text: String) {
+        if (text.isEmpty()) {
+            suggestWords.value = emptyList()
+            return
+        }
         OkGo.get<String>("https://suggest.video.iqiyi.com/?if=mobile&key=$text")
             .execute(object : AbsCallback<String?>() {
                 override fun onSuccess(response: com.lzy.okgo.model.Response<String?>) {
@@ -263,9 +277,7 @@ class FastSearchActivity : BaseActivity() {
                     } catch (th: Throwable) {
                         LogUtils.d(th.toString())
                     }
-                    if (titles.isNotEmpty()) {
-                        runOnUiThread { showSuggestDialog(titles) }
-                    }
+                    runOnUiThread { suggestWords.value = titles }
                 }
 
                 @Throws(Throwable::class)
@@ -273,31 +285,16 @@ class FastSearchActivity : BaseActivity() {
             })
     }
 
-    private fun showSuggestDialog(list: List<String>) {
-        val anchor = searchEditText ?: return
-        if (mSearchSuggestionsDialog == null) {
-            mSearchSuggestionsDialog = SearchSuggestionsDialog(this, list) { _, text ->
-                LogUtils.d("搜索:$text")
-                mSearchSuggestionsDialog!!.dismissWith { search(text) }
-            }
-            XPopup.Builder(this)
-                // 联想弹窗不带遮罩/模糊: 旧实现全屏遮罩把输入框也盖住, 输入时看不到正在打的词
-                .hasShadowBg(false)
-                .atView(anchor)
-                .notDismissWhenTouchInView(anchor)
-                .isViewMode(true)
-                .isRequestFocus(false)
-                .setPopupCallback(object : SimpleCallback() {
-                    override fun onDismiss(popupView: BasePopupView) {
-                        super.onDismiss(popupView)
-                        mSearchSuggestionsDialog = null
-                    }
-                })
-                .asCustom(mSearchSuggestionsDialog!!)
-                .show()
-        } else {
-            mSearchSuggestionsDialog!!.updateSuggestions(list)
-        }
+    private fun removeHistoryWord(word: String) {
+        val history = Hawk.get(HawkConfig.HISTORY_SEARCH, ArrayList<String?>())
+        history.remove(word)
+        Hawk.put(HawkConfig.HISTORY_SEARCH, history)
+        initHistorySearch()
+    }
+
+    private fun clearAllHistory() {
+        Hawk.put(HawkConfig.HISTORY_SEARCH, ArrayList<Any>())
+        initHistorySearch()
     }
 
     private fun saveSearchHistory(searchWord: String?) {
@@ -334,21 +331,16 @@ class FastSearchActivity : BaseActivity() {
         }
     }
 
-    private fun search(title: String?) {
+    fun search(title: String?) {
         if (title.isNullOrEmpty()) {
             ToastUtils.showShort("请输入搜索内容")
             return
         }
-        searchEditText?.removeTextChangedListener(textWatcher)
-        searchEditText?.setText(title)
-        searchEditText?.setSelection(title.length)
-        searchEditText?.addTextChangedListener(textWatcher)
         inputText.value = title
-        if (mSearchSuggestionsDialog != null && mSearchSuggestionsDialog!!.isShow) {
-            mSearchSuggestionsDialog!!.dismiss()
-        }
+        suggestWords.value = emptyList()
         if (!Hawk.get(HawkConfig.PRIVATE_BROWSING, false)) {
             saveSearchHistory(title)
+            initHistorySearch()
         }
         showSuggestPage.value = false
         KeyboardUtils.hideSoftInput(this)
@@ -481,128 +473,148 @@ class FastSearchActivity : BaseActivity() {
             })
     }
 
-    /** 输入框 TextWatcher(联想触发), 挂在 AndroidView EditText 上 */
-    private val textWatcher = object : TextWatcher {
-        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-        override fun afterTextChanged(editable: Editable?) {
-            val text = editable?.toString() ?: ""
-            inputText.value = text
-            if (TextUtils.isEmpty(text)) {
-                mSearchSuggestionsDialog?.dismiss()
-                showSuggestPage.value = true
-            } else {
-                getSuggest(text)
-            }
-        }
-    }
-
     // ---------------- Compose 界面 ----------------
 
+    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     @Composable
     private fun FastSearchScreen() {
+        val isDark = isAppDarkTheme()
+        val focusRequester = remember { FocusRequester() }
+
+        LaunchedEffect(Unit) {
+            if (inputText.value.isEmpty()) {
+                kotlinx.coroutines.delay(200)
+                try { focusRequester.requestFocus() } catch (_: Throwable) {}
+            }
+        }
+
         Column(
             Modifier
                 .fillMaxSize()
                 .background(colorScheme.background)
                 .statusBarsPadding()
         ) {
-            // 顶栏: 返回 + 搜索框(内含搜索钮) + 过滤。图标尺寸统一 22dp
+            // M3 Expressive SearchBar 胶囊顶栏
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { finish() }, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        painterResource(R.drawable.ic_arrow_back),
-                        contentDescription = "返回",
-                        tint = colorScheme.onSurface,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Box(
+                // 搜索胶囊主容器 (52dp 饱满 Expressive 高度，26dp 连续平滑方圆)
+                Surface(
+                    shape = RoundedCornerShape(26.dp),
+                    color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4),
                     modifier = Modifier
                         .weight(1f)
-                        .height(38.dp)
-                        .background(colorScheme.surfaceContainerHigh, RoundedCornerShape(19.dp)),
-                    contentAlignment = Alignment.CenterStart
+                        .height(52.dp)
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(modifier = Modifier.weight(1f)) {
-                            AndroidView(
-                                factory = { ctx ->
-                                    EditText(ctx).apply {
-                                        setBackgroundResource(android.R.color.transparent)
-                                        setPadding(28, 12, 0, 12)
-                                        textSize = 14f
-                                        setSingleLine(true)
-                                        hint = "搜索"
-                                        setTextColor(resolveColorOnSurface())
-                                        setHintTextColor(resolveColorOnSurfaceVariant())
-                                        imeOptions = EditorInfo.IME_ACTION_SEARCH
-                                        setOnEditorActionListener { _: TextView?, actionId: Int, _: KeyEvent? ->
-                                            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                                                search(text.toString())
-                                                true
-                                            } else false
-                                        }
-                                        if (inputText.value.isNotEmpty()) {
-                                            setText(inputText.value)
-                                            setSelection(inputText.value.length)
-                                        }
-                                        addTextChangedListener(textWatcher)
-                                        // 进页自动聚焦并拉起输入法(若已有搜索关键词则不自动拉起键盘挡住内容)
-                                        isFocusableInTouchMode = true
-                                        if (inputText.value.isEmpty()) {
-                                            post {
-                                                requestFocus()
-                                                val imm =
-                                                    ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                                                imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
-                                            }
-                                        }
-                                    }.also { searchEditText = it }
-                                },
-                                update = { et ->
-                                    if (et.text.toString() != inputText.value) {
-                                        et.removeTextChangedListener(textWatcher)
-                                        et.setText(inputText.value)
-                                        et.setSelection(inputText.value.length)
-                                        et.addTextChangedListener(textWatcher)
-                                    }
-                                },
-                                modifier = Modifier.fillMaxSize()
+                        IconButton(onClick = { finish() }, modifier = Modifier.size(40.dp)) {
+                            Icon(
+                                painterResource(R.drawable.ic_arrow_back),
+                                contentDescription = "返回",
+                                tint = colorScheme.onSurface,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
-                        // 搜索钮移入搜索框内(与首页搜索框样式一致)
-                        Icon(
-                            painterResource(R.drawable.ic_search_18),
-                            contentDescription = "搜索",
-                            tint = colorScheme.onSurfaceVariant,
+
+                        BasicTextField(
+                            value = inputText.value,
+                            onValueChange = { newText ->
+                                inputText.value = newText
+                                if (newText.isEmpty()) {
+                                    suggestWords.value = emptyList()
+                                    showSuggestPage.value = true
+                                } else {
+                                    getSuggest(newText)
+                                }
+                            },
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = colorScheme.onSurface,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Normal
+                            ),
+                            cursorBrush = SolidColor(colorScheme.primary),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { search(inputText.value) }),
                             modifier = Modifier
-                                .size(38.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) { search(searchEditText?.text?.toString()) }
-                                .padding(9.dp)
-                                .size(20.dp)
+                                .weight(1f)
+                                .focusRequester(focusRequester)
+                                .padding(horizontal = 6.dp),
+                            decorationBox = { innerTextField ->
+                                Box(contentAlignment = Alignment.CenterStart) {
+                                    if (inputText.value.isEmpty()) {
+                                        Text(
+                                            "搜索电影、电视剧、综艺…",
+                                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
                         )
-                        Spacer(Modifier.width(6.dp))
+
+                        // 清空按钮
+                        if (inputText.value.isNotEmpty()) {
+                            IconButton(
+                                onClick = {
+                                    inputText.value = ""
+                                    suggestWords.value = emptyList()
+                                    showSuggestPage.value = true
+                                },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    painterResource(R.drawable.ic_clear),
+                                    contentDescription = "清空输入",
+                                    tint = colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        // 搜索按钮
+                        IconButton(
+                            onClick = { search(inputText.value) },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_search_18),
+                                contentDescription = "搜索",
+                                tint = colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
-                IconButton(onClick = { filterSearchSource() }, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        painterResource(R.drawable.ic_filter_list),
-                        contentDescription = "搜索源过滤",
-                        tint = colorScheme.onSurface,
-                        modifier = Modifier.size(22.dp)
-                    )
+
+                Spacer(Modifier.width(8.dp))
+
+                // 右侧搜索源过滤按钮 (48dp 圆形)
+                Surface(
+                    shape = CircleShape,
+                    color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .clickable { filterSearchSource() }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            painterResource(R.drawable.ic_filter_list),
+                            contentDescription = "搜索源过滤",
+                            tint = colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
 
@@ -614,80 +626,188 @@ class FastSearchActivity : BaseActivity() {
         }
     }
 
-    private fun resolveColorOnSurface(): Int =
-        com.google.android.material.color.MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurface, 0)
-
-    private fun resolveColorOnSurfaceVariant(): Int =
-        com.google.android.material.color.MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant, 0)
-
-    /** 历史+热词页 */
-    @OptIn(ExperimentalFoundationApi::class)
-    @Composable
-    private fun SuggestPage() {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-        ) {
-            if (historyWords.value.isNotEmpty()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "搜索历史",
-                        color = colorScheme.onSurface,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Icon(
-                        painterResource(R.drawable.ic_clear),
-                        contentDescription = "清除历史",
-                        tint = colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clickable {
-                                Hawk.put(HawkConfig.HISTORY_SEARCH, ArrayList<Any>())
-                                initHistorySearch()
-                            }
-                    )
-                }
-                ChipFlow(words = historyWords.value) { search(it) }
-            }
-            if (hotWords.value.isNotEmpty()) {
-                Text(
-                    "热门搜索",
-                    color = colorScheme.onSurface,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 18.dp)
-                )
-                ChipFlow(words = hotWords.value) { search(it) }
-            }
-        }
-    }
-
+    /** 联想与历史+热词页 */
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     @Composable
-    private fun ChipFlow(words: List<String>, onPick: (String) -> Unit) {
-        FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            words.forEach { word ->
-                Text(
-                    word,
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(colorScheme.surfaceContainerHigh)
-                        .clickable { onPick(word) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                )
+    private fun SuggestPage() {
+        val isDark = isAppDarkTheme()
+        val suggestions = suggestWords.value
+        val hasInput = inputText.value.isNotBlank()
+
+        if (hasInput && suggestions.isNotEmpty()) {
+            // 实时联想词列表
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                itemsIndexed(suggestions) { _, suggest ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { search(suggest) }
+                            .padding(horizontal = 12.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_search_18),
+                            contentDescription = null,
+                            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            suggest,
+                            color = colorScheme.onSurface,
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                            painterResource(R.drawable.ic_chevron_right),
+                            contentDescription = null,
+                            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        } else {
+            // 搜索历史 + 全网热搜
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                if (historyWords.value.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "搜索历史",
+                            color = colorScheme.onSurface,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4),
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable { clearAllHistory() }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    painterResource(R.drawable.ic_delete_outline_24),
+                                    contentDescription = "清空历史",
+                                    tint = colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(3.dp))
+                                Text(
+                                    "清空",
+                                    color = colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+
+                    FlowRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        historyWords.value.forEach { word ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF4F4F6)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+                                ) {
+                                    Text(
+                                        word,
+                                        color = colorScheme.onSurface,
+                                        fontSize = 13.sp,
+                                        maxLines = 1,
+                                        modifier = Modifier.clickable { search(word) }
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Icon(
+                                        painterResource(R.drawable.ic_clear),
+                                        contentDescription = "删除记录",
+                                        tint = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clip(CircleShape)
+                                            .clickable { removeHistoryWord(word) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (hotWords.value.isNotEmpty()) {
+                    Text(
+                        "全网热门搜索",
+                        color = colorScheme.onSurface,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 22.dp)
+                    )
+
+                    FlowRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        hotWords.value.forEachIndexed { index, word ->
+                            val isTop3 = index < 3
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isTop3) colorScheme.primaryContainer.copy(alpha = if (isDark) 0.35f else 0.6f)
+                                else if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF4F4F6),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { search(word) }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                                ) {
+                                    Text(
+                                        "${index + 1}",
+                                        color = if (isTop3) colorScheme.primary else colorScheme.onSurfaceVariant,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        word,
+                                        color = colorScheme.onSurface,
+                                        fontSize = 13.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -702,8 +822,8 @@ class FastSearchActivity : BaseActivity() {
                     Spacer(Modifier.height(38.dp))
                 }
                 when {
-                    loadState.value == 1 && displayed().isEmpty() -> SearchHint("正在搜索…")
-                    loadState.value == 3 && displayed().isEmpty() -> SearchHint("暂无搜索结果")
+                    loadState.value == 1 && displayed().isEmpty() -> SearchLoadingHint()
+                    loadState.value == 3 && displayed().isEmpty() -> SearchEmptyHint()
                     else -> {
                         val list = displayed()
                         LazyVerticalGrid(
@@ -795,14 +915,62 @@ class FastSearchActivity : BaseActivity() {
     }
 
     @Composable
-    private fun SearchHint(text: String) {
-        Box(
-            Modifier
+    private fun SearchLoadingHint() {
+        Column(
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 80.dp),
-            contentAlignment = Alignment.TopCenter
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text, color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+            CircularProgressIndicator(
+                modifier = Modifier.size(36.dp),
+                color = colorScheme.primary,
+                strokeWidth = 3.dp
+            )
+            Text(
+                "正在聚合搜索各大影视源…",
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 14.dp)
+            )
+        }
+    }
+
+    @Composable
+    private fun SearchEmptyHint() {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 80.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(colorScheme.surfaceContainerHigh),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_search_18),
+                    contentDescription = null,
+                    tint = colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            Text(
+                "未找到相关影视结果",
+                color = colorScheme.onSurface,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+            Text(
+                "可尝试更换关键字，或点击右上角筛选搜索源",
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 

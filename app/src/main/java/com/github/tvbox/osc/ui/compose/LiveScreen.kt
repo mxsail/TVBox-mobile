@@ -26,13 +26,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -50,14 +56,13 @@ fun attachLiveScreen(fragment: LiveFragment, composeView: androidx.compose.ui.pl
 }
 
 /**
- * 直播页 Compose 渲染层: 视频区(MyVideoView 内嵌, doikki 控制器仍为 View) +
- * 右侧滑入设置面板 + EPG 信息卡 + 常驻频道浏览区(分组/频道双列) + 频道号浮层。
- * 业务回调全部走 LiveFragment。
+ * 直播页 Compose 渲染层 (Material Design 3 Expressive):
+ * 1. 视频区 (MyVideoView 内嵌) + 右侧 M3 Expressive 设置面板
+ * 2. 交互型 EPG 媒体卡片 (LIVE 徽标 + 线路切换胶囊 Chips + 投屏/全屏/设置按钮)
+ * 3. 频道浏览器架构 (左分组右频道，高亮有机胶囊 PrimaryContainer，频道序号方形徽标)
  */
 @Composable
 fun LiveScreen(fragment: LiveFragment, uiState: LiveUiState) {
-    // 状态栏避让双保险: 先取 Compose insets, 为 0(嵌套组合/桥接吞掉)时回退
-    // 根 View insets(旧 View 版验证过的读取路径)
     val statusBarPad = with(LocalDensity.current) {
         val viaCompose = androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(this)
         val fallback = if (viaCompose > 0) 0 else {
@@ -78,7 +83,7 @@ fun LiveScreen(fragment: LiveFragment, uiState: LiveUiState) {
                     .fillMaxSize()
                     .padding(top = statusBarPad)
             ) {
-                // 视频区: 高度由 uiState 驱动(初始 16:9, 起播后按实际比例)
+                // 视频区: 高度由 uiState 驱动
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -97,7 +102,7 @@ fun LiveScreen(fragment: LiveFragment, uiState: LiveUiState) {
     }
 }
 
-/** 右侧滑入设置面板: 线路/比例/解码/超时/偏好 五组, 双列结构同旧版 */
+/** 右侧滑入 M3 Expressive 设置面板: 线路/比例/解码/超时/偏好 五组 */
 @Composable
 private fun LiveSettingsPanel(fragment: LiveFragment, uiState: LiveUiState, modifier: Modifier) {
     AnimatedVisibility(
@@ -110,196 +115,335 @@ private fun LiveSettingsPanel(fragment: LiveFragment, uiState: LiveUiState, modi
             Modifier
                 .width(320.dp)
                 .fillMaxHeight()
-                .background(colorScheme.surfaceContainerHigh, RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
-                .padding(vertical = 10.dp)
+                .background(colorScheme.surfaceContainerHigh, RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp))
+                .padding(vertical = 12.dp, horizontal = 6.dp)
         ) {
-            LazyColumn(Modifier.weight(1f)) {
+            // 参数项
+            LazyColumn(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 itemsIndexed(uiState.settingItems, key = { _, item -> item.itemIndex }) { _, item ->
                     val selected = item.itemIndex == uiState.settingItemSelectedIdx
-                    Text(
-                        item.itemName,
-                        color = if (selected) colorScheme.primary else colorScheme.onSurface,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (selected) colorScheme.primaryContainer else Color.Transparent,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
                             .clickable { fragment.clickSettingItem(item.itemIndex) }
-                            .padding(horizontal = 14.dp, vertical = 12.dp)
-                    )
+                    ) {
+                        Text(
+                            item.itemName,
+                            color = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurface,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp)
+                        )
+                    }
                 }
             }
             Box(
                 Modifier
+                    .padding(horizontal = 4.dp)
                     .width(1.dp)
                     .fillMaxHeight()
-                    .background(colorScheme.outlineVariant)
+                    .background(colorScheme.outlineVariant.copy(alpha = 0.5f))
             )
-            LazyColumn(Modifier.weight(1f)) {
+            // 分组项
+            LazyColumn(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 itemsIndexed(uiState.settingGroups, key = { _, group -> group.groupIndex }) { _, group ->
                     val selected = group.groupIndex == uiState.settingGroupIdx
-                    Text(
-                        group.groupName,
-                        color = if (selected) colorScheme.primary else colorScheme.onSurface,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (selected) colorScheme.primaryContainer else Color.Transparent,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
                             .clickable { fragment.selectSettingGroup(group.groupIndex, false) }
-                            .padding(horizontal = 14.dp, vertical = 12.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** EPG 信息卡: 频道名 + 投屏/设置入口 + 横向源切换 chips(高亮当前源) */
-@Composable
-private fun LiveEpgBar(fragment: LiveFragment, uiState: LiveUiState) {
-    Column(
-        Modifier
-            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp)
-            .fillMaxWidth()
-            .background(colorScheme.surfaceContainerLow, RoundedCornerShape(18.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                uiState.epgName,
-                color = colorScheme.onSurface,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                modifier = Modifier
-                    .weight(1f)
-                    .basicMarquee()
-                    .clickable { fragment.scrollChannelListToSelection() }
-            )
-            Icon(
-                painterResource(R.drawable.ic_cast),
-                contentDescription = "投屏",
-                tint = colorScheme.onSurface,
-                modifier = Modifier
-                    .size(32.dp)
-                    .padding(4.dp)
-                    .clickable { fragment.showCastDialog() }
-            )
-            Spacer(Modifier.width(10.dp))
-            Icon(
-                painterResource(R.drawable.ic_player_setting),
-                contentDescription = "设置",
-                tint = colorScheme.onSurface,
-                modifier = Modifier
-                    .size(32.dp)
-                    .padding(4.dp)
-                    .clickable { fragment.showSettingDialog(false) }
-            )
-        }
-        // 源切换 chips: 直观横向列出全部线路, 高亮当前源; 源多时横向滚动
-        if (uiState.sourceNames.size > 0) {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(top = 10.dp)
-            ) {
-                itemsIndexed(uiState.sourceNames) { index, name ->
-                    val selected = index == uiState.sourceIdx
-                    Text(
-                        name,
-                        color = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 13.sp,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .clickable { fragment.switchingLine2Replay(index) }
-                            .background(
-                                if (selected) colorScheme.primaryContainer else colorScheme.surfaceContainerHighest,
-                                RoundedCornerShape(8.dp)
-                            )
-                            .padding(horizontal = 14.dp, vertical = 7.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** 常驻频道浏览区: 左分组右频道双列 */
-@Composable
-private fun LiveChannelBrowser(fragment: LiveFragment, uiState: LiveUiState, modifier: Modifier) {
-    Row(
-        modifier
-            .padding(start = 14.dp, end = 14.dp, bottom = 14.dp)
-            .background(colorScheme.surfaceContainerLow, RoundedCornerShape(18.dp))
-    ) {
-        LazyColumn(
-            state = uiState.groupListState,
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 24.dp, top = 8.dp, bottom = 8.dp)
-        ) {
-            itemsIndexed(uiState.groups, key = { _, group -> group.groupIndex }) { _, group ->
-                val selected = group.groupIndex == uiState.selectedGroupIdx
-                val locked = group.groupPassword.isNotEmpty()
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { fragment.selectChannelGroup(group.groupIndex, false, -1) }
-                        .background(
-                            if (selected) colorScheme.primaryContainer else Color.Transparent,
-                            RoundedCornerShape(10.dp)
-                        )
-                        .padding(horizontal = 12.dp, vertical = 11.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        group.groupName,
-                        color = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurface,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (locked) {
-                        Icon(
-                            painterResource(R.drawable.ic_lock),
-                            contentDescription = "已加密",
-                            tint = colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
+                    ) {
+                        Text(
+                            group.groupName,
+                            color = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurface,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp)
                         )
                     }
                 }
             }
         }
-        LazyColumn(
-            state = uiState.channelListState,
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 16.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
+    }
+}
+
+/** 交互型 EPG 媒体卡片: LIVE 标志 + 频道名 + 投屏/全屏/设置入口 + 线路胶囊 */
+@Composable
+private fun LiveEpgBar(fragment: LiveFragment, uiState: LiveUiState) {
+    val isDark = isAppDarkTheme()
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) colorScheme.surfaceContainerLow else Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .fillMaxWidth()
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            itemsIndexed(uiState.channels, key = { _, channel -> channel.channelIndex }) { index, channel ->
-                val selected = index == uiState.selectedChannelIdx
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // LIVE 红色高亮胶囊
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color(0xFFE53935)
+                ) {
+                    Text(
+                        "LIVE",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+
+                Spacer(Modifier.width(8.dp))
+
                 Text(
-                    channel.channelName,
-                    color = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurface,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                    fontSize = 14.sp,
+                    uiState.epgName,
+                    color = colorScheme.onSurface,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { fragment.clickLiveChannel(index) }
-                        .background(
-                            if (selected) colorScheme.primaryContainer else Color.Transparent,
-                            RoundedCornerShape(10.dp)
-                        )
-                        .padding(horizontal = 12.dp, vertical = 11.dp)
+                        .weight(1f)
+                        .basicMarquee()
+                        .clickable { fragment.scrollChannelListToSelection() }
                 )
+
+                // 投屏
+                IconButton(
+                    onClick = { fragment.showCastDialog() },
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_cast),
+                        contentDescription = "投屏",
+                        tint = colorScheme.onSurface,
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+
+                // 全屏
+                IconButton(
+                    onClick = {
+                        try {
+                            fragment.videoView.startFullScreen()
+                        } catch (_: Throwable) {}
+                    },
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_m3_fullscreen),
+                        contentDescription = "全屏",
+                        tint = colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // 设置
+                IconButton(
+                    onClick = { fragment.showSettingDialog(false) },
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_player_setting),
+                        contentDescription = "设置",
+                        tint = colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            // 线路切换 Expressive Chips
+            if (uiState.sourceNames.size > 0) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    itemsIndexed(uiState.sourceNames) { index, name ->
+                        val selected = index == uiState.sourceIdx
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (selected) colorScheme.primaryContainer
+                            else if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF1F1F4),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { fragment.switchingLine2Replay(index) }
+                        ) {
+                            Text(
+                                name,
+                                color = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
+
+/** 常驻频道浏览区: 左分组右频道双列 (Material Design 3 Expressive) */
+@Composable
+private fun LiveChannelBrowser(fragment: LiveFragment, uiState: LiveUiState, modifier: Modifier) {
+    val isDark = isAppDarkTheme()
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) colorScheme.surfaceContainerLow else Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = modifier
+            .padding(start = 14.dp, end = 14.dp, bottom = 14.dp)
+            .fillMaxWidth()
+    ) {
+        Row(
+            Modifier
+                .fillMaxSize()
+                .padding(vertical = 8.dp, horizontal = 8.dp)
+        ) {
+            // 分组列 (左侧 40% 宽度)
+            LazyColumn(
+                state = uiState.groupListState,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .weight(0.42f)
+                    .fillMaxHeight()
+                    .padding(end = 4.dp)
+            ) {
+                itemsIndexed(uiState.groups, key = { _, group -> group.groupIndex }) { _, group ->
+                    val selected = group.groupIndex == uiState.selectedGroupIdx
+                    val locked = group.groupPassword.isNotEmpty()
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (selected) colorScheme.primaryContainer else Color.Transparent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { fragment.selectChannelGroup(group.groupIndex, false, -1) }
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                group.groupName,
+                                color = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurface,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (locked) {
+                                Icon(
+                                    painterResource(R.drawable.ic_lock),
+                                    contentDescription = "已加密",
+                                    tint = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 中间优雅细分隔线
+            Box(
+                Modifier
+                    .width(1.dp)
+                    .fillMaxHeight()
+                    .background(colorScheme.outlineVariant.copy(alpha = 0.35f))
+            )
+
+            // 频道列 (右侧 58% 宽度)
+            LazyColumn(
+                state = uiState.channelListState,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .weight(0.58f)
+                    .fillMaxHeight()
+                    .padding(start = 6.dp)
+            ) {
+                itemsIndexed(uiState.channels, key = { _, channel -> channel.channelIndex }) { index, channel ->
+                    val selected = index == uiState.selectedChannelIdx
+                    val channelNumStr = if (channel.channelNum > 0) String.format("%02d", channel.channelNum) else "${index + 1}"
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (selected) colorScheme.primaryContainer.copy(alpha = if (isDark) 0.45f else 0.7f) else Color.Transparent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { fragment.clickLiveChannel(index) }
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 频道序号徽标
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (selected) colorScheme.primary
+                                else if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF0F0F2)
+                            ) {
+                                Text(
+                                    channelNumStr,
+                                    color = if (selected) colorScheme.onPrimary else colorScheme.onSurfaceVariant,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                )
+                            }
+
+                            Spacer(Modifier.width(8.dp))
+
+                            Text(
+                                channel.channelName,
+                                color = if (selected) colorScheme.primary else colorScheme.onSurface,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            if (selected) {
+                                Icon(
+                                    painterResource(R.drawable.ic_m3_play_arrow),
+                                    contentDescription = "正在播放",
+                                    tint = colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

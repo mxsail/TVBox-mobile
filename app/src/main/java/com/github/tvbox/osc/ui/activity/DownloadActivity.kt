@@ -7,10 +7,12 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -27,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -36,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,6 +58,7 @@ import com.github.tvbox.osc.event.DownloadEvent
 import com.github.tvbox.osc.ui.adapter.DownloadAdapter
 import com.github.tvbox.osc.ui.compose.PosterImage
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
+import com.github.tvbox.osc.ui.compose.isAppDarkTheme
 import com.github.tvbox.osc.util.Utils
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
@@ -408,12 +414,13 @@ class DownloadActivity : BaseActivity() {
     @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
     @Composable
     private fun DownloadScreen() {
+        val isDark = isAppDarkTheme()
         Scaffold(
             containerColor = colorScheme.background,
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(titleState.value, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(titleState.value, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
@@ -429,7 +436,7 @@ class DownloadActivity : BaseActivity() {
                             Icon(
                                 painterResource(R.drawable.ic_delete_outline_24),
                                 contentDescription = "删除全剧下载",
-                                tint = colorScheme.onSurface
+                                tint = colorScheme.error
                             )
                         }
                     },
@@ -441,89 +448,135 @@ class DownloadActivity : BaseActivity() {
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 header.value?.let { hd ->
                     item {
-                        // 剧集信息卡: 左侧大海报定高撑起卡片, 右侧文字列与播放按钮同列左对齐
+                        // M3 Expressive 剧集信息 Hero 卡
+                        val progressFraction = if (hd.totalCount > 0) (hd.doneCount.toFloat() / hd.totalCount.toFloat()).coerceIn(0f, 1f) else 0f
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
-                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDark) colorScheme.surfaceContainerLow else Color.White
+                            ),
+                            shape = RoundedCornerShape(22.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                PosterImage(
-                                    hd.pic,
-                                    Modifier
-                                        .width(96.dp)
-                                        .height(120.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(colorScheme.surfaceContainerHigh)
-                                )
-                                Column(Modifier.weight(1f).padding(start = 16.dp)) {
-                                    Text(
-                                        hd.seriesName,
-                                        color = colorScheme.onSurface,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
+                            Column(Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    PosterImage(
+                                        hd.pic,
+                                        Modifier
+                                            .width(88.dp)
+                                            .height(118.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(colorScheme.surfaceContainerHigh)
                                     )
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(top = 5.dp)
-                                    ) {
-                                        Icon(
-                                            painterResource(R.drawable.ic_check_circle),
-                                            contentDescription = null,
-                                            tint = colorScheme.primary,
-                                            modifier = Modifier.size(14.dp)
-                                        )
+                                    Column(Modifier.weight(1f).padding(start = 14.dp)) {
                                         Text(
-                                            " ${hd.doneCount}/${hd.totalCount} 集 · " + hd.sizeText,
-                                            color = colorScheme.onSurfaceVariant,
-                                            fontSize = 12.sp
+                                            hd.seriesName,
+                                            color = colorScheme.onSurface,
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
                                         )
-                                    }
-                                    if (hd.failedCount > 0) {
+                                        // 进度与占用胶囊
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(top = 3.dp)
+                                            modifier = Modifier.padding(top = 6.dp)
                                         ) {
-                                            Icon(
-                                                painterResource(R.drawable.icon_error),
-                                                contentDescription = null,
-                                                tint = colorScheme.error,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Text(
-                                                " $hd.failedCount 集失败",
-                                                color = colorScheme.error,
-                                                fontSize = 12.sp
-                                            )
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = colorScheme.primaryContainer.copy(alpha = 0.6f)
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                ) {
+                                                    Icon(
+                                                        painterResource(R.drawable.ic_check_circle),
+                                                        contentDescription = null,
+                                                        tint = colorScheme.primary,
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Text(
+                                                        "${hd.doneCount}/${hd.totalCount} 集 · ${hd.sizeText}",
+                                                        color = colorScheme.onPrimaryContainer,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                }
+                                            }
                                         }
-                                    }
-                                    Row(
-                                        modifier = Modifier.padding(top = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        FilledTonalButton(onClick = { playFirstOfGroup(detailGroupKey ?: return@FilledTonalButton) }) {
-                                            Text("播放全部")
-                                        }
+
                                         if (hd.failedCount > 0) {
-                                            Spacer(Modifier.width(8.dp))
-                                            TextButton(onClick = {
-                                                val n = DownloadTaskManager.get().retryAllFailed()
-                                                if (n > 0) ToastUtils.showShort("已重新排队 $n 个失败集")
-                                            }) {
-                                                Text("重试失败(${hd.failedCount})", color = colorScheme.primary)
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(top = 4.dp)
+                                            ) {
+                                                Icon(
+                                                    painterResource(R.drawable.icon_error),
+                                                    contentDescription = null,
+                                                    tint = colorScheme.error,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Spacer(Modifier.width(4.dp))
+                                                Text(
+                                                    "${hd.failedCount} 集下载失败",
+                                                    color = colorScheme.error,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.padding(top = 10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            FilledTonalButton(
+                                                onClick = { playFirstOfGroup(detailGroupKey ?: return@FilledTonalButton) },
+                                                shape = RoundedCornerShape(12.dp),
+                                                modifier = Modifier.height(34.dp)
+                                            ) {
+                                                Text("播放全部", fontSize = 12.sp)
+                                            }
+                                            if (hd.failedCount > 0) {
+                                                Spacer(Modifier.width(8.dp))
+                                                TextButton(
+                                                    onClick = {
+                                                        val n = DownloadTaskManager.get().retryAllFailed()
+                                                        if (n > 0) ToastUtils.showShort("已重新排队 $n 个失败集")
+                                                    },
+                                                    modifier = Modifier.height(34.dp)
+                                                ) {
+                                                    Text("重试失败(${hd.failedCount})", color = colorScheme.error, fontSize = 12.sp)
+                                                }
                                             }
                                         }
                                     }
+                                }
+
+                                // 底部平滑圆角进度条
+                                Spacer(Modifier.height(12.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(5.dp)
+                                        .clip(RoundedCornerShape(2.5.dp))
+                                        .background(colorScheme.surfaceContainerHighest)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(fraction = progressFraction)
+                                            .fillMaxHeight()
+                                            .clip(RoundedCornerShape(2.5.dp))
+                                            .background(colorScheme.primary)
+                                    )
                                 }
                             }
                         }
@@ -532,8 +585,10 @@ class DownloadActivity : BaseActivity() {
                 items(epRows.value.size) { index ->
                     val row = epRows.value[index]
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
-                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDark) colorScheme.surfaceContainerLow else Color.White
+                        ),
+                        shape = RoundedCornerShape(16.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                     ) {
                         Row(
@@ -549,21 +604,30 @@ class DownloadActivity : BaseActivity() {
                                         ToastUtils.showShort("下载文件不存在")
                                     }
                                 }
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 状态图标
-                            Icon(
-                                painterResource(statusIcon(row.status)),
-                                contentDescription = null,
-                                tint = statusTint(row.status),
-                                modifier = Modifier.size(22.dp)
-                            )
+                            // 状态图标底座 (Squircle)
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(statusContainerTint(row.status)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painterResource(statusIcon(row.status)),
+                                    contentDescription = null,
+                                    tint = statusTint(row.status),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                                 Text(
                                     row.name,
                                     color = colorScheme.onSurface,
                                     fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -574,30 +638,43 @@ class DownloadActivity : BaseActivity() {
                                     fontSize = 12.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(top = 3.dp)
+                                    modifier = Modifier.padding(top = 2.dp)
                                 )
                                 when (row.progress) {
                                     -2 -> LinearProgressIndicator(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(top = 6.dp)
+                                            .clip(RoundedCornerShape(2.dp))
                                     )
                                     in 0..100 -> LinearProgressIndicator(
                                         progress = { row.progress / 100f },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(top = 6.dp)
+                                            .clip(RoundedCornerShape(2.dp))
                                     )
                                 }
                             }
                             if (row.actionVisible) {
-                                TextButton(onClick = {
-                                    val ep = RoomDataManger.getDownloadEpisode(row.id) ?: return@TextButton
-                                    handleEpisodeAction(ep)
-                                }) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (row.actionText == "删除") colorScheme.errorContainer.copy(alpha = 0.15f)
+                                    else colorScheme.primaryContainer.copy(alpha = 0.4f),
+                                    modifier = Modifier
+                                        .padding(start = 8.dp)
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            val ep = RoomDataManger.getDownloadEpisode(row.id) ?: return@clickable
+                                            handleEpisodeAction(ep)
+                                        }
+                                ) {
                                     Text(
                                         row.actionText,
-                                        color = if (row.actionText == "删除") colorScheme.error else colorScheme.primary
+                                        color = if (row.actionText == "删除") colorScheme.error else colorScheme.primary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                     )
                                 }
                             }
@@ -624,5 +701,17 @@ class DownloadActivity : BaseActivity() {
         DownloadEpisode.STATUS_FAILED -> colorScheme.error
         DownloadEpisode.STATUS_PAUSED -> colorScheme.onSurfaceVariant
         else -> colorScheme.primary
+    }
+
+    /** 集数行图标底座颜色 */
+    @androidx.compose.runtime.Composable
+    private fun statusContainerTint(status: Int): androidx.compose.ui.graphics.Color {
+        val isDark = isAppDarkTheme()
+        return when (status) {
+            DownloadEpisode.STATUS_DONE -> colorScheme.primaryContainer.copy(alpha = if (isDark) 0.5f else 0.8f)
+            DownloadEpisode.STATUS_FAILED -> colorScheme.errorContainer.copy(alpha = if (isDark) 0.4f else 0.7f)
+            DownloadEpisode.STATUS_PAUSED -> if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF0F0F2)
+            else -> colorScheme.primaryContainer.copy(alpha = if (isDark) 0.5f else 0.8f)
+        }
     }
 }

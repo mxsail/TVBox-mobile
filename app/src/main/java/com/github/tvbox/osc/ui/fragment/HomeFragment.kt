@@ -33,12 +33,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import com.github.tvbox.osc.ui.compose.HomeFilterPanel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -559,10 +562,9 @@ class HomeFragment : Fragment() {
                     // 数据源名称: 点击切源, 长按刷新订阅
                     Row(
                         Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.75f))
                             .combinedClickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
                                 onClick = {
                                     if (dataInitOk && jarInitOk) {
                                         showSiteSwitch()
@@ -572,39 +574,39 @@ class HomeFragment : Fragment() {
                                 },
                                 onLongClick = { refreshHomeSources() }
                             )
-                            .padding(vertical = 4.dp),
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             sourceNameState.value,
                             color = colorScheme.onSurface,
-                            fontSize = 16.sp,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Clip,
                             modifier = Modifier
-                                .widthIn(max = 110.dp)
+                                .widthIn(max = 76.dp)
                                 .basicMarquee(iterations = Int.MAX_VALUE)
                         )
                         Icon(
                             painterResource(R.drawable.ic_arrow_down),
                             contentDescription = "切换数据源",
-                            tint = colorScheme.onSurface,
+                            tint = colorScheme.onSurfaceVariant,
                             modifier = Modifier
-                                .padding(start = 6.dp)
-                                .size(14.dp)
+                                .padding(start = 4.dp)
+                                .size(13.dp)
                         )
                     }
                     // 搜索入口
                     Box(
                         Modifier
                             .weight(1f)
-                            .padding(start = 10.dp)
-                            .height(36.dp)
+                            .padding(start = 8.dp)
+                            .height(38.dp)
                             .clip(RoundedCornerShape(percent = 50))
                             .background(colorScheme.surfaceContainerHigh)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
+                            .clickable {
                                 val act = activity ?: return@clickable
                                 act.startActivity(Intent(act, FastSearchActivity::class.java))
                             }
@@ -612,16 +614,23 @@ class HomeFragment : Fragment() {
                         Row(
                             Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 14.dp),
+                                .padding(horizontal = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("搜索", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                            Spacer(Modifier.weight(1f))
                             Icon(
                                 painterResource(R.drawable.ic_search_18),
                                 contentDescription = "搜索",
                                 tint = colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "搜索影视",
+                                color = colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -670,7 +679,7 @@ class HomeFragment : Fragment() {
 
                         Box(
                             Modifier
-                                .padding(start = 10.dp)
+                                .padding(start = 8.dp)
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(percent = 50))
                                 .background(btnBg)
@@ -700,7 +709,7 @@ class HomeFragment : Fragment() {
                     // 观看历史入口
                     Box(
                         Modifier
-                            .padding(start = 10.dp)
+                            .padding(start = 8.dp)
                             .size(36.dp)
                             .clip(RoundedCornerShape(percent = 50))
                             .background(colorScheme.surfaceContainerHigh)
