@@ -84,7 +84,7 @@ import java.io.File
 
 /**
  * 我的页(Material Design 3 Expressive):
- * 1. 沉浸式 Hero 头部卡片: 应用 Logo + 名称版本 +「当前主源」/「数据同步」Expressive 胶囊
+ * 1. 沉浸式 Hero 头部卡片: 应用 Logo + 名称版本 + 关于快捷入口
  * 2. 观看历史卡片: 14dp 平滑圆角横向海报墙 + 渐变高对比度已播胶囊 +「全部 >」胶囊与 Expressive 空态
  * 3. 常用功能 2 列大卡片磁贴 (Feature Tiles): 18dp 圆角、色彩强调底座、主副标题说明
  */
@@ -261,8 +261,6 @@ class MyFragment : Fragment() {
     @Composable
     private fun HeroCard(currentActivity: android.app.Activity?) {
         val isDark = isAppDarkTheme()
-        val homeSource = ApiConfig.get().homeSourceBean?.name?.takeIf { it.isNotBlank() } ?: "未配置"
-        val syncEnabled = Hawk.get(HawkConfig.SYNC_ENABLED, false)
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -272,163 +270,74 @@ class MyFragment : Fragment() {
             shape = RoundedCornerShape(22.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // 上半部分: Logo + 应用名/版本 + 设置快捷入口
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                // App Logo 底座
+                Box(
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // App Logo 底座
-                    Box(
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(R.drawable.app_icon),
-                            contentDescription = "App Icon",
-                            modifier = Modifier.size(42.dp)
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 14.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                stringResource(R.string.app_name),
-                                color = colorScheme.onSurface,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Surface(
-                                shape = CircleShape,
-                                color = colorScheme.primaryContainer.copy(alpha = 0.7f)
-                            ) {
-                                Text(
-                                    "v${AppUtils.getAppVersionName()}",
-                                    color = colorScheme.primary,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        Text(
-                            "随时随地畅享影音视界",
-                            color = colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 3.dp)
-                        )
-                    }
-
-                    // 右上角: 进关于页
-                    IconButton(
-                        onClick = { jumpActivity(currentActivity, AboutActivity::class.java) },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_about_48),
-                            contentDescription = "关于应用",
-                            tint = colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                    Image(
+                        painter = painterResource(R.drawable.app_icon),
+                        contentDescription = "App Icon",
+                        modifier = Modifier.size(42.dp)
+                    )
                 }
 
-                Spacer(Modifier.height(14.dp))
-
-                // 下半部分: M3 Expressive 状态胶囊 (主源 + 数据同步)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 14.dp)
                 ) {
-                    // 主源胶囊
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = colorScheme.surfaceContainerHigh,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { jumpActivity(currentActivity, SubscriptionActivity::class.java) }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.app_name),
+                            color = colorScheme.onSurface,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = colorScheme.primaryContainer.copy(alpha = 0.7f)
                         ) {
-                            Icon(
-                                painterResource(R.drawable.ic_database_48),
-                                contentDescription = null,
-                                tint = colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
+                            Text(
+                                "v${AppUtils.getAppVersionName()}",
+                                color = colorScheme.primary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
-                            Spacer(Modifier.width(6.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    "当前主源",
-                                    color = colorScheme.onSurfaceVariant,
-                                    fontSize = 10.sp
-                                )
-                                Text(
-                                    homeSource,
-                                    color = colorScheme.onSurface,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
                         }
                     }
+                    Text(
+                        "随时随地畅享影音视界",
+                        color = colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 3.dp)
+                    )
+                }
 
-                    // 同步状态胶囊
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (syncEnabled) colorScheme.primaryContainer.copy(alpha = 0.5f) else colorScheme.surfaceContainerHigh,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { jumpActivity(currentActivity, BackupRestoreActivity::class.java) }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.ic_sync_48),
-                                contentDescription = null,
-                                tint = if (syncEnabled) colorScheme.primary else colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    "数据同步",
-                                    color = colorScheme.onSurfaceVariant,
-                                    fontSize = 10.sp
-                                )
-                                Text(
-                                    if (syncEnabled) "WebDAV已开启" else "未开启同步",
-                                    color = if (syncEnabled) colorScheme.primary else colorScheme.onSurface,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
+                // 右上角: 进关于页
+                IconButton(
+                    onClick = { jumpActivity(currentActivity, AboutActivity::class.java) },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_about_48),
+                        contentDescription = "关于应用",
+                        tint = colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
