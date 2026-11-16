@@ -37,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.draw.shadow
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -492,7 +493,8 @@ fun LiquidBottomTabs(
     val accentColor = if (isLightTheme) Color(0xFF0088FF) else Color(0xFF0091FF)
     val isLiquid = material == ThemeManager.MATERIAL_LIQUID && isLiquidGlassSupported
     val containerColor = if (isLightTheme) Color(0x66FAFAFA) else Color(0x66121212)
-    val solidBarColor = if (isLightTheme) Color(0xFFF7F7F9) else Color(0xFF202024)
+    val colorScheme = MaterialTheme.colorScheme
+    val solidBarColor = if (floating) colorScheme.surfaceContainerHigh else colorScheme.surfaceContainer
     val barShape: Shape = if (floating) Capsule else RoundedCornerShape(0.dp)
     val barHeight = if (floating) LiquidBarSpec.HeightDp.dp else (LiquidBarSpec.HeightDp.dp + navInsetBottom)
 
@@ -775,15 +777,40 @@ fun LiquidBottomTabs(
                     .fillMaxWidth(1f / tabsCount)
             )
         } else {
-            // Material You 风格: 实底表面 + 位于图文下方的 M3 胶囊指示器 (绝不挡住图文)
+            // Material Design 风格: 实底表面 + 位于图文下方的 M3 胶囊指示器 (绝不挡住图文)
             // 1. 实底容器背景 (非悬浮时平直贴底无圆角, 悬浮时为胶囊)
             Box(
                 Modifier
                     .graphicsLayer { translationX = panelOffset }
                     .height(barHeight)
                     .fillMaxWidth()
-                    .background(solidBarColor, barShape)
+                    .then(
+                        if (floating) {
+                            Modifier
+                                .shadow(
+                                    elevation = 6.dp,
+                                    shape = barShape,
+                                    spotColor = colorScheme.outline.copy(alpha = 0.25f),
+                                    ambientColor = colorScheme.outline.copy(alpha = 0.12f)
+                                )
+                                .background(solidBarColor, barShape)
+                                .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.45f), barShape)
+                        } else {
+                            Modifier.background(solidBarColor, barShape)
+                        }
+                    )
             )
+
+            // 1.1 贴底非悬浮状态: 顶部增加 0.75dp 柔和 M3 分割线
+            if (!floating) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(0.75.dp)
+                        .background(colorScheme.outlineVariant.copy(alpha = 0.35f))
+                        .align(Alignment.TopStart)
+                )
+            }
 
             // 2. M3 胶囊指示器 (位于内容下方，跟随滚动滑动)
             // 显示文字时内容高约 34dp, 固定 32dp 会与图标/文字相交 → 胶囊随 showLabels 放大到完整包住图文
@@ -861,7 +888,9 @@ fun LiquidBottomBar(
 
     Box(
         modifier = modifier
-            .widthIn(max = 400.dp)
+            .then(
+                if (effectiveFloating) Modifier.widthIn(max = 400.dp) else Modifier
+            )
             .fillMaxWidth()
             .padding(
                 start = if (effectiveFloating) LiquidBarSpec.HorizontalMarginDp.dp else 0.dp,

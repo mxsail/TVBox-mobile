@@ -7,6 +7,7 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -99,7 +100,7 @@ class AppearanceActivity : BaseActivity() {
 
     private val THEME_MODES = listOf("跟随系统", "浅色", "深色")
     private val MATERIAL_OPTIONS = listOf(
-        Triple(ThemeManager.MATERIAL_YOU, "Material You", "实底 · 经典原生规范"),
+        Triple(ThemeManager.MATERIAL_YOU, "Material Design", "实底 · M3 Expressive 规范"),
         Triple(ThemeManager.MATERIAL_LIQUID, "液态玻璃", "折射 · 色散 · 动态高光"),
     )
 
@@ -404,45 +405,32 @@ class AppearanceActivity : BaseActivity() {
 
                 SectionTitle("底栏与材质")
                 GroupCard {
-                    var materialExpanded by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(
-                        expanded = materialExpanded,
-                        onExpandedChange = { materialExpanded = it },
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                    Text(
+                        "材质效果",
+                        color = colorScheme.onSurface,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        OutlinedTextField(
-                            value = materialLabel(material),
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("材质效果") },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = materialExpanded)
-                            },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                unfocusedContainerColor = colorScheme.surfaceContainerHigh,
-                                focusedContainerColor = colorScheme.surfaceContainerHigh
-                            ),
-                            modifier = Modifier
-                                .menuAnchor()
-                                .fillMaxWidth()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = materialExpanded,
-                            onDismissRequest = { materialExpanded = false }
-                        ) {
-                            MATERIAL_OPTIONS.forEach { (code, label, desc) ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Column {
-                                            Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                            Text(
-                                                desc,
-                                                fontSize = 11.sp,
-                                                color = colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    },
-                                    onClick = {
+                        MATERIAL_OPTIONS.forEach { (code, label, desc) ->
+                            val isSelected = material == code
+                            val tileBg = if (isSelected) colorScheme.primaryContainer else colorScheme.surfaceContainerHigh
+                            val tileBorder = if (isSelected) colorScheme.primary else colorScheme.outlineVariant.copy(alpha = 0.3f)
+                            val contentColor = if (isSelected) colorScheme.onPrimaryContainer else colorScheme.onSurface
+                            val descColor = if (isSelected) colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else colorScheme.onSurfaceVariant
+                            val iconRes = if (code == ThemeManager.MATERIAL_LIQUID) R.drawable.ic_material_48 else R.drawable.ic_palette_48
+
+                            Card(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .clickable {
                                         if (material != code) {
                                             Hawk.put(HawkConfig.UI_MATERIAL, code)
                                             material = code
@@ -453,18 +441,84 @@ class AppearanceActivity : BaseActivity() {
                                             EventBus.getDefault()
                                                 .post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_STYLE))
                                         }
-                                        materialExpanded = false
+                                    },
+                                shape = RoundedCornerShape(18.dp),
+                                colors = CardDefaults.cardColors(containerColor = tileBg),
+                                border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, tileBorder),
+                                elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 2.dp else 0.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(
+                                                    if (isSelected) colorScheme.primary.copy(alpha = 0.18f)
+                                                    else colorScheme.surfaceContainerHighest
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                painterResource(iconRes),
+                                                contentDescription = null,
+                                                tint = if (isSelected) colorScheme.primary else colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        if (isSelected) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(18.dp)
+                                                    .clip(CircleShape)
+                                                    .background(colorScheme.primary),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(8.dp)
+                                                        .clip(CircleShape)
+                                                        .background(colorScheme.onPrimary)
+                                                )
+                                            }
+                                        }
                                     }
-                                )
+                                    Spacer(Modifier.height(10.dp))
+                                    Text(
+                                        label,
+                                        color = contentColor,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        desc,
+                                        color = descColor,
+                                        fontSize = 11.sp,
+                                        lineHeight = 15.sp,
+                                        minLines = 2,
+                                        maxLines = 2
+                                    )
+                                }
                             }
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+
                     val isLiquidMode = material == ThemeManager.MATERIAL_LIQUID
                     SwitchRow(
                         icon = R.drawable.ic_dock_48,
                         title = "悬浮底栏",
                         checked = if (isLiquidMode) true else barFloating,
-                        subtitle = if (isLiquidMode) "液态玻璃仅支持悬浮形态" else null,
+                        subtitle = if (isLiquidMode) "液态玻璃仅支持悬浮形态" else "开启时为 M3 悬浮胶囊，关闭时为平直贴底栏",
                         enabled = !isLiquidMode,
                         onToggle = { newValue ->
                             barFloating = newValue
@@ -730,7 +784,8 @@ class AppearanceActivity : BaseActivity() {
                                         shape = barShape,
                                         blurRadius = blurRadius,
                                         refractionAmount = refractionAmount,
-                                        dispersion = dispersion
+                                        dispersion = dispersion,
+                                        floating = barFloating
                                     )
                                 )
                                 .padding(horizontal = if (barFloating) 8.dp else 6.dp),
@@ -798,12 +853,22 @@ class AppearanceActivity : BaseActivity() {
         shape: androidx.compose.ui.graphics.Shape,
         blurRadius: Float,
         refractionAmount: Float,
-        dispersion: Boolean = false
+        dispersion: Boolean = false,
+        floating: Boolean = true
     ): Modifier {
         return when (material) {
             ThemeManager.MATERIAL_YOU -> {
-                val solid = if (dark) Color(0xFF202024) else Color(0xFFF7F7F9)
-                Modifier.background(solid.copy(alpha = 0.95f), shape)
+                val solid = if (floating) {
+                    if (dark) Color(0xFF2C2D35) else Color(0xFFECECF2)
+                } else {
+                    if (dark) Color(0xFF202024) else Color(0xFFF7F7F9)
+                }
+                Modifier
+                    .background(solid, shape)
+                    .then(
+                        if (floating) Modifier.border(0.75.dp, colorScheme.outlineVariant.copy(alpha = 0.4f), shape)
+                        else Modifier
+                    )
             }
             else -> { // MATERIAL_LIQUID
                 val liquidBg = if (dark) Color(0x55323444) else Color(0x88FFFFFF)
@@ -835,13 +900,25 @@ class AppearanceActivity : BaseActivity() {
 
     @Composable
     private fun SectionTitle(text: String) {
-        Text(
-            text,
-            color = colorScheme.primary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 4.dp, top = 18.dp, bottom = 8.dp)
-        )
+        Row(
+            modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(4.dp, 14.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(colorScheme.primary)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text,
+                color = colorScheme.primary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
+            )
+        }
     }
 
     @Composable
@@ -849,7 +926,7 @@ class AppearanceActivity : BaseActivity() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(22.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column { content() }
@@ -862,36 +939,45 @@ class AppearanceActivity : BaseActivity() {
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(enabled = onClick != null) { onClick?.invoke() }
-                .padding(start = 20.dp, end = 16.dp, top = 15.dp, bottom = 15.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                painterResource(icon),
-                contentDescription = null,
-                tint = colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painterResource(icon),
+                    contentDescription = null,
+                    tint = colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             Text(
                 title,
                 color = colorScheme.onSurface,
-                fontSize = 16.sp,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
                 modifier = Modifier
-                    .padding(start = 20.dp)
+                    .padding(start = 14.dp)
                     .weight(1f)
             )
             if (value != null) {
                 Text(
                     value,
                     color = colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     maxLines = 1,
-                    modifier = Modifier.padding(end = 6.dp)
+                    modifier = Modifier.padding(end = 4.dp)
                 )
                 Icon(
                     painterResource(R.drawable.icon_pre),
                     contentDescription = null,
                     tint = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -906,35 +992,48 @@ class AppearanceActivity : BaseActivity() {
         enabled: Boolean = true,
         onToggle: (Boolean) -> Unit
     ) {
-        val alpha = if (enabled) 1f else 0.45f
+        val alpha = if (enabled) 1f else 0.42f
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(enabled = enabled) { onToggle(!checked) }
-                .padding(start = 20.dp, end = 16.dp, top = 15.dp, bottom = 15.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                painterResource(icon),
-                contentDescription = null,
-                tint = colorScheme.primary.copy(alpha = alpha),
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (checked && enabled) colorScheme.primary.copy(alpha = 0.14f)
+                        else colorScheme.surfaceContainerHighest.copy(alpha = alpha)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painterResource(icon),
+                    contentDescription = null,
+                    tint = if (checked && enabled) colorScheme.primary else colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             Column(
                 modifier = Modifier
-                    .padding(start = 20.dp)
+                    .padding(start = 14.dp)
                     .weight(1f)
             ) {
                 Text(
                     title,
                     color = colorScheme.onSurface.copy(alpha = alpha),
-                    fontSize = 16.sp
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium
                 )
                 if (subtitle != null) {
                     Text(
                         subtitle,
                         color = colorScheme.onSurfaceVariant.copy(alpha = alpha),
                         fontSize = 12.sp,
+                        lineHeight = 16.sp,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
@@ -958,15 +1057,27 @@ class AppearanceActivity : BaseActivity() {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(title, color = colorScheme.onSurface, fontSize = 15.sp)
-                Text(displayValue, color = colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(title, color = colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(colorScheme.primaryContainer)
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        displayValue,
+                        color = colorScheme.onPrimaryContainer,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
             Slider(
                 value = value,

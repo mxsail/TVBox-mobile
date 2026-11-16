@@ -21,11 +21,12 @@ object ThemeManager {
     const val COLOR_DYNAMIC = "dynamic"
 
     // 界面材质取值(HawkConfig.UI_MATERIAL), 二选
-    const val MATERIAL_YOU = "you"                 // Material You: 实底跟随 M3 动态色
+    const val MATERIAL_YOU = "you"                 // Material Design: 实底跟随 M3 Expressive 规范
+    const val MATERIAL_DESIGN = MATERIAL_YOU       // 语义化别名
     const val MATERIAL_LIQUID = "liquid"           // 液态玻璃(默认): 折射+色散+高光
 
     /**
-     * 读取材质(二选: Material You / 液态玻璃)。液态玻璃为默认材质且强制使用悬浮底栏,
+     * 读取材质(二选: Material Design / 液态玻璃)。液态玻璃为默认材质且强制使用悬浮底栏,
      * 不再因底栏形态把材质降级为实底, 避免底栏渲染与设置页/弹窗得出不同结论。
      */
     @JvmStatic

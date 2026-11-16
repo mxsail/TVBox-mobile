@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
@@ -62,9 +63,13 @@ fun Modifier.materialGlass(
     chromaticAberration: Boolean = Hawk.get(HawkConfig.LIQUID_DISPERSION, true),
     containerColor: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)
 ): Modifier {
-    // Material You: 实底 M3 表面, 无玻璃
+    // Material Design: 实底 M3 Expressive 表面容器, 辅以微描边与柔和阴影
     if (material == ThemeManager.MATERIAL_YOU || !isLiquidGlassSupported) {
-        return this.background(MaterialTheme.colorScheme.surface, shape)
+        val colorScheme = MaterialTheme.colorScheme
+        return this
+            .shadow(elevation = 6.dp, shape = shape, spotColor = colorScheme.outline.copy(alpha = 0.2f))
+            .background(colorScheme.surfaceContainerHigh, shape)
+            .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.4f), shape)
     }
 
     // 液态玻璃: 物理折射(Android 14+)+色散+高光+模糊
@@ -97,10 +102,13 @@ fun Modifier.barGlass(
     shape: Shape,
     isLightTheme: Boolean
 ): Modifier {
-    // Material You / 低版本: 实底胶囊(轻微透出以保留层次)
+    // Material Design / 低版本: 实底 M3 Expressive 胶囊
     if (material == ThemeManager.MATERIAL_YOU || !isLiquidGlassSupported) {
-        val solid = if (isLightTheme) Color(0xFFF7F7F9) else Color(0xFF202024)
-        return this.background(solid.copy(alpha = 0.92f), shape)
+        val colorScheme = MaterialTheme.colorScheme
+        return this
+            .shadow(elevation = 6.dp, shape = shape, spotColor = colorScheme.outline.copy(alpha = 0.2f))
+            .background(colorScheme.surfaceContainerHigh, shape)
+            .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.4f), shape)
     }
     val containerColor = if (isLightTheme) Color(0xFFFAFAFA).copy(0.4f) else Color(0xFF121212).copy(0.4f)
     return this.drawBackdrop(
