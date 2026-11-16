@@ -27,6 +27,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +43,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,7 +58,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
+import com.blankj.utilcode.util.ToastUtils
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.util.HawkConfig
 import com.google.android.material.color.MaterialColors
@@ -641,4 +655,390 @@ fun M3ConfirmDialog(
             }
         }
     )
+}
+
+/**
+ * M3 Expressive 操作动作模型
+ */
+data class M3ItemAction(
+    val title: String,
+    val iconRes: Int,
+    val isDestructive: Boolean = false,
+    val onClick: () -> Unit
+)
+
+/**
+ * Material Design 3 Expressive 风格操作列表居中弹窗 (条目更多操作)
+ */
+@Composable
+fun M3ActionsCenterDialog(
+    visible: Boolean,
+    title: String,
+    subtitle: String? = null,
+    actions: List<M3ItemAction>,
+    onDismissRequest: () -> Unit
+) {
+    if (!visible) return
+    val colorScheme = MaterialTheme.colorScheme
+    val isDark = isAppDarkTheme()
+
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = if (isDark) colorScheme.surfaceContainerHigh else Color.White,
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!subtitle.isNullOrEmpty()) {
+                    Text(
+                        text = subtitle,
+                        fontSize = 12.sp,
+                        color = colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                    )
+                } else {
+                    Spacer(Modifier.height(10.dp))
+                }
+
+                Spacer(Modifier.height(6.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    actions.forEach { action ->
+                        val actionColor = if (action.isDestructive) colorScheme.error else colorScheme.onSurface
+                        val iconBg = if (action.isDestructive) colorScheme.errorContainer.copy(alpha = 0.6f)
+                                     else colorScheme.surfaceContainerHighest
+
+                        Surface(
+                            onClick = {
+                                onDismissRequest()
+                                action.onClick()
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color.Transparent,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(iconBg),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painter = painterResource(action.iconRes),
+                                        contentDescription = null,
+                                        tint = if (action.isDestructive) colorScheme.error else colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Text(
+                                    text = action.title,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = actionColor,
+                                    modifier = Modifier
+                                        .padding(start = 14.dp)
+                                        .weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = onDismissRequest,
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("关闭", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Material Design 3 Expressive 风格输入弹窗 (重命名等)
+ */
+@Composable
+fun M3InputDialog(
+    visible: Boolean,
+    title: String,
+    initialValue: String = "",
+    label: String = "请输入",
+    maxLength: Int = 20,
+    confirmText: String = "保存",
+    cancelText: String = "取消",
+    onDismissRequest: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    if (!visible) return
+    var text by remember(initialValue) { mutableStateOf(initialValue) }
+    val colorScheme = MaterialTheme.colorScheme
+    val isDark = isAppDarkTheme()
+
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = if (isDark) colorScheme.surfaceContainerHigh else Color.White,
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colorScheme.onSurface
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = {
+                        if (it.length <= maxLength) {
+                            text = it
+                        }
+                    },
+                    label = { Text(label) },
+                    singleLine = true,
+                    supportingText = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Text(
+                                text = "${text.length}/$maxLength",
+                                fontSize = 12.sp,
+                                color = colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    trailingIcon = {
+                        if (text.isNotEmpty()) {
+                            IconButton(onClick = { text = "" }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_close_24),
+                                    contentDescription = "清空",
+                                    tint = colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = colorScheme.primary,
+                        unfocusedBorderColor = colorScheme.outlineVariant
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = onDismissRequest,
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(cancelText, color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Button(
+                        onClick = {
+                            val trimmed = text.trim()
+                            if (trimmed.isEmpty()) {
+                                ToastUtils.showShort("内容不能为空")
+                                return@Button
+                            }
+                            onConfirm(trimmed)
+                            onDismissRequest()
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colorScheme.primary,
+                            contentColor = colorScheme.onPrimary
+                        )
+                    ) {
+                        Text(confirmText, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Material Design 3 Expressive 风格列表单选居中弹窗 (多仓线路选择等)
+ */
+@Composable
+fun <T> M3SingleChoiceCenterDialog(
+    visible: Boolean,
+    title: String,
+    subtitle: String? = null,
+    options: List<T>,
+    getDisplayName: (T) -> String = { it.toString() },
+    getSecondaryText: ((T) -> String?)? = null,
+    onDismissRequest: () -> Unit,
+    onSelected: (pos: Int, item: T) -> Unit
+) {
+    if (!visible) return
+    val colorScheme = MaterialTheme.colorScheme
+    val isDark = isAppDarkTheme()
+
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = if (isDark) colorScheme.surfaceContainerHigh else Color.White,
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+                if (!subtitle.isNullOrEmpty()) {
+                    Text(
+                        text = subtitle,
+                        fontSize = 12.sp,
+                        color = colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(horizontal = 24.dp)
+                            .padding(top = 4.dp, bottom = 12.dp)
+                    )
+                } else {
+                    Spacer(Modifier.height(14.dp))
+                }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(weight = 1f, fill = false)
+                        .padding(horizontal = 14.dp)
+                ) {
+                    items(options.size) { index ->
+                        val item = options[index]
+                        Surface(
+                            onClick = {
+                                onSelected(index, item)
+                                onDismissRequest()
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            color = colorScheme.surfaceContainerLow,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = getDisplayName(item),
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    val secondary = getSecondaryText?.invoke(item)
+                                    if (!secondary.isNullOrEmpty()) {
+                                        Text(
+                                            text = secondary,
+                                            fontSize = 12.sp,
+                                            color = colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(top = 2.dp)
+                                        )
+                                    }
+                                }
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_chevron_right),
+                                    contentDescription = null,
+                                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = onDismissRequest,
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("取消", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+    }
 }

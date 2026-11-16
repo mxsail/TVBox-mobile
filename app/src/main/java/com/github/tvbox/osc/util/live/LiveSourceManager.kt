@@ -1,5 +1,7 @@
 package com.github.tvbox.osc.util.live
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Base64
 import com.blankj.utilcode.util.ToastUtils
@@ -11,8 +13,10 @@ import com.github.tvbox.osc.event.LiveSourceChangedEvent
 import com.github.tvbox.osc.util.DefaultConfig
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.MD5
+import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.google.gson.reflect.TypeToken
 import com.orhanobut.hawk.Hawk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,12 +25,21 @@ import kotlinx.coroutines.withContext
 import org.greenrobot.eventbus.EventBus
 import java.io.File
 import java.io.FileInputStream
+import java.lang.reflect.Type
 import java.util.ArrayList
 import java.util.LinkedHashMap
 
 object LiveSourceManager {
 
     private val scope = CoroutineScope(Dispatchers.IO)
+    private const val PREF_NAME = "tvbox_live_sources"
+    private const val PREF_KEY_JSON = "live_sources_json"
+    private val GSON = Gson()
+    private val LIVE_SOURCE_LIST_TYPE: Type = object : TypeToken<ArrayList<LiveSource>>() {}.type
+
+    private fun prefs(): SharedPreferences {
+        return Utils.getApp().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    }
 
     /** 本地直播内容文本缓存目录 */
     private fun getCacheDir(): File {
@@ -39,49 +52,43 @@ object LiveSourceManager {
         return File(getCacheDir(), MD5.string2MD5(url) + ".txt")
     }
 
-    /** 获取所有直播源列表，首次为空时自动从历史 LIVE_URL / LIVE_HISTORY 迁移 */
+    /** 获取所有直播源列表（独立 SharedPreferences + 明文 JSON，彻底避免 Hawk 泛型 List 反序列化异常） */
+    @Synchronized
     fun getLiveSources(): MutableList<LiveSource> {
-        var list: MutableList<LiveSource>? = Hawk.get(HawkConfig.LIVE_SOURCES, null)
-        if (list == null) {
-            list = ArrayList()
-            val oldLiveUrl: String = Hawk.get(HawkConfig.LIVE_URL, "")
-            val history: ArrayList<String> = Hawk.get(HawkConfig.LIVE_HISTORY, ArrayList())
-
-            val urls = ArrayList<String>()
-            if (oldLiveUrl.isNotBlank() && !urls.contains(oldLiveUrl)) {
-                urls.add(oldLiveUrl)
-            }
-            for (h in history) {
-                if (h.isNotBlank() && !urls.contains(h)) {
-                    urls.add(h)
+        val json = prefs().getString(PREF_KEY_JSON, null)
+        if (!json.isNullOrEmpty()) {
+            try {
+                val list: MutableList<LiveSource>? = GSON.fromJson(json, LIVE_SOURCE_LIST_TYPE)
+                if (list != null) {
+                    return list
                 }
+            } catch (t: Throwable) {
+                t.printStackTrace()
             }
-
-            var selected = Hawk.get(HawkConfig.LIVE_SOURCE_SELECTED, null as String?)
-            if (selected == null) {
-                selected = if (oldLiveUrl.isNotBlank()) oldLiveUrl else LiveSource.FOLLOW_SUBSCRIPTION
-                Hawk.put(HawkConfig.LIVE_SOURCE_SELECTED, selected)
-            }
-
-            urls.forEachIndexed { index, url ->
-                val source = LiveSource("直播源 " + (index + 1), url)
-                source.isChecked = (url == selected)
-                list.add(source)
-            }
-            Hawk.put(HawkConfig.LIVE_SOURCES, list)
         }
-        return list
+        return ArrayList()
     }
 
     /** 获取当前生效的直播源 URL（空字符串代表跟随当前订阅源） */
     fun getSelectedSourceUrl(): String {
-        return Hawk.get(HawkConfig.LIVE_SOURCE_SELECTED, LiveSource.FOLLOW_SUBSCRIPTION) ?: LiveSource.FOLLOW_SUBSCRIPTION
+        val sel = Hawk.get(HawkConfig.LIVE_SOURCE_SELECTED, LiveSource.FOLLOW_SUBSCRIPTION) ?: LiveSource.FOLLOW_SUBSCRIPTION
+        if (sel == LiveSource.FOLLOW_SUBSCRIPTION || sel.isEmpty()) {
+            return LiveSource.FOLLOW_SUBSCRIPTION
+        }
+        val sources = getLiveSources()
+        if (sources.none { it.url == sel }) {
+            // 已不存在于自定义源列表中，纯净回退为跟随当前订阅源
+            Hawk.put(HawkConfig.LIVE_SOURCE_SELECTED, LiveSource.FOLLOW_SUBSCRIPTION)
+            return LiveSource.FOLLOW_SUBSCRIPTION
+        }
+        return sel
     }
 
     var isReloading: Boolean = false
         private set
 
     /** 设置当前选中的直播源 */
+    @Synchronized
     fun setSelectedSourceUrl(url: String, callback: ((Boolean) -> Unit)? = null) {
         Hawk.put(HawkConfig.LIVE_SOURCE_SELECTED, url)
         val sources = getLiveSources()
@@ -92,10 +99,18 @@ object LiveSourceManager {
         reloadLiveChannels(force = true, callback = callback)
     }
 
+    @Synchronized
     fun saveLiveSources(list: List<LiveSource>) {
-        Hawk.put(HawkConfig.LIVE_SOURCES, ArrayList(list))
+        val copy = ArrayList(list)
+        val json = GSON.toJson(copy, LIVE_SOURCE_LIST_TYPE)
+        try {
+            prefs().edit().putString(PREF_KEY_JSON, json).commit()
+        } catch (t: Throwable) {
+            t.printStackTrace()
+        }
     }
 
+    @Synchronized
     fun addLiveSource(name: String, url: String, checked: Boolean): Boolean {
         val list = getLiveSources()
         for (item in list) {
@@ -116,6 +131,7 @@ object LiveSourceManager {
         return true
     }
 
+    @Synchronized
     fun deleteLiveSource(url: String) {
         val list = getLiveSources()
         list.removeAll { it.url == url }
@@ -125,12 +141,14 @@ object LiveSourceManager {
         }
     }
 
+    @Synchronized
     fun updateLiveSourceName(url: String, newName: String) {
         val list = getLiveSources()
         list.find { it.url == url }?.name = newName
         saveLiveSources(list)
     }
 
+    @Synchronized
     fun toggleTop(url: String) {
         val list = getLiveSources()
         val item = list.find { it.url == url } ?: return
