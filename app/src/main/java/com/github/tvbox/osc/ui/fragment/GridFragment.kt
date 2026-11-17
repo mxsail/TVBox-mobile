@@ -295,7 +295,7 @@ class GridFragment : BaseComposeLazyFragment() {
         Box(Modifier.fillMaxSize()) {
             LoadStateBox(loadState.value, Modifier.fillMaxSize()) {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
+                    columns = GridCells.Adaptive(minSize = 105.dp),
                     state = scrollState,
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),

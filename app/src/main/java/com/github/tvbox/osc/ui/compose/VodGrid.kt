@@ -491,7 +491,7 @@ fun VodGridScreen(
                     label = "grid_bottom_padding"
                 )
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
+                    columns = GridCells.Adaptive(minSize = 105.dp),
                     contentPadding = PaddingValues(
                         start = 14.dp,
                         end = 14.dp,

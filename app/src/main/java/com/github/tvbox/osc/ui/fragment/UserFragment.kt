@@ -169,7 +169,7 @@ class UserFragment : BaseComposeLazyFragment() {
         }
         LoadStateBox(loadState.value, Modifier.fillMaxSize()) {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
+                columns = GridCells.Adaptive(minSize = 105.dp),
                 state = gridState,
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),

@@ -240,7 +240,7 @@ class VideoListActivity : BaseActivity() {
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+                    columns = GridCells.Adaptive(minSize = 160.dp),
                     contentPadding = PaddingValues(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),

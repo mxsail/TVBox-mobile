@@ -148,7 +148,7 @@ fun UserCategoryScreen(
 
     LoadStateBox(loadState.value, Modifier.fillMaxSize()) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
+            columns = GridCells.Adaptive(minSize = 105.dp),
             state = gridState,
             contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 6.dp, bottom = bottomPadding),
             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -393,7 +393,7 @@ fun GridCategoryScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
+                    columns = GridCells.Adaptive(minSize = 105.dp),
                     state = scrollState,
                     contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 6.dp, bottom = bottomPadding),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
