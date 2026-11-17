@@ -2,10 +2,17 @@ package com.github.tvbox.osc.ui.compose
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,6 +33,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -43,7 +51,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,10 +61,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -184,8 +193,22 @@ fun VodCardItem(
     isEditMode: Boolean = false,
     isSelected: Boolean = false
 ) {
+    // M3 Expressive: 选中时具有弹性的微缩与描边动效
+    val cardScale by animateFloatAsState(
+        targetValue = if (isEditMode && isSelected) 0.92f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "card_scale"
+    )
+
     Column(
         modifier = modifier
+            .graphicsLayer {
+                scaleX = cardScale
+                scaleY = cardScale
+            }
             .clip(RoundedCornerShape(16.dp))
             .combinedClickable(onClick = onClick, onLongClick = { onLongClick?.invoke() })
     ) {
@@ -195,8 +218,23 @@ fun VodCardItem(
                 .aspectRatio(0.75f)
                 .clip(RoundedCornerShape(16.dp))
                 .background(colorScheme.surfaceContainer)
+                .then(
+                    if (isEditMode && isSelected) {
+                        Modifier.border(2.5.dp, colorScheme.primary, RoundedCornerShape(16.dp))
+                    } else Modifier
+                )
         ) {
             PosterImage(card.pic, Modifier.fillMaxSize())
+
+            // M3 Expressive: 选中时海报覆盖一层 Primary 品牌半透光晕
+            if (isEditMode && isSelected) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(colorScheme.primary.copy(alpha = 0.22f))
+                )
+            }
+
             if (card.badge.isNotEmpty()) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -240,31 +278,45 @@ fun VodCardItem(
                 }
             }
 
-            // 多选编辑模式下的右上角勾选圈
+            // M3 Expressive: 多选模式下右上角选择徽章 (未选为半透圆环，选中为弹性弹跳实心勾选圈)
             if (isEditMode) {
+                val checkScale by animateFloatAsState(
+                    targetValue = if (isSelected) 1f else 0.88f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "check_scale"
+                )
+
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(22.dp)
+                        .padding(7.dp)
+                        .size(24.dp)
+                        .graphicsLayer {
+                            scaleX = checkScale
+                            scaleY = checkScale
+                        }
+                        .shadow(elevation = if (isSelected) 4.dp else 2.dp, shape = CircleShape)
                         .clip(CircleShape)
                         .background(
                             if (isSelected) colorScheme.primary
-                            else Color(0x66000000)
+                            else Color.Black.copy(alpha = 0.45f)
                         )
                         .border(
-                            width = 1.5.dp,
-                            color = if (isSelected) colorScheme.primary else Color.White.copy(alpha = 0.85f),
+                            width = if (isSelected) 0.dp else 1.8.dp,
+                            color = if (isSelected) Color.Transparent else Color.White.copy(alpha = 0.85f),
                             shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isSelected) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_check_circle),
+                            painter = painterResource(R.drawable.ic_check_16),
                             contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            tint = colorScheme.onPrimary,
+                            modifier = Modifier.size(15.dp)
                         )
                     }
                 }
@@ -284,7 +336,7 @@ fun VodCardItem(
 }
 
 /**
- * 海报网格页骨架: 顶栏(标题+右上管理) + 3 列网格 + 空态 + 批量多选管理底栏。
+ * 海报网格页骨架: 顶栏(标题+右上管理) + 3 列网格 + 空态 + M3 Expressive 悬浮多选管理胶囊岛。
  * cards 由页面自行加载传入; 点击/批量删除由页面注入。
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -321,43 +373,112 @@ fun VodGridScreen(
     Scaffold(
         containerColor = colorScheme.background,
         topBar = {
-            TvBoxTopBar(
-                title = if (isEditMode) {
-                    if (selectedKeys.isEmpty()) "选择项目" else "已选择 ${selectedKeys.size} 项"
-                } else {
-                    title
-                },
-                onBack = {
+            CenterAlignedTopAppBar(
+                title = {
                     if (isEditMode) {
-                        isEditMode = false
-                        selectedKeys = emptySet()
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = if (selectedKeys.isEmpty()) "选择项目" else "已选择",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colorScheme.onSurface
+                            )
+                            if (selectedKeys.isNotEmpty()) {
+                                Spacer(Modifier.width(6.dp))
+                                Surface(
+                                    shape = CircleShape,
+                                    color = colorScheme.primaryContainer,
+                                    modifier = Modifier.height(22.dp)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    ) {
+                                        Text(
+                                            text = "${selectedKeys.size}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     } else {
-                        onBack()
+                        Text(
+                            text = title,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        if (isEditMode) {
+                            isEditMode = false
+                            selectedKeys = emptySet()
+                        } else {
+                            onBack()
+                        }
+                    }) {
+                        Icon(
+                            painter = painterResource(
+                                if (isEditMode) R.drawable.ic_close_24 else R.drawable.ic_arrow_back
+                            ),
+                            contentDescription = if (isEditMode) "退出管理" else "返回",
+                            tint = colorScheme.onSurface
+                        )
                     }
                 },
                 actions = {
                     if (cards.isNotEmpty()) {
                         if (isEditMode) {
-                            TextButton(onClick = {
-                                isEditMode = false
-                                selectedKeys = emptySet()
-                            }) {
+                            Button(
+                                onClick = {
+                                    isEditMode = false
+                                    selectedKeys = emptySet()
+                                },
+                                shape = CircleShape,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = colorScheme.primary,
+                                    contentColor = colorScheme.onPrimary
+                                ),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                                modifier = Modifier
+                                    .height(32.dp)
+                                    .padding(end = 6.dp)
+                            ) {
                                 Text(
                                     "完成",
-                                    color = colorScheme.primary,
-                                    fontSize = 14.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
                         } else if (onDeleteSelected != null) {
-                            TextButton(onClick = {
-                                isEditMode = true
-                                selectedKeys = emptySet()
-                            }) {
+                            FilledTonalButton(
+                                onClick = {
+                                    isEditMode = true
+                                    selectedKeys = emptySet()
+                                },
+                                shape = CircleShape,
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = colorScheme.surfaceContainerHigh,
+                                    contentColor = colorScheme.primary
+                                ),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                                modifier = Modifier
+                                    .height(32.dp)
+                                    .padding(end = 6.dp)
+                            ) {
                                 Text(
                                     "管理",
-                                    color = colorScheme.primary,
-                                    fontSize = 14.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -371,40 +492,160 @@ fun VodGridScreen(
                             }
                         }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = colorScheme.background
+                )
             )
-        },
-        bottomBar = {
+        }
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+        ) {
+            if (cards.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_inbox_24),
+                        contentDescription = null,
+                        tint = colorScheme.outline,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text("暂无内容", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                }
+            } else {
+                val gridBottomPadding by animateDpAsState(
+                    targetValue = if (isEditMode) 92.dp else 16.dp,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "grid_bottom_padding"
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    contentPadding = PaddingValues(
+                        start = 14.dp,
+                        end = 14.dp,
+                        top = 8.dp,
+                        bottom = gridBottomPadding
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(cards, key = { it.key }) { card ->
+                        val isSelected = selectedKeys.contains(card.key)
+                        VodCardItem(
+                            card = card,
+                            isEditMode = isEditMode,
+                            isSelected = isSelected,
+                            onClick = {
+                                if (isEditMode) {
+                                    selectedKeys = if (isSelected) {
+                                        selectedKeys - card.key
+                                    } else {
+                                        selectedKeys + card.key
+                                    }
+                                } else {
+                                    onItemClick(card)
+                                }
+                            },
+                            onLongClick = {
+                                if (isEditMode) {
+                                    selectedKeys = if (isSelected) {
+                                        selectedKeys - card.key
+                                    } else {
+                                        selectedKeys + card.key
+                                    }
+                                } else {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    isEditMode = true
+                                    selectedKeys = setOf(card.key)
+                                    onItemLongClick?.invoke(card)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            // M3 Expressive: 悬浮多选管理胶囊岛 (Floating Capsule Action Island)
             AnimatedVisibility(
                 visible = isEditMode && cards.isNotEmpty(),
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                ) + fadeIn() + scaleIn(initialScale = 0.85f),
+                exit = slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = spring(stiffness = Spring.StiffnessMedium)
+                ) + fadeOut() + scaleOut(targetScale = 0.85f),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
             ) {
                 Surface(
-                    color = if (isDark) colorScheme.surfaceContainerLow else Color.White,
+                    shape = CircleShape,
+                    color = if (isDark) colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)
+                    else Color.White.copy(alpha = 0.96f),
                     tonalElevation = 6.dp,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.fillMaxWidth()
+                    shadowElevation = 10.dp,
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = colorScheme.outlineVariant.copy(alpha = 0.35f)
+                    ),
+                    modifier = Modifier
+                        .wrapContentWidth()
+                        .height(56.dp)
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .padding(horizontal = 20.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                     ) {
                         val isAllSelected = selectedKeys.size == cards.size && cards.isNotEmpty()
+                        // 全选 / 取消全选胶囊
                         FilledTonalButton(
                             onClick = {
                                 selectedKeys = if (isAllSelected) emptySet() else cards.map { it.key }.toSet()
                             },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.height(38.dp)
+                            shape = CircleShape,
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = if (isAllSelected) colorScheme.secondaryContainer
+                                else colorScheme.surfaceContainerHighest,
+                                contentColor = if (isAllSelected) colorScheme.onSecondaryContainer
+                                else colorScheme.onSurface
+                            ),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.height(40.dp)
                         ) {
-                            Text(if (isAllSelected) "取消全选" else "全选", fontSize = 13.sp)
+                            Text(
+                                text = if (isAllSelected) "取消全选" else "全选",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
 
+                        Spacer(Modifier.width(8.dp))
+
+                        // 胶囊内部精致分隔线
+                        Box(
+                            modifier = Modifier
+                                .height(20.dp)
+                                .width(1.dp)
+                                .background(colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        )
+
+                        Spacer(Modifier.width(8.dp))
+
+                        // 删除按钮 (危险色胶囊，带动态计数)
                         Button(
                             onClick = {
                                 if (selectedKeys.isNotEmpty()) {
@@ -412,97 +653,34 @@ fun VodGridScreen(
                                 }
                             },
                             enabled = selectedKeys.isNotEmpty(),
+                            shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = colorScheme.error,
                                 contentColor = colorScheme.onError,
-                                disabledContainerColor = colorScheme.surfaceContainerHighest,
-                                disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                disabledContainerColor = colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+                                disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                             ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.height(38.dp)
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+                            modifier = Modifier.height(40.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_delete_outline_24),
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(17.dp)
                                 )
-                                Spacer(Modifier.width(4.dp))
+                                Spacer(Modifier.width(6.dp))
                                 Text(
-                                    if (selectedKeys.isEmpty()) "删除" else "删除 (${selectedKeys.size})",
+                                    text = if (selectedKeys.isEmpty()) "删除" else "删除 (${selectedKeys.size})",
                                     fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                     }
-                }
-            }
-        }
-    ) { padding ->
-        if (cards.isEmpty()) {
-            Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_inbox_24),
-                    contentDescription = null,
-                    tint = colorScheme.outline,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Text("暂无内容", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                contentPadding = PaddingValues(
-                    start = 14.dp,
-                    end = 14.dp,
-                    top = 8.dp,
-                    bottom = if (isEditMode) 68.dp else 8.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-            ) {
-                items(cards, key = { it.key }) { card ->
-                    val isSelected = selectedKeys.contains(card.key)
-                    VodCardItem(
-                        card = card,
-                        isEditMode = isEditMode,
-                        isSelected = isSelected,
-                        onClick = {
-                            if (isEditMode) {
-                                selectedKeys = if (isSelected) {
-                                    selectedKeys - card.key
-                                } else {
-                                    selectedKeys + card.key
-                                }
-                            } else {
-                                onItemClick(card)
-                            }
-                        },
-                        onLongClick = {
-                            if (isEditMode) {
-                                selectedKeys = if (isSelected) {
-                                    selectedKeys - card.key
-                                } else {
-                                    selectedKeys + card.key
-                                }
-                            } else {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                isEditMode = true
-                                selectedKeys = setOf(card.key)
-                                onItemLongClick?.invoke(card)
-                            }
-                        }
-                    )
                 }
             }
         }
