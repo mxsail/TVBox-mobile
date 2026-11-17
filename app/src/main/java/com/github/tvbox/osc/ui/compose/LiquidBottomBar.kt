@@ -1,12 +1,12 @@
 package com.github.tvbox.osc.ui.compose
 
 import android.content.res.Configuration
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -14,8 +14,10 @@ import androidx.compose.foundation.MutatorMutex
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,18 +26,20 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.draw.shadow
 import androidx.compose.runtime.CompositionLocalProvider
@@ -140,7 +144,7 @@ object LiquidBarSpec {
     const val InsetDp: Int = 4            // 外壳内边距 / 采样层与滑块的水平 padding (4dp)
     const val TopInsetDp: Int = 6         // 顶部预留 6dp, 供水滴膨胀突破边界
     const val ContentHeightDp: Int = HeightDp - InsetDp * 2 // Layer 2 / Layer 3 实际内容高度 (48dp)
-    const val PressedHeightDp: Int = 68   // 按下膨胀目标高 68dp (官方 64/56/78 链 x0.875, 68/48 ≈ 1.417x, 保证两端同心包络)
+    const val PressedHeightDp: Int = 61   // 按下微凸目标高 61dp (约 1.27x, 略微超出 56dp 底栏外边距约 2.5dp)
     const val HorizontalMarginDp: Int = 24 // 悬浮底栏左右外边距
     const val OccupiedHeightDp: Int = HeightDp + TopInsetDp // View 侧底部避让
     const val IconTextGapDp: Int = 2     // 图标与文字间距 2dp
@@ -647,7 +651,7 @@ fun LiquidBottomTabs(
                             },
                             layerBlock = {
                                 val progress = dampedDragAnimation.pressProgress
-                                val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
+                                val scale = lerp(1f, 1f + 6f.dp.toPx() / size.width, progress)
                                 scaleX = scale
                                 scaleY = scale
                             },
@@ -665,7 +669,7 @@ fun LiquidBottomTabs(
             // Layer 2: 采样层 tabsBackdrop (与 Layer 1 几何坐标 100% 对齐，承载底板背景与主题强调色染色)
             CompositionLocalProvider(
                 LocalLiquidBottomTabScale provides {
-                    lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
+                    lerp(1f, 1.08f, dampedDragAnimation.pressProgress)
                 },
                 androidx.compose.material3.LocalContentColor provides accentColor
             ) {
@@ -704,7 +708,7 @@ fun LiquidBottomTabs(
                         // 仅缩放图标内容层 (位于 drawBackdrop 之后), 与 Layer 1 外壳的缩放保持一致, 防止高亮图标偏移
                         .graphicsLayer {
                             val progress = dampedDragAnimation.pressProgress
-                            val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
+                            val scale = lerp(1f, 1f + 6f.dp.toPx() / size.width, progress)
                             scaleX = scale
                             scaleY = scale
                         }
@@ -755,8 +759,8 @@ fun LiquidBottomTabs(
                             scaleX = dampedDragAnimation.scaleX
                             scaleY = dampedDragAnimation.scaleY
                             val velocity = dampedDragAnimation.velocity / 10f
-                            scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
-                            scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
+                            scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.08f, 0.08f)
+                            scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.08f, 0.08f)
                         },
                         onDrawBackdrop = { drawBackdrop ->
                             val _pos = dampedDragAnimation.value + panelOffset
@@ -775,93 +779,213 @@ fun LiquidBottomTabs(
                     .height(LiquidBarSpec.ContentHeightDp.dp)
                     .fillMaxWidth(1f / tabsCount)
             )
-        } else {
-            // Material Design 风格: 实底表面 + 位于图文下方的 M3 胶囊指示器 (绝不挡住图文)
-            // 1. 实底容器背景 (非悬浮时平直贴底无圆角, 悬浮时为胶囊)
+
+            // 全局手势交互层: 覆盖底栏全域 (任意 Tab 按下即刻水滴膨胀与弹射飞渡)
             Box(
                 Modifier
-                    .graphicsLayer { translationX = panelOffset }
-                    .height(barHeight)
                     .fillMaxWidth()
-                    .then(
-                        if (floating) {
-                            Modifier
-                                .shadow(
-                                    elevation = 6.dp,
-                                    shape = barShape,
-                                    spotColor = colorScheme.outline.copy(alpha = 0.25f),
-                                    ambientColor = colorScheme.outline.copy(alpha = 0.12f)
-                                )
-                                .background(solidBarColor, barShape)
-                                .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.45f), barShape)
-                        } else {
-                            Modifier.background(solidBarColor, barShape)
-                        }
-                    )
+                    .height(barHeight)
+                    .then(interactiveHighlight.gestureModifier)
+                    .then(dampedDragAnimation.modifier)
             )
-
-            // 1.1 贴底非悬浮状态: 顶部增加 0.75dp 柔和 M3 分割线
-            if (!floating) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(0.75.dp)
-                        .background(colorScheme.outlineVariant.copy(alpha = 0.35f))
-                        .align(Alignment.TopStart)
-                )
-            }
-
-            // 2. M3 胶囊指示器 (位于内容下方，跟随滚动滑动)
-            // 显示文字时内容高约 34dp, 固定 32dp 会与图标/文字相交 → 胶囊随 showLabels 放大到完整包住图文
-            val indicatorHeight = if (showLabels) 40.dp else 32.dp
-            // 胶囊宽度自适应: 筛选钮出现使 bar 收窄后 tabWidth 变小, 固定 64dp 会贴近底栏左端圆帽
-            // 与外壳不同心(液态玻璃的滑块是 fillMaxWidth(1/n) 自适应所以无此问题), 两端各留 8dp 钳制
-            val maxPillWidthPx = with(density) { (if (showLabels) 64f else 56f).dp.toPx() }
-            val pillWidthPx = with(density) { (tabWidth - 16f.dp.toPx()).coerceIn(0f, maxPillWidthPx) }
-            val indicatorWidth = with(density) { pillWidthPx.toDp() }
-            Box(
-                Modifier
-                    .padding(horizontal = LiquidBarSpec.InsetDp.dp)
-                    .padding(bottom = if (floating) 0.dp else navInsetBottom)
-                    .graphicsLayer {
-                        val tabCenterOffset = (tabWidth - with(density) { indicatorWidth.toPx() }) / 2f
-                        val startX = if (isLtr) {
-                            dampedDragAnimation.value * tabWidth + tabCenterOffset
-                        } else {
-                            constraints.maxWidth.toFloat() - (dampedDragAnimation.value + 1f) * tabWidth + tabCenterOffset
-                        }
-                        translationX = startX + panelOffset
-                    }
-                    .size(indicatorWidth, indicatorHeight)
-                    .clip(Capsule)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-            )
-
-            // 3. Tab 项内容层 (位于指示器上方，图文完全清晰)
+        } else {
+            // 兼容性回退
             Row(
                 Modifier
-                    .graphicsLayer { translationX = panelOffset }
-                    // InteractiveHighlight 的按压高亮是无裁剪的全幅 drawRect(Plus 混合),
-                    // 悬浮底栏上会露出底栏胶囊外的直角亮区, 裁进底栏形状内
-                    .clip(barShape)
-                    .then(interactiveHighlight.modifier)
                     .height(barHeight)
-                    .fillMaxWidth()
-                    .padding(horizontal = LiquidBarSpec.InsetDp.dp)
-                    .padding(bottom = if (floating) 0.dp else navInsetBottom),
+                    .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 content = content
             )
         }
+    }
+}
 
-        // 全局手势交互层: 覆盖底栏全域 (任意 Tab 按下即刻水滴膨胀与弹射飞渡)
+// =========================================================================
+// 5.1 Material Design 3 Expressive 底栏组件 (悬浮与贴底原生规范)
+// =========================================================================
+@Composable
+fun MaterialExpressiveBottomTabs(
+    tabs: List<BottomBarTabItem>,
+    selectedIndex: Int,
+    onTabSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    floating: Boolean = true,
+    navInsetBottom: Dp = 0.dp,
+    pageScrollFraction: Float? = null,
+    showLabels: Boolean = true
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val solidBarColor = if (floating) colorScheme.surfaceContainerHigh else colorScheme.surfaceContainer
+    val barShape: Shape = if (floating) Capsule else RoundedCornerShape(0.dp)
+    val barHeight = if (floating) LiquidBarSpec.HeightDp.dp else (LiquidBarSpec.HeightDp.dp + navInsetBottom)
+
+    val animatedPosition = remember { Animatable(selectedIndex.toFloat()) }
+    var isProgrammaticClick by remember { mutableStateOf(false) }
+
+    LaunchedEffect(selectedIndex) {
+        if (abs(animatedPosition.value - selectedIndex.toFloat()) > 0.001f) {
+            isProgrammaticClick = true
+            animatedPosition.animateTo(
+                targetValue = selectedIndex.toFloat(),
+                animationSpec = spring(
+                    dampingRatio = 0.8f,
+                    stiffness = 380f
+                )
+            )
+            isProgrammaticClick = false
+        }
+    }
+
+    LaunchedEffect(pageScrollFraction) {
+        if (!isProgrammaticClick && pageScrollFraction != null && pageScrollFraction >= 0f) {
+            animatedPosition.snapTo(pageScrollFraction)
+        }
+    }
+
+    BoxWithConstraints(
+        modifier = modifier.height(barHeight),
+        contentAlignment = Alignment.TopStart
+    ) {
+        val density = LocalDensity.current
+        val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
+        val tabWidth = constraints.maxWidth.toFloat() / tabs.size
+        val pillWidthDp = 56.dp
+        val pillWidthPx = with(density) { pillWidthDp.toPx() }
+
+        // 1. 实底容器背景 (非悬浮贴底平直, 悬浮为居中圆角胶囊)
+        if (floating) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(LiquidBarSpec.HeightDp.dp)
+                    .shadow(
+                        elevation = 3.dp,
+                        shape = barShape,
+                        spotColor = colorScheme.outline.copy(alpha = 0.2f),
+                        ambientColor = colorScheme.outline.copy(alpha = 0.1f)
+                    )
+                    .background(solidBarColor, barShape)
+                    .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.35f), barShape)
+            )
+        } else {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(solidBarColor, barShape)
+            )
+            // 贴底顶部 0.75dp 柔和 M3 分割线
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(0.75.dp)
+                    .background(colorScheme.outlineVariant.copy(alpha = 0.35f))
+            )
+        }
+
+        // 2. M3 Expressive 指示胶囊 (在内容下方, 仅包裹 32dp 图标区域, 绝不遮挡文字)
+        val distToTarget = abs(animatedPosition.targetValue - animatedPosition.value)
+        val stretchScaleX = 1f + distToTarget.coerceIn(0f, 1f) * 0.18f
+        val centerXPx = if (isLtr) {
+            (animatedPosition.value + 0.5f) * tabWidth
+        } else {
+            constraints.maxWidth.toFloat() - (animatedPosition.value + 0.5f) * tabWidth
+        }
+        val pillTopDp = if (showLabels) 4.dp else 12.dp
+
         Box(
             Modifier
-                .fillMaxWidth()
-                .height(barHeight)
-                .then(interactiveHighlight.gestureModifier)
-                .then(dampedDragAnimation.modifier)
+                .graphicsLayer {
+                    translationX = centerXPx - (pillWidthPx / 2f)
+                    translationY = with(density) { pillTopDp.toPx() }
+                    scaleX = stretchScaleX
+                }
+                .size(pillWidthDp, 32.dp)
+                .clip(Capsule)
+                .background(colorScheme.secondaryContainer)
         )
+
+        // 3. Tab 项列表 (位于指示器上方, 各 Tab 独立 M3 Ripple 水波纹点击反馈)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(LiquidBarSpec.HeightDp.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabs.forEachIndexed { index, item ->
+                val selected = index == selectedIndex
+                val iconTint = if (selected) colorScheme.onSecondaryContainer else colorScheme.onSurfaceVariant
+                val labelColor = if (selected) colorScheme.onSurface else colorScheme.onSurfaceVariant
+                val iconScale by animateFloatAsState(
+                    targetValue = if (selected) 1.08f else 1.0f,
+                    animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+                    label = "iconScale_$index"
+                )
+
+                val interactionSource = remember { MutableInteractionSource() }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            role = Role.Tab,
+                            onClick = { onTabSelected(index) }
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = if (showLabels) Arrangement.Top else Arrangement.Center
+                ) {
+                    if (showLabels) {
+                        Spacer(Modifier.height(4.dp))
+                    }
+                    // 32dp 图标容器: 尺寸与激活指示胶囊 100% 严丝合缝同心对齐, 水波纹仅在此胶囊内展现, 避免全项大椭圆
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp, 32.dp)
+                            .clip(Capsule)
+                            .indication(
+                                interactionSource = interactionSource,
+                                indication = ripple(bounded = true)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(item.iconRes),
+                            contentDescription = item.title,
+                            tint = iconTint,
+                            modifier = Modifier
+                                .size(if (showLabels) 20.dp else 24.dp)
+                                .graphicsLayer {
+                                    scaleX = iconScale
+                                    scaleY = iconScale
+                                }
+                        )
+                    }
+                    if (showLabels) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = item.title,
+                            fontSize = 11.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            color = labelColor,
+                            maxLines = 1,
+                            style = androidx.compose.ui.text.TextStyle(
+                                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                                    includeFontPadding = false
+                                ),
+                                lineHeight = 13.sp,
+                                lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+                                    alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+                                    trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both
+                                )
+                            )
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -884,6 +1008,7 @@ fun LiquidBottomBar(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val effectiveFloating = floating || isLandscape
+    val isLiquid = material == ThemeManager.MATERIAL_LIQUID && isLiquidGlassSupported
 
     Box(
         modifier = modifier
@@ -903,62 +1028,60 @@ fun LiquidBottomBar(
             .graphicsLayer { clip = false },
         contentAlignment = Alignment.Center
     ) {
-        LiquidBottomTabs(
-            selectedTabIndex = { selectedIndex },
-            onTabSelected = onTabSelected,
-            backdrop = backdrop,
-            tabsCount = tabs.size,
-            modifier = Modifier.fillMaxWidth(),
-            floating = effectiveFloating,
-            navInsetBottom = if (effectiveFloating) 0.dp else navInsetBottom,
-            pageScrollFraction = pageScrollFraction,
-            material = material,
-            showLabels = showLabels
-        ) {
-            tabs.forEachIndexed { index, item ->
-                val selected = index == selectedIndex
-                LiquidBottomTab(onClick = { onTabSelected(index) }) {
-                    val iconTint = if (material == ThemeManager.MATERIAL_YOU) {
-                        if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        androidx.compose.material3.LocalContentColor.current
-                    }
-                    Icon(
-                        painter = painterResource(item.iconRes),
-                        contentDescription = item.title,
-                        tint = iconTint,
-                        modifier = Modifier.size(if (showLabels) 20.dp else 24.dp)
-                    )
-                    if (showLabels) {
-                        val labelColor = if (material == ThemeManager.MATERIAL_YOU) {
-                            if (selected) MaterialTheme.colorScheme.onSurface
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            androidx.compose.material3.LocalContentColor.current
-                        }
-                        Text(
-                            text = item.title,
-                            fontSize = 11.sp,
-                            fontWeight = if (material == ThemeManager.MATERIAL_YOU && selected) FontWeight.Bold else FontWeight.Medium,
-                            color = labelColor,
-                            maxLines = 1,
-                            // 行框收紧到字形实际高度: 默认字体盒底部留有 descent/fontPadding 空隙,
-                            // 盒模型垂直居中后整组视觉偏上(图标贴顶、文字下方空一截)
-                            style = androidx.compose.ui.text.TextStyle(
-                                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
-                                    includeFontPadding = false
-                                ),
-                                lineHeight = 13.sp,
-                                lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
-                                    alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
-                                    trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both
+        if (isLiquid) {
+            LiquidBottomTabs(
+                selectedTabIndex = { selectedIndex },
+                onTabSelected = onTabSelected,
+                backdrop = backdrop,
+                tabsCount = tabs.size,
+                modifier = Modifier.fillMaxWidth(),
+                floating = effectiveFloating,
+                navInsetBottom = if (effectiveFloating) 0.dp else navInsetBottom,
+                pageScrollFraction = pageScrollFraction,
+                material = material,
+                showLabels = showLabels
+            ) {
+                tabs.forEachIndexed { index, item ->
+                    LiquidBottomTab(onClick = { onTabSelected(index) }) {
+                        Icon(
+                            painter = painterResource(item.iconRes),
+                            contentDescription = item.title,
+                            tint = androidx.compose.material3.LocalContentColor.current,
+                            modifier = Modifier.size(if (showLabels) 20.dp else 24.dp)
+                        )
+                        if (showLabels) {
+                            Text(
+                                text = item.title,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = androidx.compose.material3.LocalContentColor.current,
+                                maxLines = 1,
+                                style = androidx.compose.ui.text.TextStyle(
+                                    platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                                        includeFontPadding = false
+                                    ),
+                                    lineHeight = 13.sp,
+                                    lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+                                        alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+                                        trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both
+                                    )
                                 )
                             )
-                        )
+                        }
                     }
                 }
             }
+        } else {
+            MaterialExpressiveBottomTabs(
+                tabs = tabs,
+                selectedIndex = selectedIndex,
+                onTabSelected = onTabSelected,
+                modifier = Modifier.fillMaxWidth(),
+                floating = effectiveFloating,
+                navInsetBottom = if (effectiveFloating) 0.dp else navInsetBottom,
+                pageScrollFraction = pageScrollFraction,
+                showLabels = showLabels
+            )
         }
     }
 }
