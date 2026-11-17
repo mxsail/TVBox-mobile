@@ -39,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +59,7 @@ import com.github.tvbox.osc.event.DownloadEvent
 import com.github.tvbox.osc.ui.activity.DownloadActivity
 import com.github.tvbox.osc.ui.activity.MainActivity
 import com.github.tvbox.osc.ui.adapter.DownloadAdapter
+import com.github.tvbox.osc.ui.compose.DownloadSettingsSheet
 import com.github.tvbox.osc.ui.compose.ObserveBarHideDeltas
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.compose.isAppDarkTheme
@@ -93,7 +95,9 @@ class CacheFragment : Fragment() {
         val sizeText: String?,
         val isDownloading: Boolean = false,
         val doneCount: Int = 0,
-        val totalCount: Int = 0
+        val totalCount: Int = 0,
+        val speedText: String? = null,
+        val progress: Float? = null
     )
 
     /** 网格数据(后台线程构建, 主线程更新) */
@@ -155,6 +159,7 @@ class CacheFragment : Fragment() {
                 .statusBarsPadding()
         ) {
             // 顶部 M3 Expressive 存储空间 Hero 卡片
+            val showSettingsSheet = remember { mutableStateOf(false) }
             Box(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 StorageHeroCard(
                     cardsCount = cards.value.size,
@@ -162,6 +167,7 @@ class CacheFragment : Fragment() {
                     freeBytes = freeBytesState.value,
                     usedBytes = usedBytesState.value,
                     totalBytes = totalBytesState.value,
+                    onOpenSettings = { showSettingsSheet.value = true },
                     onClearAll = { currentActivity?.let { confirmClearAll(it) } }
                 )
             }
@@ -222,7 +228,11 @@ class CacheFragment : Fragment() {
                         .fillMaxWidth()
                 ) {
                     items(cards.value, key = { it.groupKey }) { card ->
-                        val supporting = listOfNotNull(card.note, card.sizeText).joinToString(" · ")
+                        val supporting = listOfNotNull(
+                            card.note,
+                            card.sizeText,
+                            if (card.isDownloading) card.speedText else null
+                        ).joinToString(" · ")
                         Card(
                             colors = CardDefaults.cardColors(
                                 containerColor = if (isDark) colorScheme.surfaceContainerLow else Color.White
@@ -337,6 +347,25 @@ class CacheFragment : Fragment() {
                                             modifier = Modifier.padding(top = 4.dp)
                                         )
                                     }
+
+                                    if (card.isDownloading && card.progress != null) {
+                                        Spacer(Modifier.height(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(3.dp)
+                                                .clip(RoundedCornerShape(1.5.dp))
+                                                .background(colorScheme.surfaceContainerHighest)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth(fraction = card.progress.coerceIn(0.01f, 1f))
+                                                    .fillMaxHeight()
+                                                    .clip(RoundedCornerShape(1.5.dp))
+                                                    .background(colorScheme.primary)
+                                            )
+                                        }
+                                    }
                                 }
 
                                 Icon(
@@ -352,6 +381,11 @@ class CacheFragment : Fragment() {
                     }
                 }
             }
+
+            DownloadSettingsSheet(
+                visible = showSettingsSheet.value,
+                onDismissRequest = { showSettingsSheet.value = false }
+            )
         }
     }
 
@@ -362,6 +396,7 @@ class CacheFragment : Fragment() {
         freeBytes: Long,
         usedBytes: Long,
         totalBytes: Long,
+        onOpenSettings: () -> Unit,
         onClearAll: () -> Unit
     ) {
         val isDark = isAppDarkTheme()
@@ -414,31 +449,53 @@ class CacheFragment : Fragment() {
                             modifier = Modifier.padding(top = 1.dp)
                         )
                     }
-                    if (cardsCount > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = CircleShape,
-                            color = colorScheme.errorContainer.copy(alpha = 0.18f),
+                            color = colorScheme.surfaceContainerHighest,
                             modifier = Modifier
                                 .clip(CircleShape)
-                                .clickable { onClearAll() }
+                                .clickable { onOpenSettings() }
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            Box(
+                                modifier = Modifier.size(30.dp),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    androidx.compose.ui.res.painterResource(R.drawable.ic_delete_outline_24),
-                                    contentDescription = "清空全部",
-                                    tint = colorScheme.error,
-                                    modifier = Modifier.size(14.dp)
+                                    androidx.compose.ui.res.painterResource(R.drawable.ic_m3_settings),
+                                    contentDescription = "下载设置",
+                                    tint = colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
                                 )
-                                Spacer(Modifier.width(3.dp))
-                                Text(
-                                    "清空",
-                                    color = colorScheme.error,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                            }
+                        }
+                        if (cardsCount > 0) {
+                            Spacer(Modifier.width(8.dp))
+                            Surface(
+                                shape = CircleShape,
+                                color = colorScheme.errorContainer.copy(alpha = 0.18f),
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .clickable { onClearAll() }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Icon(
+                                        androidx.compose.ui.res.painterResource(R.drawable.ic_delete_outline_24),
+                                        contentDescription = "清空全部",
+                                        tint = colorScheme.error,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(3.dp))
+                                    Text(
+                                        "清空",
+                                        color = colorScheme.error,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     }
@@ -590,16 +647,9 @@ class CacheFragment : Fragment() {
         val pendingGroups = HashSet<String>()
         for (entry in groups.entries) {
             val eps = entry.value
-            var sizeText: String? = null
-            val cached = cachedGroupSize(entry.key)
-            if (cached != null) {
-                sizeText = if (cached > 0) DownloadStorage.formatSize(cached) else null
-            } else if (!needsWalk) {
-                sizeText = computeGroupSize(entry.key, eps)
-            } else {
-                pendingGroups.add(entry.key)
-            }
             var done = 0; var waiting = 0; var resolving = 0; var downloading = 0; var paused = 0; var failed = 0
+            var totalLiveSpeed = 0L
+            var activeProgressSum = 0f
             for (ep in eps) {
                 when (ep.status) {
                     DownloadEpisode.STATUS_WAITING -> waiting++
@@ -609,8 +659,51 @@ class CacheFragment : Fragment() {
                     DownloadEpisode.STATUS_FAILED -> failed++
                     else -> done++
                 }
+                val live = liveProgress[ep.getId()]
+                if (live != null) {
+                    if (live.speedBytes > 0) {
+                        totalLiveSpeed += live.speedBytes
+                    }
+                    if (live.segmentsTotal > 0 && live.segmentsDone >= 0) {
+                        activeProgressSum += (live.segmentsDone.toFloat() / live.segmentsTotal.toFloat()).coerceIn(0f, 1f)
+                    } else if (live.totalBytes > 0 && live.downloadedBytes >= 0) {
+                        activeProgressSum += (live.downloadedBytes.toFloat() / live.totalBytes.toFloat()).coerceIn(0f, 1f)
+                    }
+                }
             }
             val isDownloading = downloading > 0 || resolving > 0 || waiting > 0
+            val hasActive = downloading > 0 || resolving > 0
+
+            var sizeText: String? = null
+            if (hasActive) {
+                // 有下载中集数时，实时计算已下载总字节，跳过静态缓存以实时更新显示
+                var liveGroupSize = 0L
+                for (ep in eps) {
+                    liveGroupSize += episodeSize(ep)
+                }
+                if (liveGroupSize > 0) {
+                    sizeText = DownloadStorage.formatSize(liveGroupSize)
+                }
+            } else {
+                val cached = cachedGroupSize(entry.key)
+                if (cached != null) {
+                    sizeText = if (cached > 0) DownloadStorage.formatSize(cached) else null
+                } else if (!needsWalk) {
+                    sizeText = computeGroupSize(entry.key, eps)
+                } else {
+                    pendingGroups.add(entry.key)
+                }
+            }
+
+            val speedText = if (isDownloading && totalLiveSpeed > 0) {
+                DownloadStorage.formatSize(totalLiveSpeed) + "/s"
+            } else null
+
+            val progressFraction: Float? = if (isDownloading && eps.isNotEmpty()) {
+                val overall = (done.toFloat() + activeProgressSum) / eps.size.toFloat()
+                overall.coerceIn(0f, 1f)
+            } else null
+
             items.add(
                 CacheCard(
                     groupKey = entry.key,
@@ -620,7 +713,9 @@ class CacheFragment : Fragment() {
                     sizeText = sizeText,
                     isDownloading = isDownloading,
                     doneCount = done,
-                    totalCount = eps.size
+                    totalCount = eps.size,
+                    speedText = speedText,
+                    progress = progressFraction
                 )
             )
         }
@@ -817,7 +912,7 @@ class CacheFragment : Fragment() {
             return ep.totalBytes
         }
 
-        /** 网格角标文案: 已下 x/共 y(等待/解析中/下载中/暂停/失败) */
+        /** 网格角标文案: 已下 x/共 y(解析中/下载中/暂停/失败) —— 移除 等待x */
         @JvmStatic
         fun buildNote(
             done: Int, total: Int, waiting: Int, resolving: Int,
@@ -826,7 +921,6 @@ class CacheFragment : Fragment() {
             val sb = StringBuilder("已下").append(done).append("/").append(total)
             if (downloading > 0) sb.append(" 下载中").append(downloading)
             if (resolving > 0) sb.append(" 解析中").append(resolving)
-            if (waiting > 0) sb.append(" 等待").append(waiting)
             if (paused > 0) sb.append(" 暂停").append(paused)
             if (failed > 0) sb.append(" 失败").append(failed)
             return sb.toString()

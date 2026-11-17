@@ -43,10 +43,15 @@ public class ProgressiveDownloader {
      */
     public static Result download(String url, Map<String, String> headers, File target,
                                   AbortChecker abort, ProgressListener listener) {
+        return download(null, url, headers, target, abort, listener);
+    }
+
+    public static Result download(Object tag, String url, Map<String, String> headers, File target,
+                                  AbortChecker abort, ProgressListener listener) {
         long downloaded = target.exists() && target.length() > 0 ? target.length() : 0;
         // 最多清零重下一次:再次 416 直接失败,防止"Range 越界→416→重试"死循环
         for (int attempt = 0; attempt < 2; attempt++) {
-            Result result = downloadOnce(url, headers, target, abort, listener, downloaded);
+            Result result = downloadOnce(tag, url, headers, target, abort, listener, downloaded);
             if (result.restart) {
                 downloaded = 0;
                 continue;
@@ -58,12 +63,15 @@ public class ProgressiveDownloader {
         return result;
     }
 
-    private static Result downloadOnce(String url, Map<String, String> headers, File target,
+    private static Result downloadOnce(Object tag, String url, Map<String, String> headers, File target,
                                        AbortChecker abort, ProgressListener listener, long downloaded) {
         Result result = new Result();
         OkHttpClient client = DownloadHttp.client();
         try {
             Request.Builder builder = new Request.Builder().url(url);
+            if (tag != null) {
+                builder.tag(tag);
+            }
             builder.header("User-Agent", DEFAULT_UA);
             if (headers != null) {
                 for (Map.Entry<String, String> h : headers.entrySet()) {

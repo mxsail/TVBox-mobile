@@ -19,9 +19,9 @@ import com.github.tvbox.osc.base.App;
 import org.greenrobot.eventbus.EventBus;
 
 import java.io.File;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 应用内缓存(离线下载)总调度:
- * - 队列: 同时处理 1 集,集内 HLS 分片并发下载
+ * - 队列: 支持配置同时下载 1~5 集,集内 HLS 分片并发下载
  * - 状态机: 等待→解析中→下载中→(合并)→完成 / 暂停 / 失败
  * - 支持暂停/继续/取消/重试,断点续传精确到分片
  * - 进度通过 EventBus 广播,前台服务展示通知
@@ -39,15 +39,17 @@ public class DownloadTaskManager {
     private static DownloadTaskManager instance;
 
     private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
-    private final AtomicBoolean looping = new AtomicBoolean(false);
+    private final ExecutorService workerPool = Executors.newFixedThreadPool(5);
+    private final Set<Integer> runningIds = ConcurrentHashMap.newKeySet();
     /** 请求暂停的集数id */
     private final Map<Integer, Boolean> pauseIds = new ConcurrentHashMap<>();
     /** 请求取消的集数id */
     private final Map<Integer, Boolean> cancelIds = new ConcurrentHashMap<>();
     private volatile boolean pausedAll = false;
     /** 当前正在下载的集数id,用于速度统计 */
-    private final Map<Integer, Long> lastBytes = new HashMap<>();
-    private final Map<Integer, Long> lastTime = new HashMap<>();
+    private final Map<Integer, Long> lastBytes = new ConcurrentHashMap<>();
+    private final Map<Integer, Long> lastTime = new ConcurrentHashMap<>();
+    private final Map<Integer, Long> lastCheckTimes = new ConcurrentHashMap<>();
     /** 失败自动重试: 每集已重试次数与下次重试时间(内存态,不落库,进程重启后手动重试重新计)。
      *  次数给足 6 次:限流型源(防盗链配额)每窗口只能推进几十个分片,已下分片跨尝试累加,多退几次能下完整集 */
     private static final int MAX_AUTO_RETRY = 6;
@@ -247,8 +249,8 @@ public class DownloadTaskManager {
 
     public void pause(int episodeId) {
         pauseIds.put(episodeId, true);
-        // 立即打断在途下载请求:阻塞中的连接可能长时间无响应,不能等它自然超时
-        DownloadHttp.cancelAll();
+        // 精准打断指定集数的在途请求，不影响其他并发任务
+        DownloadHttp.cancelTag(episodeId);
     }
 
     public void resume(int episodeId) {
@@ -274,7 +276,7 @@ public class DownloadTaskManager {
     public void cancel(int episodeId) {
         cancelIds.put(episodeId, true);
         pauseIds.remove(episodeId);
-        DownloadHttp.cancelAll();
+        DownloadHttp.cancelTag(episodeId);
         DownloadEpisode t = RoomDataManger.getDownloadEpisode(episodeId);
         if (t != null && t.status != DownloadEpisode.STATUS_DOWNLOADING && t.status != DownloadEpisode.STATUS_RESOLVING) {
             removeTask(t);
@@ -330,63 +332,95 @@ public class DownloadTaskManager {
         return false;
     }
 
+    public void onConfigChanged() {
+        kick();
+    }
+
+    public int getMaxConcurrent() {
+        int count = Hawk.get(HawkConfig.DOWNLOAD_MAX_CONCURRENT, 1);
+        if (count < 1) count = 1;
+        if (count > 5) count = 5;
+        return count;
+    }
+
+    public static int getHlsThreads() {
+        return HlsDownloader.getThreads();
+    }
+
+    public long getLowStorageLimit() {
+        return Hawk.get(HawkConfig.DOWNLOAD_LOW_STORAGE_LIMIT, 500L * 1024 * 1024L);
+    }
+
+    public long getUsableStorage() {
+        try {
+            return DownloadStorage.baseDir().getUsableSpace();
+        } catch (Throwable th) {
+            return Long.MAX_VALUE;
+        }
+    }
+
+    public Set<Integer> getRunningEpisodeIds() {
+        return new java.util.HashSet<>(runningIds);
+    }
+
     private void kick() {
-        android.util.Log.d("DownloadTask", "kick looping=" + looping.get() + " pausedAll=" + pausedAll);
-        if (looping.compareAndSet(false, true)) {
-            scheduler.execute(() -> {
+        if (scheduler.isShutdown()) return;
+        scheduler.execute(this::scheduleNext);
+    }
+
+    private void scheduleNext() {
+        if (pausedAll) return;
+        if (isWifiOnly() && !isWifi()) {
+            android.util.Log.d("DownloadTask", "scheduleNext: 仅Wi-Fi模式且当前非Wi-Fi, 等待网络");
+            return;
+        }
+        long lowLimit = getLowStorageLimit();
+        if (lowLimit > 0 && getUsableStorage() < lowLimit) {
+            android.util.Log.w("DownloadTask", "scheduleNext: 磁盘可用空间低于警戒阈值, 暂停调度新任务");
+            return;
+        }
+
+        int maxConcurrent = getMaxConcurrent();
+        int availableSlots = maxConcurrent - runningIds.size();
+        for (int i = 0; i < availableSlots; i++) {
+            DownloadEpisode task = nextWaitingTask(runningIds);
+            if (task == null) break;
+            int id = task.getId();
+            runningIds.add(id);
+            android.util.Log.d("DownloadTask", "scheduleNext dispatch id=" + id + " " + task.displayTitle());
+            workerPool.execute(() -> {
                 try {
-                    runLoop();
+                    processTask(task);
+                } catch (Throwable th) {
+                    android.util.Log.e("DownloadTask", "processTask crashed: " + task.displayTitle(), th);
+                    if (!failOrRetry(task, "内部错误:" + th.getMessage())) {
+                        task.status = DownloadEpisode.STATUS_FAILED;
+                        task.errMsg = "内部错误:" + th.getMessage();
+                        touch(task);
+                        postChanged();
+                    }
                 } finally {
-                    looping.set(false);
-                }
-                // 防止竞态:循环退出瞬间又入了新任务
-                if (nextWaitingTask() != null && !pausedAll) {
+                    runningIds.remove(id);
+                    lastBytes.remove(id);
+                    lastTime.remove(id);
+                    lastCheckTimes.remove(id);
                     kick();
                 }
             });
         }
     }
 
-    private void runLoop() {
-        android.util.Log.d("DownloadTask", "runLoop enter pausedAll=" + pausedAll);
-        while (!pausedAll) {
-            DownloadEpisode task = nextWaitingTask();
-            if (task == null) break;
-            android.util.Log.d("DownloadTask", "runLoop pick id=" + task.getId() + " " + task.displayTitle());
-            if (cancelIds.containsKey(task.getId())) {
-                removeTask(task);
-                postChanged();
-                continue;
-            }
-            if (isWifiOnly() && !isWifi()) {
-                // 仅Wi-Fi下载模式下等待网络
-                break;
-            }
-            try {
-                processTask(task);
-            } catch (Throwable th) {
-                // 单集处理中的意外异常不允许杀死唯一的调度线程,否则整个队列永久卡死
-                android.util.Log.e("DownloadTask", "processTask crashed: " + task.displayTitle(), th);
-                if (!failOrRetry(task, "内部错误:" + th.getMessage())) {
-                    task.status = DownloadEpisode.STATUS_FAILED;
-                    task.errMsg = "内部错误:" + th.getMessage();
-                    touch(task);
-                    postChanged();
-                }
-            }
-        }
-        // 注意:这里不能调用 DownloadService.stop()——
-        // 外部 stopService 与 startForegroundService 竞态会触发
-        // ForegroundServiceDidNotStartInTimeException 崩溃;
-        // 服务空队列时自行 stopSelf(见 DownloadService.onDownloadEvent)。
+    private DownloadEpisode nextWaitingTask() {
+        return nextWaitingTask(runningIds);
     }
 
-    private DownloadEpisode nextWaitingTask() {
+    private DownloadEpisode nextWaitingTask(Set<Integer> excludeIds) {
         List<DownloadEpisode> waiting = RoomDataManger.getAllDownloadEpisodes();
         DownloadEpisode first = null;
         long now = System.currentTimeMillis();
         for (DownloadEpisode t : waiting) {
             if (t.status != DownloadEpisode.STATUS_WAITING) continue;
+            if (excludeIds != null && excludeIds.contains(t.getId())) continue;
             Long until = retryUntil.get(t.getId());
             if (until != null && until > now) continue; // 重试退避期内先跳过,不阻塞其他集
             if (first == null || t.createTime < first.createTime) {
@@ -394,6 +428,29 @@ public class DownloadTaskManager {
             }
         }
         return first;
+    }
+
+    private boolean shouldAbort(int id) {
+        if (pausedAll || pauseIds.containsKey(id) || cancelIds.containsKey(id)) {
+            return true;
+        }
+        long now = System.currentTimeMillis();
+        Long last = lastCheckTimes.get(id);
+        if (last == null || now - last > 3000) {
+            lastCheckTimes.put(id, now);
+            if (isWifiOnly() && !isWifi()) {
+                pauseIds.put(id, true);
+                android.util.Log.w("DownloadTask", "已脱离 Wi-Fi 网络，自动暂停任务: " + id);
+                return true;
+            }
+            long limit = getLowStorageLimit();
+            if (limit > 0 && getUsableStorage() < limit) {
+                pauseIds.put(id, true);
+                android.util.Log.w("DownloadTask", "存储空间低于警戒阈值，自动暂停任务: " + id);
+                return true;
+            }
+        }
+        return false;
     }
 
     private void processTask(DownloadEpisode task) {
@@ -473,8 +530,8 @@ public class DownloadTaskManager {
                 postProgress(task, DownloadEpisode.STATUS_DOWNLOADING, bytes, total, 0, -1, -1);
             }
         };
-        ProgressiveDownloader.Result r = ProgressiveDownloader.download(task.resolvedUrl, headers, target,
-                () -> pausedAll || pauseIds.containsKey(id) || cancelIds.containsKey(id), listener);
+        ProgressiveDownloader.Result r = ProgressiveDownloader.download(id, task.resolvedUrl, headers, target,
+                () -> shouldAbort(id), listener);
         if (r.cancelled || cancelIds.containsKey(id)) {
             removeTask(task);
             postChanged();
@@ -562,8 +619,8 @@ public class DownloadTaskManager {
             fresh.headers = rr.headers;
             return fresh;
         };
-        HlsDownloader.Result r = HlsDownloader.download(task.resolvedUrl, headers, dir,
-                () -> pausedAll || pauseIds.containsKey(id) || cancelIds.containsKey(id), listener, refresher);
+        HlsDownloader.Result r = HlsDownloader.download(id, task.resolvedUrl, headers, dir,
+                () -> shouldAbort(id), listener, refresher);
         if (r.cancelled || cancelIds.containsKey(id)) {
             removeTask(task);
             postChanged();

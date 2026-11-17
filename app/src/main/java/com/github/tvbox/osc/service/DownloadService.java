@@ -156,6 +156,12 @@ public class DownloadService extends Service {
         // 进度事件不再查库(hasActiveTasks 是主线程全表查询):
         // 任务排空必然伴随 TASKS_CHANGED 事件,停服务在那边处理
         String title = "正在下载视频";
+        java.util.Set<Integer> running = DownloadTaskManager.get().getRunningEpisodeIds();
+        if (running.size() > 1) {
+            title = "正在下载 (" + running.size() + "个任务并发)";
+        } else if (event.title != null && !event.title.isEmpty()) {
+            title = event.title;
+        }
         String text = buildProgressText(event);
         updateNotification(buildNotification(title, text, percentOf(event), true));
     }

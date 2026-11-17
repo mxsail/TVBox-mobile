@@ -40,6 +40,7 @@ import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.bean.IJKCode
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.event.AppearanceChangedEvent
+import com.github.tvbox.osc.ui.compose.DownloadSettingsSheet
 import com.github.tvbox.osc.ui.compose.GroupCard
 import com.github.tvbox.osc.ui.compose.M3ConfirmDialog
 import com.github.tvbox.osc.ui.compose.M3SingleChoiceBottomSheet
@@ -193,6 +194,7 @@ class SettingActivity : BaseActivity() {
 
         var ijkCodesSheetVisible by remember { mutableStateOf(false) }
         var clearCacheDialogVisible by remember { mutableStateOf(false) }
+        var downloadSettingsSheetVisible by remember { mutableStateOf(false) }
 
         fun showM3Select(title: String, options: List<String>, selectedPos: Int, onPick: (Int) -> Unit) {
             sheetTitle = title
@@ -264,9 +266,10 @@ class SettingActivity : BaseActivity() {
                         videoPurify = newValue
                         Hawk.put(HawkConfig.VIDEO_PURIFY, newValue)
                     }
-                    SwitchRow(R.drawable.ic_download_18, "仅Wi-Fi下载", wifiOnly) { newValue ->
-                        wifiOnly = newValue
-                        Hawk.put(HawkConfig.DOWNLOAD_WIFI_ONLY, newValue)
+                    val currentConcurrent = Hawk.get(HawkConfig.DOWNLOAD_MAX_CONCURRENT, 1)
+                    val wifiOnlyDesc = if (Hawk.get(HawkConfig.DOWNLOAD_WIFI_ONLY, false)) " · 仅Wi-Fi" else ""
+                    MenuRow(R.drawable.ic_download_18, "下载设置", "${currentConcurrent}任务并发$wifiOnlyDesc") {
+                        downloadSettingsSheetVisible = true
                     }
                     MenuRow(R.drawable.ic_speed_48, "长按倍速", speedValue) {
                         val types = listOf("2.0", "3.0", "4.0", "5.0", "6.0", "8.0", "10.0")
@@ -384,6 +387,11 @@ class SettingActivity : BaseActivity() {
             iconRes = R.drawable.ic_clear,
             onDismissRequest = { clearCacheDialogVisible = false },
             onConfirm = { clearCache() }
+        )
+
+        DownloadSettingsSheet(
+            visible = downloadSettingsSheetVisible,
+            onDismissRequest = { downloadSettingsSheetVisible = false }
         )
     }
 }

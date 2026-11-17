@@ -5,19 +5,31 @@ import android.text.TextUtils
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.blankj.utilcode.util.GsonUtils
@@ -187,17 +199,19 @@ class GridFragment : BaseComposeLazyFragment() {
 
                 if (page > maxPage) {
                     canLoadMore.value = false
-                    if (page > 2) Toast.makeText(context, "没有更多了", Toast.LENGTH_SHORT).show()
                 } else {
                     canLoadMore.value = true
                 }
             } else {
                 if (page == 1) {
                     showEmpty()
+                    canLoadMore.value = false
                 } else {
-                    Toast.makeText(context, "没有更多了", Toast.LENGTH_SHORT).show()
+                    // page > 1 返回空或失败时，若已超最大页才标到底，避免偶发网络抖动锁死分页
+                    if (maxPage > 0 && page > maxPage) {
+                        canLoadMore.value = false
+                    }
                 }
-                canLoadMore.value = false
             }
         }
     }
@@ -300,6 +314,45 @@ class GridFragment : BaseComposeLazyFragment() {
                             onClick = { onGridItemClick(video, clickView) },
                             onLongClick = { onGridItemLongClick(video, clickView) }
                         )
+                    }
+
+                    if (gridItems.value.isNotEmpty()) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            if (loadingMore.value) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp),
+                                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = colorScheme.primary
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "正在加载更多...",
+                                        color = colorScheme.onSurfaceVariant,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            } else if (!canLoadMore.value || (maxPage > 0 && page > maxPage)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 18.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "— 已经到底了，没有更多内容了 —",
+                                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

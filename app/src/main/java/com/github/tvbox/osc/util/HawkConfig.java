@@ -106,6 +106,18 @@ public class HawkConfig {
      */
     public static final String DOWNLOAD_WIFI_ONLY = "download_wifi_only";
     /**
+     * 应用内下载:最大同时下载任务数(1~5, 默认1)
+     */
+    public static final String DOWNLOAD_MAX_CONCURRENT = "download_max_concurrent";
+    /**
+     * 应用内下载:HLS单任务切片并发线程数(2, 3, 5, 默认3)
+     */
+    public static final String DOWNLOAD_HLS_THREADS = "download_hls_threads";
+    /**
+     * 应用内下载:低存储保护阈值(字节数: 0=关闭, 500MB, 1GB, 2GB, 默认500MB)
+     */
+    public static final String DOWNLOAD_LOW_STORAGE_LIMIT = "download_low_storage_limit";
+    /**
      * 应用内下载:已同意免责声明
      */
     public static final String DOWNLOAD_DISCLAIMER_AGREED = "download_disclaimer_agreed";
