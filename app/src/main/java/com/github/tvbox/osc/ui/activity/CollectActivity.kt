@@ -35,7 +35,6 @@ class CollectActivity : BaseActivity() {
                     title = "收藏",
                     cards = cards.value,
                     onBack = { finish() },
-                    onClear = { confirmClear() },
                     onItemClick = { card ->
                         val item = rawCollects.firstOrNull { it.id.toString() == card.key }
                         if (item != null) {
@@ -52,10 +51,8 @@ class CollectActivity : BaseActivity() {
                             }
                         }
                     },
-                    onItemLongClick = { card ->
-                        RoomDataManger.deleteVodCollect(card.key.toInt())
-                        cards.value = cards.value.filterNot { it == card }
-                        rawCollects.removeAll { it.id.toString() == card.key }
+                    onDeleteSelected = { selectedKeys ->
+                        deleteSelected(selectedKeys)
                     }
                 )
             }
@@ -89,21 +86,23 @@ class CollectActivity : BaseActivity() {
         }
     }
 
-    private fun confirmClear() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("提示")
-            .setMessage("确定清空?")
-            .setNegativeButton("取消", null)
-            .setPositiveButton("确定") { _, _ ->
-                showLoadingDialog()
-                lifecycleScope.launch(Dispatchers.IO) {
-                    RoomDataManger.deleteVodCollectAll()
-                    withContext(Dispatchers.Main) {
-                        dismissLoadingDialog()
-                        cards.value = emptyList()
-                    }
+    private fun deleteSelected(selectedKeys: Set<String>) {
+        if (selectedKeys.isEmpty()) return
+        showLoadingDialog()
+        lifecycleScope.launch(Dispatchers.IO) {
+            for (key in selectedKeys) {
+                try {
+                    RoomDataManger.deleteVodCollect(key.toInt())
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
-            .show()
+            withContext(Dispatchers.Main) {
+                dismissLoadingDialog()
+                cards.value = cards.value.filterNot { selectedKeys.contains(it.key) }
+                rawCollects.removeAll { selectedKeys.contains(it.id.toString()) }
+                com.blankj.utilcode.util.ToastUtils.showShort("已删除 ${selectedKeys.size} 项收藏")
+            }
+        }
     }
 }

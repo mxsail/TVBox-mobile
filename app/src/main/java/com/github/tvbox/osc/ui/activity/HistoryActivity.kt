@@ -34,20 +34,14 @@ class HistoryActivity : BaseActivity() {
                     title = "观看历史",
                     cards = cards.value,
                     onBack = { finish() },
-                    onClear = { confirmClear() },
                     onItemClick = { card ->
                         val bundle = Bundle()
                         bundle.putString("id", card.key.substringAfter('|'))
                         bundle.putString("sourceKey", card.key.substringBefore('|'))
                         jumpActivity(DetailActivity::class.java, bundle)
                     },
-                    onItemLongClick = { card ->
-                        val info = rawInfos.firstOrNull {
-                            it.sourceKey + "|" + it.id == card.key
-                        } ?: return@VodGridScreen
-                        RoomDataManger.deleteVodRecord(info.sourceKey, info)
-                        cards.value = cards.value.filterNot { it == card }
-                        rawInfos.removeAll { it.sourceKey + "|" + it.id == card.key }
+                    onDeleteSelected = { selectedKeys ->
+                        deleteSelected(selectedKeys)
                     }
                 )
             }
@@ -102,21 +96,25 @@ class HistoryActivity : BaseActivity() {
 
     private val rawInfos = mutableListOf<VodInfo>()
 
-    private fun confirmClear() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("提示")
-            .setMessage("确定清空?")
-            .setNegativeButton("取消", null)
-            .setPositiveButton("确定") { _, _ ->
-                showLoadingDialog()
-                lifecycleScope.launch(Dispatchers.IO) {
-                    RoomDataManger.deleteVodRecordAll()
-                    withContext(Dispatchers.Main) {
-                        dismissLoadingDialog()
-                        cards.value = emptyList()
-                    }
+    private fun deleteSelected(selectedKeys: Set<String>) {
+        if (selectedKeys.isEmpty()) return
+        showLoadingDialog()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val toRemove = rawInfos.filter { selectedKeys.contains(it.sourceKey + "|" + it.id) }
+            for (info in toRemove) {
+                try {
+                    RoomDataManger.deleteVodRecord(info.sourceKey, info)
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
-            .show()
+            withContext(Dispatchers.Main) {
+                dismissLoadingDialog()
+                cards.value = cards.value.filterNot { selectedKeys.contains(it.key) }
+                rawInfos.removeAll(toRemove)
+                org.greenrobot.eventbus.EventBus.getDefault().post(RefreshEvent(RefreshEvent.TYPE_HISTORY_REFRESH))
+                com.blankj.utilcode.util.ToastUtils.showShort("已删除 ${toRemove.size} 项历史记录")
+            }
+        }
     }
 }
