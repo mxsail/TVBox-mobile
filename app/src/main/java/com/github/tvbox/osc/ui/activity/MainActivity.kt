@@ -222,6 +222,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                 HorizontalPager(
                     state = pagerState,
                     beyondViewportPageCount = 2,
+                    userScrollEnabled = !homeFragment.isAnyDropdownExpanded.value,
                     modifier = Modifier.fillMaxSize()
                 ) { pageIndex ->
                     when (pageIndex) {

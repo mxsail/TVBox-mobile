@@ -3,6 +3,7 @@ package com.github.tvbox.osc.ui.compose
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,15 +60,19 @@ fun HomeFilterPanel(
     modifier: Modifier = Modifier
 ) {
     val filterVersion = remember { mutableIntStateOf(0) }
-    val drawerShape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+    val drawerShape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clipToBounds()
             .padding(bottom = 12.dp)
-            .shadow(elevation = 10.dp, shape = drawerShape)
-            .background(color = colorScheme.surfaceContainer, shape = drawerShape)
+            .shadow(elevation = 12.dp, shape = drawerShape)
+            .background(color = colorScheme.surface, shape = drawerShape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {}
     ) {
         Column(
             modifier = Modifier
@@ -150,7 +155,7 @@ fun HomeFilterPanel(
                                         },
                                         shape = RoundedCornerShape(10.dp),
                                         colors = FilterChipDefaults.filterChipColors(
-                                            containerColor = colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                            containerColor = colorScheme.surfaceContainerHigh,
                                             labelColor = colorScheme.onSurfaceVariant,
                                             selectedContainerColor = colorScheme.primaryContainer,
                                             selectedLabelColor = colorScheme.onPrimaryContainer

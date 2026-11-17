@@ -139,6 +139,7 @@ class HomeFragment : Fragment() {
     private val materialState = mutableStateOf(ThemeManager.material())
     private val isTabsExpandedState = mutableStateOf(false)
     private val isFilterExpandedState = mutableStateOf(false)
+    val isAnyDropdownExpanded = derivedStateOf { isTabsExpandedState.value || isFilterExpandedState.value }
     private val sourceNameState = mutableStateOf("")
     private val pageLoadState = mutableStateOf(LoadState.None)
 
@@ -614,9 +615,17 @@ class HomeFragment : Fragment() {
             label = "home_top_blur_alpha"
         )
 
-        val surfaceAlpha = (if (isDark) 0.82f else 0.86f) * blurAlpha
-        val surfaceColor = colorScheme.surface.copy(alpha = surfaceAlpha)
-        val isBackdropActive = isScrolled && isRenderEffectSupported()
+        val isAnyDropdownOpen = isAnyDropdownExpanded.value
+        val topBarBgColor by androidx.compose.animation.animateColorAsState(
+            targetValue = when {
+                isAnyDropdownOpen -> colorScheme.surface
+                isScrolled -> colorScheme.surface.copy(alpha = (if (isDark) 0.82f else 0.86f) * blurAlpha)
+                else -> Color.Transparent
+            },
+            animationSpec = tween(durationMillis = 200),
+            label = "top_bar_bg_color"
+        )
+        val isBackdropActive = !isAnyDropdownOpen && isScrolled && isRenderEffectSupported()
 
         Box(
             Modifier
@@ -634,6 +643,7 @@ class HomeFragment : Fragment() {
                         androidx.compose.foundation.pager.HorizontalPager(
                             state = categoryPagerState,
                             beyondViewportPageCount = 1,
+                            userScrollEnabled = !isAnyDropdownOpen,
                             modifier = Modifier.fillMaxSize()
                         ) { catIndex ->
                             val sortData = mDisplaySortList.getOrNull(catIndex)
@@ -709,11 +719,11 @@ class HomeFragment : Fragment() {
                                 highlight = null,
                                 shadow = null,
                                 onDrawSurface = {
-                                    drawRect(surfaceColor)
+                                    drawRect(topBarBgColor)
                                 }
                             )
                         } else {
-                            Modifier.background(surfaceColor)
+                            Modifier.background(topBarBgColor)
                         }
                     )
             ) {

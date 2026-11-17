@@ -12,12 +12,19 @@ import android.widget.EditText
 import android.widget.TextView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.draw.rotate
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import com.github.tvbox.osc.ui.compose.M3ConfirmDialog
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -195,6 +202,11 @@ class FastSearchActivity : BaseActivity() {
             isSourceTabsExpanded.value = false
             return
         }
+        if (!showSuggestPage.value) {
+            showSuggestPage.value = true
+            initHistorySearch()
+            return
+        }
         super.onBackHandled()
     }
 
@@ -207,6 +219,7 @@ class FastSearchActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
+        initHistorySearch()
         if (pauseRunnable != null && pauseRunnable!!.size > 0) {
             searchExecutorService = Executors.newFixedThreadPool(10)
             allRunCount.set(pauseRunnable!!.size)
@@ -252,30 +265,78 @@ class FastSearchActivity : BaseActivity() {
         }
     }
 
+    private fun loadHistoryList(): List<String> {
+        return try {
+            val raw = Hawk.get<Any?>(HawkConfig.HISTORY_SEARCH)
+            when (raw) {
+                is String -> {
+                    if (raw.isNotBlank()) {
+                        val type = object : com.google.gson.reflect.TypeToken<List<String>>() {}.type
+                        com.google.gson.Gson().fromJson<List<String>>(raw, type) ?: emptyList()
+                    } else emptyList()
+                }
+                is List<*> -> {
+                    raw.mapNotNull { it?.toString() }
+                }
+                else -> {
+                    val spJson = com.blankj.utilcode.util.SPUtils.getInstance("search_prefs").getString("history", "")
+                    if (spJson.isNotBlank()) {
+                        val type = object : com.google.gson.reflect.TypeToken<List<String>>() {}.type
+                        com.google.gson.Gson().fromJson<List<String>>(spJson, type) ?: emptyList()
+                    } else emptyList()
+                }
+            }
+        } catch (_: Throwable) {
+            try {
+                val spJson = com.blankj.utilcode.util.SPUtils.getInstance("search_prefs").getString("history", "")
+                if (spJson.isNotBlank()) {
+                    val type = object : com.google.gson.reflect.TypeToken<List<String>>() {}.type
+                    com.google.gson.Gson().fromJson<List<String>>(spJson, type) ?: emptyList()
+                } else emptyList()
+            } catch (_: Throwable) {
+                emptyList()
+            }
+        }
+    }
+
+    private fun saveHistoryList(list: List<String>) {
+        try {
+            val json = com.google.gson.Gson().toJson(list)
+            Hawk.put(HawkConfig.HISTORY_SEARCH, json)
+            com.blankj.utilcode.util.SPUtils.getInstance("search_prefs").put("history", json)
+        } catch (th: Throwable) {
+            th.printStackTrace()
+        }
+    }
+
     private fun initHistorySearch() {
-        val mSearchHistory: List<String> = Hawk.get(HawkConfig.HISTORY_SEARCH, ArrayList())
-        historyWords.value = mSearchHistory
+        historyWords.value = loadHistoryList()
     }
 
     private fun loadHotWords() {
-        OkGo.get<String>("https://node.video.qq.com/x/api/hot_search")
-            .params("channdlId", "0")
-            .params("_", System.currentTimeMillis())
+        OkGo.get<String>("https://top.baidu.com/api/board?platform=wise&tab=movie")
+            .headers("User-Agent", "Mozilla/5.0")
             .execute(object : AbsCallback<String?>() {
                 override fun onSuccess(response: com.lzy.okgo.model.Response<String?>) {
                     try {
                         val hots = ArrayList<String>()
-                        val itemList = JsonParser.parseString(response.body()).asJsonObject["data"]
-                            .asJsonObject["mapResult"].asJsonObject["0"].asJsonObject["listInfo"].asJsonArray
-                        for (ele in itemList) {
-                            val obj = ele as JsonObject
-                            hots.add(
-                                obj["title"].asString.trim { it <= ' ' }
-                                    .replace("<|>|《|》|-".toRegex(), "")
-                                    .split(" ".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()[0]
-                            )
+                        val root = JsonParser.parseString(response.body()).asJsonObject
+                        val cards = root["data"].asJsonObject["cards"].asJsonArray
+                        if (cards.size() > 0) {
+                            val contentList = cards[0].asJsonObject["content"].asJsonArray
+                            if (contentList.size() > 0) {
+                                val items = contentList[0].asJsonObject["content"].asJsonArray
+                                for (ele in items) {
+                                    val title = (ele as JsonObject)["title"].asString.trim()
+                                    if (title.isNotEmpty() && !hots.contains(title)) {
+                                        hots.add(title)
+                                    }
+                                }
+                            }
                         }
-                        runOnUiThread { hotWords.value = hots }
+                        if (hots.isNotEmpty()) {
+                            runOnUiThread { hotWords.value = hots }
+                        }
                     } catch (th: Throwable) {
                         th.printStackTrace()
                     }
@@ -315,31 +376,31 @@ class FastSearchActivity : BaseActivity() {
     }
 
     private fun removeHistoryWord(word: String) {
-        val history = Hawk.get(HawkConfig.HISTORY_SEARCH, ArrayList<String?>())
-        history.remove(word)
-        Hawk.put(HawkConfig.HISTORY_SEARCH, history)
-        initHistorySearch()
+        val list = loadHistoryList().toMutableList()
+        list.remove(word)
+        saveHistoryList(list)
+        historyWords.value = list.toList()
     }
 
     private fun clearAllHistory() {
-        Hawk.put(HawkConfig.HISTORY_SEARCH, ArrayList<Any>())
-        initHistorySearch()
+        try {
+            Hawk.delete(HawkConfig.HISTORY_SEARCH)
+            com.blankj.utilcode.util.SPUtils.getInstance("search_prefs").remove("history")
+        } catch (_: Throwable) {}
+        historyWords.value = emptyList()
     }
 
     private fun saveSearchHistory(searchWord: String?) {
-        if (!searchWord.isNullOrEmpty()) {
-            val history = Hawk.get(HawkConfig.HISTORY_SEARCH, ArrayList<String?>())
-            if (!history.contains(searchWord)) {
-                history.add(0, searchWord)
-            } else {
-                history.remove(searchWord)
-                history.add(0, searchWord)
-            }
-            if (history.size > 30) {
-                history.removeAt(30)
-            }
-            Hawk.put(HawkConfig.HISTORY_SEARCH, history)
+        if (searchWord.isNullOrBlank()) return
+        val word = searchWord.trim()
+        val list = loadHistoryList().toMutableList()
+        list.remove(word)
+        list.add(0, word)
+        while (list.size > 30) {
+            list.removeAt(list.lastIndex)
         }
+        saveHistoryList(list)
+        historyWords.value = list.toList()
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -524,20 +585,32 @@ class FastSearchActivity : BaseActivity() {
             Modifier
                 .fillMaxSize()
                 .background(colorScheme.background)
-                .statusBarsPadding()
         ) {
-            // M3 Expressive SearchBar 顶栏 (对齐首页 36dp 紧凑精致规范)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // M3 Expressive 顶栏容器 (覆盖状态栏 + 搜索栏，背景统一为 surface 与首页顶栏/下拉面板完全一致)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = colorScheme.surface,
+                shadowElevation = if (showSuggestPage.value) 0.dp else 1.dp
             ) {
-                // 独立返回按钮 (无背景纯图标，触控水波纹反馈)
-                IconButton(
-                    onClick = { finish() },
-                    modifier = Modifier.size(36.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // 独立返回按钮 (若在结果页按返回则退回搜索建议/历史页，若已在建议页则退出 Activity)
+                    IconButton(
+                        onClick = {
+                            if (!showSuggestPage.value) {
+                                showSuggestPage.value = true
+                                initHistorySearch()
+                            } else {
+                                finish()
+                            }
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
                     Icon(
                         painterResource(R.drawable.ic_arrow_back),
                         contentDescription = "返回",
@@ -617,6 +690,7 @@ class FastSearchActivity : BaseActivity() {
                                     inputText.value = ""
                                     suggestWords.value = emptyList()
                                     showSuggestPage.value = true
+                                    initHistorySearch()
                                 },
                                 modifier = Modifier.size(28.dp)
                             ) {
@@ -697,11 +771,22 @@ class FastSearchActivity : BaseActivity() {
                     }
                 }
             }
+            }
+
+            var showClearConfirmDialog by remember { mutableStateOf(false) }
+            var isHistoryDeleteMode by remember { mutableStateOf(false) }
+            var isHistoryCollapsed by remember { mutableStateOf(false) }
 
             Box(Modifier.fillMaxSize()) {
                 // 1. 底层主体: 联想历史页 or 结果页
                 if (showSuggestPage.value) {
-                    SuggestPage()
+                    SuggestPage(
+                        isHistoryCollapsed = isHistoryCollapsed,
+                        onToggleHistoryCollapsed = { isHistoryCollapsed = !isHistoryCollapsed },
+                        isHistoryDeleteMode = isHistoryDeleteMode,
+                        onToggleHistoryDeleteMode = { isHistoryDeleteMode = it },
+                        onShowClearConfirm = { showClearConfirmDialog = true }
+                    )
                 } else {
                     ResultPage()
                 }
@@ -760,6 +845,23 @@ class FastSearchActivity : BaseActivity() {
                     )
                 }
             }
+
+            // 清空搜索历史二次确认弹窗 (Material 3 Expressive 危险弹窗)
+            M3ConfirmDialog(
+                visible = showClearConfirmDialog,
+                title = "清空历史",
+                message = "确定清空全部搜索历史吗？此操作不可撤销。",
+                confirmText = "清空",
+                cancelText = "取消",
+                isDestructive = true,
+                iconRes = R.drawable.ic_delete_outline_24,
+                onDismissRequest = { showClearConfirmDialog = false },
+                onConfirm = {
+                    showClearConfirmDialog = false
+                    clearAllHistory()
+                    isHistoryDeleteMode = false
+                }
+            )
         }
     }
 
@@ -774,16 +876,19 @@ class FastSearchActivity : BaseActivity() {
         onClearAll: () -> Unit,
         onClose: () -> Unit
     ) {
-        val isDark = isAppDarkTheme()
-        val drawerShape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+        val drawerShape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clipToBounds()
                 .padding(bottom = 12.dp)
-                .shadow(elevation = 10.dp, shape = drawerShape)
-                .background(color = colorScheme.surfaceContainer, shape = drawerShape)
+                .shadow(elevation = 12.dp, shape = drawerShape)
+                .background(color = colorScheme.surface, shape = drawerShape)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {}
         ) {
             Column(
                 modifier = Modifier
@@ -832,26 +937,25 @@ class FastSearchActivity : BaseActivity() {
                     ) {
                         allSources.forEach { source ->
                             val isSelected = checkedKeys.contains(source.key)
-                            val chipBg = if (isSelected) colorScheme.primaryContainer
-                            else colorScheme.surfaceContainerHigh
-                            val textColor = if (isSelected) colorScheme.onPrimaryContainer
-                            else colorScheme.onSurfaceVariant
-
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(chipBg)
-                                    .clickable { onToggleKey(source.key) }
-                                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = source.name,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = textColor
-                                )
-                            }
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { onToggleKey(source.key) },
+                                label = {
+                                    Text(
+                                        text = source.name,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                    )
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = colorScheme.surfaceContainerHigh,
+                                    labelColor = colorScheme.onSurfaceVariant,
+                                    selectedContainerColor = colorScheme.primaryContainer,
+                                    selectedLabelColor = colorScheme.onPrimaryContainer
+                                ),
+                                border = null
+                            )
                         }
                     }
                 }
@@ -888,53 +992,61 @@ class FastSearchActivity : BaseActivity() {
     /** 联想与历史+热词页 */
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     @Composable
-    private fun SuggestPage() {
+    private fun SuggestPage(
+        isHistoryCollapsed: Boolean,
+        onToggleHistoryCollapsed: () -> Unit,
+        isHistoryDeleteMode: Boolean,
+        onToggleHistoryDeleteMode: (Boolean) -> Unit,
+        onShowClearConfirm: () -> Unit
+    ) {
         val isDark = isAppDarkTheme()
         val suggestions = suggestWords.value
         val hasInput = inputText.value.isNotBlank()
 
-        if (hasInput && suggestions.isNotEmpty()) {
-            // 实时联想词列表
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
-            ) {
-                itemsIndexed(suggestions) { _, suggest ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { search(suggest) }
-                            .padding(horizontal = 12.dp, vertical = 13.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_search_18),
-                            contentDescription = null,
-                            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            suggest,
-                            color = colorScheme.onSurface,
-                            fontSize = 14.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(
-                            painterResource(R.drawable.ic_chevron_right),
-                            contentDescription = null,
-                            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
-                            modifier = Modifier.size(16.dp)
-                        )
+        if (hasInput) {
+            // 输入关键词时：隐藏搜索历史和热搜，仅展示实时联想词；若联想词为空则保持页面干净留白
+            if (suggestions.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    itemsIndexed(suggestions) { _, suggest ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { search(suggest) }
+                                .padding(horizontal = 12.dp, vertical = 13.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_search_18),
+                                contentDescription = null,
+                                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                suggest,
+                                color = colorScheme.onSurface,
+                                fontSize = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                painterResource(R.drawable.ic_chevron_right),
+                                contentDescription = null,
+                                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }
         } else {
-            // 搜索历史 + 全网热搜
+            // 输入框为空时：展示搜索历史与全网热搜
             Column(
                 Modifier
                     .fillMaxSize()
@@ -942,90 +1054,196 @@ class FastSearchActivity : BaseActivity() {
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 if (historyWords.value.isNotEmpty()) {
+                    // 搜索历史标题行
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "搜索历史",
-                            color = colorScheme.onSurface,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Surface(
-                            shape = CircleShape,
-                            color = colorScheme.surfaceContainerHigh,
+                        // 左侧：标题 + 折叠/展开小箭头
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .clip(CircleShape)
-                                .clickable { clearAllHistory() }
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onToggleHistoryCollapsed() }
+                                .padding(top = 4.dp, bottom = 4.dp, end = 8.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            Text(
+                                "搜索历史",
+                                color = colorScheme.onSurface,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            val arrowRotation by animateFloatAsState(
+                                targetValue = if (isHistoryCollapsed) -90f else 0f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
+                                label = "history_arrow_rotation"
+                            )
+                            Icon(
+                                painterResource(R.drawable.ic_arrow_down),
+                                contentDescription = if (isHistoryCollapsed) "展开历史" else "收起历史",
+                                tint = colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .rotate(arrowRotation)
+                            )
+                        }
+
+                        Spacer(Modifier.weight(1f))
+
+                        // 右侧：常态单个【删除】按钮 / 管理态【全部删除】+【完成】
+                        if (!isHistoryDeleteMode) {
+                            Surface(
+                                shape = CircleShape,
+                                color = colorScheme.surfaceContainerHigh,
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .clickable { onToggleHistoryDeleteMode(true) }
                             ) {
-                                Icon(
-                                    painterResource(R.drawable.ic_delete_outline_24),
-                                    contentDescription = "清空历史",
-                                    tint = colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(Modifier.width(3.dp))
-                                Text(
-                                    "清空",
-                                    color = colorScheme.onSurfaceVariant,
-                                    fontSize = 11.sp
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_delete_outline_24),
+                                        contentDescription = "管理历史",
+                                        tint = colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(3.dp))
+                                    Text(
+                                        "删除",
+                                        color = colorScheme.onSurfaceVariant,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // 全部删除按钮 (红调高危)
+                                Surface(
+                                    shape = CircleShape,
+                                    color = colorScheme.errorContainer.copy(alpha = 0.5f),
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .clickable { onShowClearConfirm() }
+                                ) {
+                                    Text(
+                                        "全部删除",
+                                        color = colorScheme.error,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                // 完成按钮 (主色调)
+                                Surface(
+                                    shape = CircleShape,
+                                    color = colorScheme.primary,
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .clickable { onToggleHistoryDeleteMode(false) }
+                                ) {
+                                    Text(
+                                        "完成",
+                                        color = colorScheme.onPrimary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                    )
+                                }
                             }
                         }
                     }
 
-                    FlowRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    // 历史搜索词流式布局 (带平滑折叠展开动效)
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = !isHistoryCollapsed,
+                        enter = expandVertically(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        ) + fadeIn(tween(180)),
+                        exit = shrinkVertically(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        ) + fadeOut(tween(150))
                     ) {
-                        historyWords.value.forEach { word ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = colorScheme.surfaceContainerHigh
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+                        FlowRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            historyWords.value.forEach { word ->
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = colorScheme.surfaceContainerHigh,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            if (!isHistoryDeleteMode) {
+                                                search(word)
+                                            }
+                                        }
                                 ) {
-                                    Text(
-                                        word,
-                                        color = colorScheme.onSurface,
-                                        fontSize = 13.sp,
-                                        maxLines = 1,
-                                        modifier = Modifier.clickable { search(word) }
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Icon(
-                                        painterResource(R.drawable.ic_clear),
-                                        contentDescription = "删除记录",
-                                        tint = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                        modifier = Modifier
-                                            .size(14.dp)
-                                            .clip(CircleShape)
-                                            .clickable { removeHistoryWord(word) }
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(
+                                            start = 12.dp,
+                                            end = if (isHistoryDeleteMode) 6.dp else 12.dp,
+                                            top = 6.dp,
+                                            bottom = 6.dp
+                                        )
+                                    ) {
+                                        Text(
+                                            word,
+                                            color = colorScheme.onSurface,
+                                            fontSize = 13.sp,
+                                            maxLines = 1
+                                        )
+                                        if (isHistoryDeleteMode) {
+                                            Spacer(Modifier.width(6.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                   .size(18.dp)
+                                                   .clip(CircleShape)
+                                                   .background(colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                                                   .clickable { removeHistoryWord(word) },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    painterResource(R.drawable.ic_clear),
+                                                    contentDescription = "删除记录",
+                                                    tint = colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(11.dp)
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
+                // 全网热门搜索
                 if (hotWords.value.isNotEmpty()) {
                     Text(
                         "全网热门搜索",
                         color = colorScheme.onSurface,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 22.dp)
+                        modifier = Modifier.padding(top = if (historyWords.value.isNotEmpty()) 22.dp else 6.dp)
                     )
 
                     FlowRow(
@@ -1121,7 +1339,7 @@ class FastSearchActivity : BaseActivity() {
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(androidx.compose.ui.graphics.Color(0x73000000))
+                        .background(colorScheme.scrim.copy(alpha = 0.28f))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
