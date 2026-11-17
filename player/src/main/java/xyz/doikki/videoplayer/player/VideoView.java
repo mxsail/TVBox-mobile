@@ -286,12 +286,17 @@ public class VideoView<P extends AbstractPlayer> extends FrameLayout
      * 开始准备播放（直接播放）
      */
     protected void startPrepare(boolean reset) {
-        if (reset) {
+        if (mMediaPlayer == null) {
+            initPlayer();
+        } else if (reset) {
             mMediaPlayer.reset();
             //重新设置option，media player reset之后，option会失效
             setOptions();
         }
         if (prepareDataSource()) {
+            if (mMediaPlayer == null) {
+                initPlayer();
+            }
             mMediaPlayer.prepareAsync();
             setPlayState(STATE_PREPARING);
             setPlayerState(isFullScreen() ? PLAYER_FULL_SCREEN : isTinyScreen() ? PLAYER_TINY_SCREEN : PLAYER_NORMAL);

@@ -436,11 +436,21 @@ public class LiveFragment extends BaseLazyFragment {
 
     private void onNetworkRestored() {
         if (mVideoView == null || !isAdded() || currentLiveChannelItem == null) return;
+        boolean isVisible = getUserVisibleHint() && currentVisibleState;
+        if (!isVisible && !serviceOwnedByMe) return;
         int st = mVideoView.getCurrentPlayState();
         if (st == VideoView.STATE_ERROR || st == VideoView.STATE_IDLE) {
             // 网络恢复, 重置连续失败计数并重试当前频道
             autoSwitchFailStreak = 0;
-            mVideoView.replay(true);
+            if (st == VideoView.STATE_IDLE) {
+                playChannel(currentChannelGroupIndex, currentLiveChannelIndex, false);
+            } else {
+                try {
+                    mVideoView.replay(true);
+                } catch (Throwable th) {
+                    playChannel(currentChannelGroupIndex, currentLiveChannelIndex, false);
+                }
+            }
         }
     }
 
