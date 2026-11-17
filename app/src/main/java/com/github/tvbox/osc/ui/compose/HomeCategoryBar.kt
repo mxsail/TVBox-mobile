@@ -83,6 +83,7 @@ fun HomeCategoryBar(
     selectedIndex: Int,
     onTabSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    onTabDoubleClicked: ((Int) -> Unit)? = null,
     material: String = Hawk.get(HawkConfig.UI_MATERIAL, ThemeManager.MATERIAL_LIQUID),
     isExpanded: Boolean = false,
     onExpandChanged: (Boolean) -> Unit = {},
@@ -169,6 +170,7 @@ fun HomeCategoryBar(
                 var rowCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
                 val tabOffsets = remember { mutableStateMapOf<Int, Float>() }
                 val tabWidths = remember { mutableStateMapOf<Int, Float>() }
+                var lastClickTime by remember { mutableStateOf(0L) }
 
                 val textPaddingPx = with(density) { 6.dp.toPx() }
                 val targetOffsetPx = tabOffsets[validIndex]?.let { it + textPaddingPx } ?: 0f
@@ -255,7 +257,18 @@ fun HomeCategoryBar(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
-                                        onTabSelected(index)
+                                        if (index == validIndex) {
+                                            val now = System.currentTimeMillis()
+                                            if (now - lastClickTime < 400L) {
+                                                lastClickTime = 0L
+                                                onTabDoubleClicked?.invoke(index)
+                                            } else {
+                                                lastClickTime = now
+                                            }
+                                        } else {
+                                            lastClickTime = 0L
+                                            onTabSelected(index)
+                                        }
                                     }
                                     .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 4.dp)
                                     .onGloballyPositioned { coords ->

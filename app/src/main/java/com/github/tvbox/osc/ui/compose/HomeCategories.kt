@@ -55,18 +55,30 @@ import java.util.ArrayList
 import java.util.Calendar
 
 /**
+ * 列表平滑置顶扩展函数:
+ * 若用户浏览较深 (首项 > 18, 约 6 行), 先瞬切拉近至第 18 项再平滑滚动回第 0 项, 兼顾高帧率与顺滑体验。
+ */
+suspend fun LazyGridState.smoothScrollToTop() {
+    if (firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0) return
+    if (firstVisibleItemIndex > 18) {
+        scrollToItem(18)
+    }
+    animateScrollToItem(0)
+}
+
+/**
  * 首页分类 1: 主页推荐/豆瓣热门 3 列网格 (纯 Compose 渲染)
  */
 @Composable
 fun UserCategoryScreen(
     recVod: List<Movie.Video>?,
     bottomPadding: Dp,
-    onScrollDelta: ((Int) -> Unit)? = null
+    onScrollDelta: ((Int) -> Unit)? = null,
+    gridState: LazyGridState = rememberLazyGridState()
 ) {
     val context = LocalContext.current
     val hotItems = remember { mutableStateOf<List<Movie.Video>>(emptyList()) }
     val loadState = remember { mutableStateOf(LoadState.Loading) }
-    val gridState = rememberLazyGridState()
 
     gridState.ObserveBarHideDeltas { dy ->
         onScrollDelta?.invoke(dy)

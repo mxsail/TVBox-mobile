@@ -88,6 +88,7 @@ import com.github.tvbox.osc.ui.activity.MainActivity
 import com.github.tvbox.osc.ui.activity.SubscriptionActivity
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
 import com.github.tvbox.osc.ui.compose.HomeCategoryBar
+import com.github.tvbox.osc.ui.compose.smoothScrollToTop
 import com.github.tvbox.osc.ui.compose.LoadState
 import com.github.tvbox.osc.ui.compose.LoadStateBox
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
@@ -737,6 +738,8 @@ class HomeFragment : Fragment() {
                         initialPage = 0
                     ) { categoriesState.value.size }
 
+                    val userCategoryGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+                    var scrollJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
                     var isProgrammaticScroll by remember { mutableStateOf(false) }
 
                     // 实时同步分类高亮:
@@ -781,7 +784,8 @@ class HomeFragment : Fragment() {
                                             com.github.tvbox.osc.ui.compose.UserCategoryScreen(
                                                 recVod = homeRecVod,
                                                 bottomPadding = bottomPadding,
-                                                onScrollDelta = onScrollDelta
+                                                onScrollDelta = onScrollDelta,
+                                                gridState = userCategoryGridState
                                             )
                                         } else {
                                             val ctrl = gridControllers.getOrPut(sortData.id) {
@@ -838,6 +842,17 @@ class HomeFragment : Fragment() {
                                     categoryPagerState.animateScrollToPage(pos)
                                 } finally {
                                     isProgrammaticScroll = false
+                                }
+                            }
+                        },
+                        onTabDoubleClicked = { pos ->
+                            scrollJob?.cancel()
+                            scrollJob = coroutineScope.launch {
+                                val sortData = mDisplaySortList.getOrNull(pos) ?: return@launch
+                                if (sortData.id == "my0") {
+                                    userCategoryGridState.smoothScrollToTop()
+                                } else {
+                                    gridControllers[sortData.id]?.gridScrollState?.smoothScrollToTop()
                                 }
                             }
                         },
