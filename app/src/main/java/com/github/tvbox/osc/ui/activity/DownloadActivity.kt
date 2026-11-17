@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,8 +28,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.derivedStateOf
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -472,51 +479,32 @@ class DownloadActivity : BaseActivity() {
             selectedEpisodeIds.value = emptySet()
         }
 
-        Scaffold(
-            containerColor = colorScheme.background,
-            topBar = {
-                TvBoxManageTopBar(
-                    title = titleState.value,
-                    isEditMode = isSelectionMode.value,
-                    selectedCount = selectedEpisodeIds.value.size,
-                    canManage = epRows.value.isNotEmpty(),
-                    editTitle = "选择剧集",
-                    onBack = {
-                        if (isSelectionMode.value) {
-                            isSelectionMode.value = false
-                            selectedEpisodeIds.value = emptySet()
-                        } else {
-                            finish()
-                        }
-                    },
-                    onToggleEditMode = {
-                        if (isSelectionMode.value) {
-                            isSelectionMode.value = false
-                            selectedEpisodeIds.value = emptySet()
-                        } else {
-                            isSelectionMode.value = true
-                            selectedEpisodeIds.value = emptySet()
-                        }
-                    }
-                )
-            }
-        ) { padding ->
-            Box(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-            ) {
-                val listBottomPadding by animateDpAsState(
-                    targetValue = if (isSelectionMode.value) 92.dp else 16.dp,
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                    label = "download_bottom_padding"
-                )
+        val listState = rememberLazyListState()
+        val backdrop = rememberLayerBackdrop()
+        val isScrolled by remember {
+            derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
+        }
+        val topBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 44.dp
 
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = listBottomPadding),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colorScheme.background)
+        ) {
+            val listBottomPadding by animateDpAsState(
+                targetValue = if (isSelectionMode.value) 92.dp else 16.dp,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                label = "download_bottom_padding"
+            )
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(backdrop),
+                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = topBarPadding + 8.dp, bottom = listBottomPadding),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 header.value?.let { hd ->
                     item {
                         // M3 Expressive 剧集信息 Hero 卡 (更换成年份/类型/国家 以及演员列表)
@@ -760,8 +748,36 @@ class DownloadActivity : BaseActivity() {
                 },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
+
+            // 顶层悬浮动态毛玻璃顶栏 (穿顶滑动 + 覆盖通知栏)
+            TvBoxManageTopBar(
+                title = titleState.value,
+                isEditMode = isSelectionMode.value,
+                selectedCount = selectedEpisodeIds.value.size,
+                canManage = epRows.value.isNotEmpty(),
+                editTitle = "选择剧集",
+                isScrolled = isScrolled,
+                backdrop = backdrop,
+                onBack = {
+                    if (isSelectionMode.value) {
+                        isSelectionMode.value = false
+                        selectedEpisodeIds.value = emptySet()
+                    } else {
+                        finish()
+                    }
+                },
+                onToggleEditMode = {
+                    if (isSelectionMode.value) {
+                        isSelectionMode.value = false
+                        selectedEpisodeIds.value = emptySet()
+                    } else {
+                        isSelectionMode.value = true
+                        selectedEpisodeIds.value = emptySet()
+                    }
+                },
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
         }
-    }
 
     M3ConfirmDialog(
         visible = showDeleteConfirmDialog,

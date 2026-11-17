@@ -5,11 +5,16 @@ import android.os.Bundle
 import android.view.View
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -21,12 +26,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -207,23 +216,24 @@ class SettingActivity : BaseActivity() {
         val isDark = isAppDarkTheme()
         val pageBg = if (isDark) colorScheme.background else Color(0xFFF3F3F4)
 
-        Scaffold(
-            containerColor = pageBg,
-            topBar = {
-                TvBoxTopBar(
-                    title = "设置",
-                    onBack = { onBackPressedDispatcher.onBackPressed() }
-                )
-            }
-        ) { padding ->
+        val scrollState = rememberScrollState()
+        val backdrop = rememberLayerBackdrop()
+        val isScrolled by remember { derivedStateOf { scrollState.value > 0 } }
+        val topBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 44.dp
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(pageBg)
+        ) {
             Column(
                 modifier = Modifier
-                    .padding(padding)
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
+                    .layerBackdrop(backdrop)
                     .padding(horizontal = 14.dp)
             ) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(topBarPadding + 8.dp))
                 GroupCard {
                     MenuRow(R.drawable.ic_palette_48, "外观设置", appearanceValue) { openAppearance() }
                     MenuRow(R.drawable.ic_home, "主页内容", homeRecValue) {
@@ -346,6 +356,14 @@ class SettingActivity : BaseActivity() {
                 }
                 Spacer(Modifier.height(28.dp))
             }
+
+            TvBoxTopBar(
+                title = "设置",
+                isScrolled = isScrolled,
+                backdrop = backdrop,
+                onBack = { onBackPressedDispatcher.onBackPressed() },
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
         }
 
         // ---------------- M3 Expressive Sheets & Dialogs ----------------

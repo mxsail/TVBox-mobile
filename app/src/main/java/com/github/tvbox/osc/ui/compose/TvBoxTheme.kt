@@ -3,7 +3,9 @@ package com.github.tvbox.osc.ui.compose
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -13,20 +15,31 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.RectangleShape
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.isRenderEffectSupported
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -177,49 +190,151 @@ fun isAppDarkTheme(): Boolean {
  * - 右侧 actions: 动作按钮槽位 (RowScope)
  * - 背景: 平铺一体化 (Flat Seamless) 与页面 background 融合
  */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * 顶栏毛玻璃与渐隐阴影外壳容器:
+ * - 覆盖屏幕顶端通知栏至 44dp 内容底边缘
+ * - 动态高斯模糊: 顶部时全透沉浸, 滚动时平滑渐变毛玻璃 + 半透表面色
+ * - 底部柔和扩散淡阴影: 8dp 向下平滑衰减
+ * - 防穿透点击消费: 避免穿顶滑动的底层卡片被误触
+ */
+@Composable
+fun TopBarContainer(
+    isScrolled: Boolean,
+    backdrop: Backdrop? = null,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val isDark = isAppDarkTheme()
+    val blurAlpha by animateFloatAsState(
+        targetValue = if (isScrolled) 1f else 0f,
+        animationSpec = tween(durationMillis = 220),
+        label = "top_bar_blur_alpha"
+    )
+
+    val surfaceAlpha = (if (isDark) 0.82f else 0.86f) * blurAlpha
+    val surfaceColor = colorScheme.surface.copy(alpha = surfaceAlpha)
+    val isBackdropActive = isScrolled && backdrop != null && isRenderEffectSupported()
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {} // 防穿透点击
+            .then(
+                if (isBackdropActive && backdrop != null) {
+                    Modifier.drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { RectangleShape },
+                        effects = {
+                            vibrancy()
+                            blur(20f.dp.toPx() * blurAlpha)
+                        },
+                        highlight = null,
+                        shadow = null,
+                        onDrawSurface = {
+                            drawRect(surfaceColor)
+                        }
+                    )
+                } else {
+                    Modifier.background(surfaceColor)
+                }
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(44.dp),
+            content = content
+        )
+
+        // 底部柔和扩散淡阴影
+        if (blurAlpha > 0.01f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .align(Alignment.BottomCenter)
+                    .offset(y = 8.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                (if (isDark) Color.Black else colorScheme.scrim).copy(alpha = (if (isDark) 0.16f else 0.08f) * blurAlpha),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+        }
+    }
+}
+
+/**
+ * M3 Expressive 统一二级页面顶栏:
+ * - 44dp 紧凑型内容高度 (与首页顶栏尺度统一, 贴合通知栏)
+ * - 居中标题 (17sp SemiBold, 水平绝对居中并预留 64dp 两侧避让)
+ * - 左侧返回键: 标准 44dp 触摸区域与水波纹, 垂直居中
+ * - 右侧 actions: 动作按钮槽位 (RowScope)
+ * - 支持动态高斯模糊与穿顶滑动
+ */
 @Composable
 fun TvBoxTopBar(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    isScrolled: Boolean = false,
+    backdrop: Backdrop? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
-    CenterAlignedTopAppBar(
-        title = {
-            Text(
-                text = title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_arrow_back),
-                    contentDescription = "返回",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        },
-        actions = actions,
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background
-        ),
+    TopBarContainer(
+        isScrolled = isScrolled,
+        backdrop = backdrop,
         modifier = modifier
-    )
+    ) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .size(44.dp)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_arrow_back),
+                contentDescription = "返回",
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Text(
+            text = title,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(horizontal = 64.dp)
+        )
+        Row(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = actions
+        )
+    }
 }
 
 /**
  * 标准居中管理顶栏 (收藏/下载/详情等统一顶栏组件):
- * - 居中标题与已选择计数胶囊
+ * - 44dp 紧凑型内容高度 (贴合通知栏, 垂直留白舒适)
+ * - 居中标题 (17sp SemiBold, 水平绝对居中并预留 64dp 两侧避让)
  * - 左侧返回箭头 (管理模式变为关闭叉号)
- * - 右侧管理按钮 (管理模式变为完成按钮)
+ * - 右侧管理按钮 (管理模式变为完成按钮, 高度 30dp 精致紧凑)
+ * - 支持动态高斯模糊与穿顶滑动
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TvBoxManageTopBar(
     title: String,
@@ -229,31 +344,50 @@ fun TvBoxManageTopBar(
     editTitle: String = "选择项目",
     onBack: () -> Unit,
     onToggleEditMode: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isScrolled: Boolean = false,
+    backdrop: Backdrop? = null,
+    actions: (@Composable RowScope.() -> Unit)? = null
 ) {
-    CenterAlignedTopAppBar(
-        title = {
-            Text(
-                text = title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+    TopBarContainer(
+        isScrolled = isScrolled,
+        backdrop = backdrop,
+        modifier = modifier
+    ) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .size(44.dp)
+        ) {
+            Icon(
+                painter = painterResource(
+                    if (isEditMode) R.drawable.ic_close_24 else R.drawable.ic_arrow_back
+                ),
+                contentDescription = if (isEditMode) "退出管理" else "返回",
+                tint = MaterialTheme.colorScheme.onSurface
             )
-        },
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(
-                    painter = painterResource(
-                        if (isEditMode) R.drawable.ic_close_24 else R.drawable.ic_arrow_back
-                    ),
-                    contentDescription = if (isEditMode) "退出管理" else "返回",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
+        }
+        Text(
+            text = title,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(horizontal = 64.dp)
+        )
+        Row(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (actions != null) {
+                actions()
             }
-        },
-        actions = {
             if (canManage) {
                 if (isEditMode) {
                     Button(
@@ -264,9 +398,7 @@ fun TvBoxManageTopBar(
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .height(32.dp)
-                            .padding(end = 6.dp)
+                        modifier = Modifier.height(30.dp)
                     ) {
                         Text(
                             "完成",
@@ -283,9 +415,7 @@ fun TvBoxManageTopBar(
                             contentColor = MaterialTheme.colorScheme.primary
                         ),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .height(32.dp)
-                            .padding(end = 6.dp)
+                        modifier = Modifier.height(30.dp)
                     ) {
                         Text(
                             "管理",
@@ -295,12 +425,8 @@ fun TvBoxManageTopBar(
                     }
                 }
             }
-        },
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background
-        ),
-        modifier = modifier
-    )
+        }
+    }
 }
 
 /**

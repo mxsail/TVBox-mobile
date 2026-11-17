@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,10 +25,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.derivedStateOf
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -205,40 +211,17 @@ class CacheActivity : BaseActivity() {
             selectedKeys.value = emptySet()
         }
 
-        Scaffold(
-            topBar = {
-                TvBoxManageTopBar(
-                    title = "下载",
-                    isEditMode = isSelectionMode.value,
-                    selectedCount = selectedKeys.value.size,
-                    canManage = cards.value.isNotEmpty(),
-                    editTitle = "选择项目",
-                    onBack = {
-                        if (isSelectionMode.value) {
-                            isSelectionMode.value = false
-                            selectedKeys.value = emptySet()
-                        } else {
-                            finish()
-                        }
-                    },
-                    onToggleEditMode = {
-                        if (isSelectionMode.value) {
-                            isSelectionMode.value = false
-                            selectedKeys.value = emptySet()
-                        } else {
-                            isSelectionMode.value = true
-                            selectedKeys.value = emptySet()
-                        }
-                    }
-                )
-            },
-            containerColor = colorScheme.background
-        ) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
+        val backdrop = rememberLayerBackdrop()
+        val isScrolled by remember {
+            derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
+        }
+        val topBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 44.dp
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colorScheme.background)
+        ) {
                 if (cards.value.isEmpty()) {
                     // Expressive 空态
                     Column(
@@ -299,10 +282,12 @@ class CacheActivity : BaseActivity() {
                     )
 
                     LazyColumn(
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = listBottomPadding),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topBarPadding + 8.dp, bottom = listBottomPadding),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         state = listState,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .layerBackdrop(backdrop)
                     ) {
                     items(cards.value, key = { it.groupKey }) { card ->
                         val supporting = listOfNotNull(
@@ -513,9 +498,37 @@ class CacheActivity : BaseActivity() {
                     },
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
+
+                // 顶层悬浮动态毛玻璃顶栏 (穿顶滑动 + 覆盖通知栏)
+                TvBoxManageTopBar(
+                    title = "下载",
+                    isEditMode = isSelectionMode.value,
+                    selectedCount = selectedKeys.value.size,
+                    canManage = cards.value.isNotEmpty(),
+                    editTitle = "选择项目",
+                    isScrolled = isScrolled,
+                    backdrop = backdrop,
+                    onBack = {
+                        if (isSelectionMode.value) {
+                            isSelectionMode.value = false
+                            selectedKeys.value = emptySet()
+                        } else {
+                            finish()
+                        }
+                    },
+                    onToggleEditMode = {
+                        if (isSelectionMode.value) {
+                            isSelectionMode.value = false
+                            selectedKeys.value = emptySet()
+                        } else {
+                            isSelectionMode.value = true
+                            selectedKeys.value = emptySet()
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
             }
         }
-    }
 
     M3ConfirmDialog(
             visible = showDeleteConfirmDialog,

@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,12 +33,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.runtime.derivedStateOf
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -370,139 +377,54 @@ fun VodGridScreen(
         selectedKeys = emptySet()
     }
 
-    Scaffold(
-        containerColor = colorScheme.background,
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = title,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (isEditMode) {
-                            isEditMode = false
-                            selectedKeys = emptySet()
-                        } else {
-                            onBack()
-                        }
-                    }) {
-                        Icon(
-                            painter = painterResource(
-                                if (isEditMode) R.drawable.ic_close_24 else R.drawable.ic_arrow_back
-                            ),
-                            contentDescription = if (isEditMode) "退出管理" else "返回",
-                            tint = colorScheme.onSurface
-                        )
-                    }
-                },
-                actions = {
-                    if (cards.isNotEmpty()) {
-                        if (isEditMode) {
-                            Button(
-                                onClick = {
-                                    isEditMode = false
-                                    selectedKeys = emptySet()
-                                },
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = colorScheme.primary,
-                                    contentColor = colorScheme.onPrimary
-                                ),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-                                modifier = Modifier
-                                    .height(32.dp)
-                                    .padding(end = 6.dp)
-                            ) {
-                                Text(
-                                    "完成",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        } else if (onDeleteSelected != null) {
-                            FilledTonalButton(
-                                onClick = {
-                                    isEditMode = true
-                                    selectedKeys = emptySet()
-                                },
-                                shape = CircleShape,
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = colorScheme.surfaceContainerHigh,
-                                    contentColor = colorScheme.primary
-                                ),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-                                modifier = Modifier
-                                    .height(32.dp)
-                                    .padding(end = 6.dp)
-                            ) {
-                                Text(
-                                    "管理",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        } else if (onClear != null) {
-                            IconButton(onClick = onClear) {
-                                Icon(
-                                    painterResource(R.drawable.ic_delete_outline_24),
-                                    contentDescription = "清空",
-                                    tint = colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = colorScheme.background
+    val gridState = rememberLazyGridState()
+    val backdrop = rememberLayerBackdrop()
+    val isScrolled by remember {
+        derivedStateOf { gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 0 }
+    }
+    val topBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 44.dp
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colorScheme.background)
+    ) {
+        if (cards.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_inbox_24),
+                    contentDescription = null,
+                    tint = colorScheme.outline,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
+                Text("暂无内容", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+            }
+        } else {
+            val gridBottomPadding by animateDpAsState(
+                targetValue = if (isEditMode) 92.dp else 16.dp,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                label = "grid_bottom_padding"
             )
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-        ) {
-            if (cards.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        painterResource(R.drawable.ic_inbox_24),
-                        contentDescription = null,
-                        tint = colorScheme.outline,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    Text("暂无内容", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                }
-            } else {
-                val gridBottomPadding by animateDpAsState(
-                    targetValue = if (isEditMode) 92.dp else 16.dp,
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                    label = "grid_bottom_padding"
-                )
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 105.dp),
-                    contentPadding = PaddingValues(
-                        start = 14.dp,
-                        end = 14.dp,
-                        top = 8.dp,
-                        bottom = gridBottomPadding
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(cards, key = { it.key }) { card ->
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 105.dp),
+                state = gridState,
+                contentPadding = PaddingValues(
+                    start = 14.dp,
+                    end = 14.dp,
+                    top = topBarPadding + 8.dp,
+                    bottom = gridBottomPadding
+                ),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(backdrop)
+            ) {
+                items(cards, key = { it.key }) { card ->
                         val isSelected = selectedKeys.contains(card.key)
                         VodCardItem(
                             card = card,
@@ -536,7 +458,6 @@ fun VodGridScreen(
                         )
                     }
                 }
-            }
 
             // M3 Expressive: 悬浮多选管理胶囊岛 (Floating Capsule Action Island)
             AnimatedVisibility(
@@ -650,6 +571,40 @@ fun VodGridScreen(
                 }
             }
         }
+
+        // 顶层悬浮动态毛玻璃顶栏 (穿顶滑动 + 覆盖通知栏)
+        TvBoxManageTopBar(
+            title = title,
+            isEditMode = isEditMode,
+            selectedCount = selectedKeys.size,
+            canManage = cards.isNotEmpty() && onDeleteSelected != null,
+            isScrolled = isScrolled,
+            backdrop = backdrop,
+            onBack = {
+                if (isEditMode) {
+                    isEditMode = false
+                    selectedKeys = emptySet()
+                } else {
+                    onBack()
+                }
+            },
+            onToggleEditMode = {
+                isEditMode = !isEditMode
+                selectedKeys = emptySet()
+            },
+            actions = {
+                if (!isEditMode && cards.isNotEmpty() && onClear != null) {
+                    IconButton(onClick = onClear) {
+                        Icon(
+                            painterResource(R.drawable.ic_delete_outline_24),
+                            contentDescription = "清空",
+                            tint = colorScheme.onSurface
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 
     M3ConfirmDialog(

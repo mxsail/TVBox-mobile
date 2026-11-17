@@ -8,6 +8,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -28,9 +29,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,10 +46,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.github.tvbox.osc.ui.compose.HomeFilterPanel
+import com.github.tvbox.osc.ui.compose.isAppDarkTheme
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.isRenderEffectSupported
+import com.kyant.backdrop.backdrops.layerBackdrop
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
@@ -542,293 +558,356 @@ class HomeFragment : Fragment() {
         onScrollDelta: ((Int) -> Unit)? = null
     ) {
         val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+        val isDark = isAppDarkTheme()
+
+        val backdrop = rememberLayerBackdrop()
+        val userCategoryGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+
+        val categoryPagerState = androidx.compose.foundation.pager.rememberPagerState(
+            initialPage = 0
+        ) { categoriesState.value.size }
+
+        var scrollJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+        var isProgrammaticScroll by remember { mutableStateOf(false) }
+
+        // 实时同步分类高亮: 手指滑动页面跨过一半时立即同步
+        LaunchedEffect(categoryPagerState) {
+            snapshotFlow { categoryPagerState.currentPage }
+                .collectLatest { page ->
+                    if (!isProgrammaticScroll) {
+                        selectedTabState.intValue = page
+                        setTabsExpanded(false)
+                        setFilterExpanded(false)
+                    }
+                }
+        }
+
+        // 外部触发跳转 (例如按返回键 scrollToFirstTab)
+        LaunchedEffect(selectedTabState.intValue) {
+            val target = selectedTabState.intValue
+            if (categoryPagerState.currentPage != target && !categoryPagerState.isScrollInProgress) {
+                isProgrammaticScroll = true
+                try {
+                    categoryPagerState.animateScrollToPage(target)
+                } finally {
+                    isProgrammaticScroll = false
+                }
+            }
+        }
+
+        val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        // 初态顶部避让：状态栏 + 搜索行(44dp) + 分类栏(38dp)
+        val initialTopPadding = statusBarHeight + 44.dp + 38.dp
+
+        // 滚动感知：搜索栏收起，或者主页网格产生滑动偏移，即激活动态毛玻璃
+        val isScrolled by remember {
+            derivedStateOf {
+                !topBarVisibleState.value ||
+                userCategoryGridState.firstVisibleItemIndex > 0 ||
+                userCategoryGridState.firstVisibleItemScrollOffset > 4
+            }
+        }
+
+        val blurAlpha by animateFloatAsState(
+            targetValue = if (isScrolled) 1f else 0f,
+            animationSpec = tween(durationMillis = 220),
+            label = "home_top_blur_alpha"
+        )
+
+        val surfaceAlpha = (if (isDark) 0.82f else 0.86f) * blurAlpha
+        val surfaceColor = colorScheme.surface.copy(alpha = surfaceAlpha)
+        val isBackdropActive = isScrolled && isRenderEffectSupported()
+
         Box(
             Modifier
                 .fillMaxSize()
                 .background(colorScheme.background)
         ) {
-            Column(Modifier.fillMaxSize()) {
-                Spacer(Modifier.height(44.dp)) // 原 topLayout marginTop(状态栏区)
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = topBarVisibleState.value,
-                    enter = expandVertically(tween(200)) + fadeIn(tween(200)),
-                    exit = shrinkVertically(tween(200)) + fadeOut(tween(180))
-                ) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                    // 数据源名称: 点击切源, 长按刷新订阅
-                    Row(
-                        Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.75f))
-                            .combinedClickable(
-                                onClick = {
-                                    if (dataInitOk && jarInitOk) {
-                                        showSiteSwitch()
-                                    } else {
-                                        ToastUtils.showShort("数据源未加载，长按刷新或切换订阅")
+            // 1. 底层：穿顶全屏网格内容层
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(backdrop)
+            ) {
+                LoadStateBox(pageLoadState.value, Modifier.fillMaxSize()) {
+                    if (categoriesState.value.isNotEmpty()) {
+                        androidx.compose.foundation.pager.HorizontalPager(
+                            state = categoryPagerState,
+                            beyondViewportPageCount = 1,
+                            modifier = Modifier.fillMaxSize()
+                        ) { catIndex ->
+                            val sortData = mDisplaySortList.getOrNull(catIndex)
+                            if (sortData != null) {
+                                if (sortData.id == "my0") {
+                                    com.github.tvbox.osc.ui.compose.UserCategoryScreen(
+                                        recVod = homeRecVod,
+                                        bottomPadding = bottomPadding,
+                                        topPadding = initialTopPadding,
+                                        onScrollDelta = onScrollDelta,
+                                        gridState = userCategoryGridState
+                                    )
+                                } else {
+                                    val ctrl = gridControllers.getOrPut(sortData.id) {
+                                        com.github.tvbox.osc.ui.compose.GridCategoryController(
+                                            sortData,
+                                            requireActivity()
+                                        )
                                     }
-                                },
-                                onLongClick = { refreshHomeSources() }
-                            )
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            sourceNameState.value,
-                            color = colorScheme.onSurface,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Clip,
-                            modifier = Modifier
-                                .widthIn(max = 76.dp)
-                                .basicMarquee(iterations = Int.MAX_VALUE)
-                        )
-                        Icon(
-                            painterResource(R.drawable.ic_arrow_down),
-                            contentDescription = "切换数据源",
-                            tint = colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .padding(start = 4.dp)
-                                .size(13.dp)
-                        )
-                    }
-                    // 搜索入口
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .padding(start = 8.dp)
-                            .height(38.dp)
-                            .clip(RoundedCornerShape(percent = 50))
-                            .background(colorScheme.surfaceContainerHigh)
-                            .clickable {
-                                val act = activity ?: return@clickable
-                                act.startActivity(Intent(act, FastSearchActivity::class.java))
+                                    com.github.tvbox.osc.ui.compose.GridCategoryScreen(
+                                        sortData = sortData,
+                                        controller = ctrl,
+                                        bottomPadding = bottomPadding,
+                                        topPadding = initialTopPadding,
+                                        onScrollDelta = onScrollDelta
+                                    )
+                                }
                             }
+                        }
+                    }
+                }
+            }
+
+            // 2. 遮罩层 (分类展开或筛选展开时的柔和遮罩)
+            val isAnyExpanded = isTabsExpandedState.value || isFilterExpandedState.value
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isAnyExpanded,
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(180))
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(colorScheme.scrim.copy(alpha = 0.28f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            setTabsExpanded(false)
+                            setFilterExpanded(false)
+                        }
+                )
+            }
+
+            // 3. 顶层悬浮一体化动态毛玻璃顶栏 (状态栏 + 联动折叠搜索栏 + 分类栏 + 底部渐隐阴影)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {} // 防穿透点击
+                    .then(
+                        if (isBackdropActive) {
+                            Modifier.drawBackdrop(
+                                backdrop = backdrop,
+                                shape = { RectangleShape },
+                                effects = {
+                                    vibrancy()
+                                    blur(20f.dp.toPx() * blurAlpha)
+                                },
+                                highlight = null,
+                                shadow = null,
+                                onDrawSurface = {
+                                    drawRect(surfaceColor)
+                                }
+                            )
+                        } else {
+                            Modifier.background(surfaceColor)
+                        }
+                    )
+            ) {
+                Column(Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars)) // 动态贴合系统状态栏高度
+
+                    // 联动收起的搜索栏
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = topBarVisibleState.value,
+                        enter = expandVertically(tween(200)) + fadeIn(tween(200)),
+                        exit = shrinkVertically(tween(200)) + fadeOut(tween(180))
                     ) {
                         Row(
                             Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth()
+                                .height(44.dp)
                                 .padding(horizontal = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                painterResource(R.drawable.ic_search_18),
-                                contentDescription = "搜索",
-                                tint = colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                "搜索影视",
-                                color = colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+                            // 数据源名称: 点击切源, 长按刷新订阅
+                            Row(
+                                Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.75f))
+                                    .combinedClickable(
+                                        onClick = {
+                                            if (dataInitOk && jarInitOk) {
+                                                showSiteSwitch()
+                                            } else {
+                                                ToastUtils.showShort("数据源未加载，长按刷新或切换订阅")
+                                            }
+                                        },
+                                        onLongClick = { refreshHomeSources() }
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    sourceNameState.value,
+                                    color = colorScheme.onSurface,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Clip,
+                                    modifier = Modifier
+                                        .widthIn(max = 76.dp)
+                                        .basicMarquee(iterations = Int.MAX_VALUE)
+                                )
+                                Icon(
+                                    painterResource(R.drawable.ic_arrow_down),
+                                    contentDescription = "切换数据源",
+                                    tint = colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .padding(start = 4.dp)
+                                        .size(13.dp)
+                                )
+                            }
 
-                    // 分类筛选入口: 仅在当前选中的分类支持筛选时展开, 位于搜索框与历史按钮之间
-                    val hasFilters = remember(selectedTabState.intValue, categoriesState.value) {
-                        hasCurrentCategoryFilters()
-                    }
-                    AnimatedVisibility(
-                        visible = hasFilters,
-                        enter = expandHorizontally(
-                            animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
-                            expandFrom = Alignment.End
-                        ) + scaleIn(
-                            animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
-                            initialScale = 0.8f
-                        ) + fadeIn(animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f)),
-                        exit = shrinkHorizontally(
-                            animationSpec = spring(dampingRatio = 1f, stiffness = 400f),
-                            shrinkTowards = Alignment.End
-                        ) + scaleOut(
-                            animationSpec = tween(150),
-                            targetScale = 0.8f
-                        ) + fadeOut(animationSpec = tween(150))
-                    ) {
-                        val isFilterOpen = isFilterExpandedState.value
-                        val curSort = mDisplaySortList.getOrNull(selectedTabState.intValue)
-                        val filterCount = curSort?.filterSelectCount() ?: 0
-                        val isFilterActive = filterCount > 0
+                            // 搜索入口
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .padding(start = 8.dp)
+                                    .height(38.dp)
+                                    .clip(RoundedCornerShape(percent = 50))
+                                    .background(colorScheme.surfaceContainerHigh)
+                                    .clickable {
+                                        val act = activity ?: return@clickable
+                                        act.startActivity(Intent(act, FastSearchActivity::class.java))
+                                    }
+                            ) {
+                                Row(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_search_18),
+                                        contentDescription = "搜索",
+                                        tint = colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        "搜索影视",
+                                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                        fontSize = 13.sp,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
 
-                        val btnBg = if (isFilterOpen) {
-                            colorScheme.primary
-                        } else if (isFilterActive) {
-                            colorScheme.primaryContainer
-                        } else {
-                            colorScheme.surfaceContainerHigh
-                        }
+                            // 分类筛选入口
+                            val hasFilters = remember(selectedTabState.intValue, categoriesState.value) {
+                                hasCurrentCategoryFilters()
+                            }
+                            AnimatedVisibility(
+                                visible = hasFilters,
+                                enter = expandHorizontally(
+                                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+                                    expandFrom = Alignment.End
+                                ) + scaleIn(
+                                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+                                    initialScale = 0.8f
+                                ) + fadeIn(animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f)),
+                                exit = shrinkHorizontally(
+                                    animationSpec = spring(dampingRatio = 1f, stiffness = 400f),
+                                    shrinkTowards = Alignment.End
+                                ) + scaleOut(
+                                    animationSpec = tween(150),
+                                    targetScale = 0.8f
+                                ) + fadeOut(animationSpec = tween(150))
+                            ) {
+                                val isFilterOpen = isFilterExpandedState.value
+                                val curSort = mDisplaySortList.getOrNull(selectedTabState.intValue)
+                                val filterCount = curSort?.filterSelectCount() ?: 0
+                                val isFilterActive = filterCount > 0
 
-                        val iconTint = if (isFilterOpen) {
-                            colorScheme.onPrimary
-                        } else if (isFilterActive) {
-                            colorScheme.onPrimaryContainer
-                        } else {
-                            colorScheme.onSurface
-                        }
+                                val btnBg = if (isFilterOpen) {
+                                    colorScheme.primary
+                                } else if (isFilterActive) {
+                                    colorScheme.primaryContainer
+                                } else {
+                                    colorScheme.surfaceContainerHigh
+                                }
 
-                        Box(
-                            Modifier
-                                .padding(start = 8.dp)
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(percent = 50))
-                                .background(btnBg)
-                                .clickable {
-                                    setFilterExpanded(!isFilterExpandedState.value)
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.ic_filter_list),
-                                contentDescription = "筛选",
-                                tint = iconTint,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            if (filterCount > 0 && !isFilterOpen) {
+                                val iconTint = if (isFilterOpen) {
+                                    colorScheme.onPrimary
+                                } else if (isFilterActive) {
+                                    colorScheme.onPrimaryContainer
+                                } else {
+                                    colorScheme.onSurface
+                                }
+
                                 Box(
                                     Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(top = 4.dp, end = 4.dp)
-                                        .size(6.dp)
-                                        .background(colorScheme.primary, CircleShape)
+                                        .padding(start = 8.dp)
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(percent = 50))
+                                        .background(btnBg)
+                                        .clickable {
+                                            setFilterExpanded(!isFilterExpandedState.value)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_filter_list),
+                                        contentDescription = "筛选",
+                                        tint = iconTint,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    if (filterCount > 0 && !isFilterOpen) {
+                                        Box(
+                                            Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(top = 4.dp, end = 4.dp)
+                                                .size(6.dp)
+                                                .background(colorScheme.primary, CircleShape)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // 观看历史入口
+                            Box(
+                                Modifier
+                                    .padding(start = 8.dp)
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(percent = 50))
+                                    .background(colorScheme.surfaceContainerHigh)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
+                                        val act = activity ?: return@clickable
+                                        act.startActivity(Intent(act, HistoryActivity::class.java))
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painterResource(R.drawable.ic_history_18),
+                                    contentDescription = "观看历史",
+                                    tint = colorScheme.onSurface,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
                     }
 
-                    // 观看历史入口
-                    Box(
-                        Modifier
-                            .padding(start = 8.dp)
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(percent = 50))
-                            .background(colorScheme.surfaceContainerHigh)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                val act = activity ?: return@clickable
-                                act.startActivity(Intent(act, HistoryActivity::class.java))
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_history_18),
-                            contentDescription = "观看历史",
-                            tint = colorScheme.onSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    }
-                }
-
-                Box(Modifier.weight(1f)) {
-                    val categoryPagerState = androidx.compose.foundation.pager.rememberPagerState(
-                        initialPage = 0
-                    ) { categoriesState.value.size }
-
-                    val userCategoryGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
-                    var scrollJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
-                    var isProgrammaticScroll by remember { mutableStateOf(false) }
-
-                    // 实时同步分类高亮:
-                    // 手指滑动页面跨过一半时(currentPage 变动), 立即同步 selectedTabState,
-                    // 绝不等待 settledPage(避免停稳和列表加载完成后才切换的高延迟)
-                    LaunchedEffect(categoryPagerState) {
-                        snapshotFlow { categoryPagerState.currentPage }
-                            .collectLatest { page ->
-                                if (!isProgrammaticScroll) {
-                                    selectedTabState.intValue = page
-                                    setTabsExpanded(false)
-                                    setFilterExpanded(false)
-                                }
-                            }
-                    }
-
-                    // 外部触发跳转(例如按返回键 scrollToFirstTab)
-                    LaunchedEffect(selectedTabState.intValue) {
-                        val target = selectedTabState.intValue
-                        if (categoryPagerState.currentPage != target && !categoryPagerState.isScrollInProgress) {
-                            isProgrammaticScroll = true
-                            try {
-                                categoryPagerState.animateScrollToPage(target)
-                            } finally {
-                                isProgrammaticScroll = false
-                            }
-                        }
-                    }
-
-                    Column(Modifier.fillMaxSize()) {
-                        Spacer(Modifier.height(40.dp)) // 分类栏让位(分类栏已收窄至 38dp, 同步收紧)
-                        LoadStateBox(pageLoadState.value, Modifier.fillMaxSize()) {
-                            if (categoriesState.value.isNotEmpty()) {
-                                androidx.compose.foundation.pager.HorizontalPager(
-                                    state = categoryPagerState,
-                                    beyondViewportPageCount = 1,
-                                    modifier = Modifier.fillMaxSize()
-                                ) { catIndex ->
-                                    val sortData = mDisplaySortList.getOrNull(catIndex)
-                                    if (sortData != null) {
-                                        if (sortData.id == "my0") {
-                                            com.github.tvbox.osc.ui.compose.UserCategoryScreen(
-                                                recVod = homeRecVod,
-                                                bottomPadding = bottomPadding,
-                                                onScrollDelta = onScrollDelta,
-                                                gridState = userCategoryGridState
-                                            )
-                                        } else {
-                                            val ctrl = gridControllers.getOrPut(sortData.id) {
-                                                com.github.tvbox.osc.ui.compose.GridCategoryController(
-                                                    sortData,
-                                                    requireActivity()
-                                                )
-                                            }
-                                            com.github.tvbox.osc.ui.compose.GridCategoryScreen(
-                                                sortData = sortData,
-                                                controller = ctrl,
-                                                bottomPadding = bottomPadding,
-                                                onScrollDelta = onScrollDelta
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    // 分类或筛选展开时的内容区柔和遮罩(淡入, 点击收起全部展开项)
-                    val isAnyExpanded = isTabsExpandedState.value || isFilterExpandedState.value
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = isAnyExpanded,
-                        enter = fadeIn(tween(200)),
-                        exit = fadeOut(tween(180))
-                    ) {
-                        Box(
-                            Modifier
-                                .fillMaxSize()
-                                .background(colorScheme.scrim.copy(alpha = 0.28f))
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    setTabsExpanded(false)
-                                    setFilterExpanded(false)
-                                }
-                        )
-                    }
-                    // 顶部分类栏(常态单行滚动 / 展开全量 chips)。
-                    // 不加顶部 padding: 展开面板背景必须从本 Box 顶开始, 否则让位缝里
-                    // 会透出展开遮罩形成一条分割线(面板与搜索框之间的"多余线")
+                    // 常驻分类栏 (HomeCategoryBar)
                     HomeCategoryBar(
                         categories = categoriesState.value,
                         selectedIndex = selectedTabState.intValue,
@@ -864,38 +943,60 @@ class HomeFragment : Fragment() {
                         pagerState = categoryPagerState,
                         isProgrammaticScroll = isProgrammaticScroll
                     )
+                }
 
-                    // 顶部分类高级筛选下拉面板 (M3 Expressive 纯 Compose)
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = isFilterExpandedState.value,
-                        enter = expandVertically(
-                            animationSpec = spring(
-                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                // 底部柔和扩散淡阴影
+                if (blurAlpha > 0.01f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .align(Alignment.BottomCenter)
+                            .offset(y = 8.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        (if (isDark) Color.Black else colorScheme.scrim).copy(alpha = (if (isDark) 0.16f else 0.08f) * blurAlpha),
+                                        Color.Transparent
+                                    )
+                                )
                             )
-                        ) + fadeIn(tween(180)),
-                        exit = shrinkVertically(
-                            animationSpec = spring(
-                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-                            )
-                        ) + fadeOut(tween(150)),
-                        modifier = Modifier.padding(top = 34.dp)
-                    ) {
-                        val curSort = mDisplaySortList.getOrNull(selectedTabState.intValue)
-                        if (curSort != null && !curSort.filters.isNullOrEmpty()) {
-                            val ctrl = gridControllers[curSort.id]
-                            HomeFilterPanel(
-                                sortData = curSort,
-                                onFilterChanged = {
-                                    ctrl?.refresh()
-                                },
-                                onCollapse = {
-                                    setFilterExpanded(false)
-                                }
-                            )
+                    )
+                }
+            }
+
+            // 4. 顶部分类高级筛选下拉面板 (悬浮在毛玻璃外壳与遮罩之上)
+            val filterTopOffset = statusBarHeight + (if (topBarVisibleState.value) 44.dp else 0.dp) + 38.dp
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isFilterExpandedState.value,
+                enter = expandVertically(
+                    animationSpec = spring(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
+                ) + fadeIn(tween(180)),
+                exit = shrinkVertically(
+                    animationSpec = spring(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
+                ) + fadeOut(tween(150)),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = filterTopOffset)
+            ) {
+                val curSort = mDisplaySortList.getOrNull(selectedTabState.intValue)
+                if (curSort != null && !curSort.filters.isNullOrEmpty()) {
+                    val ctrl = gridControllers[curSort.id]
+                    HomeFilterPanel(
+                        sortData = curSort,
+                        onFilterChanged = {
+                            ctrl?.refresh()
+                        },
+                        onCollapse = {
+                            setFilterExpanded(false)
                         }
-                    }
+                    )
                 }
             }
         }

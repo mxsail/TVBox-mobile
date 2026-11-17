@@ -73,6 +73,7 @@ suspend fun LazyGridState.smoothScrollToTop() {
 fun UserCategoryScreen(
     recVod: List<Movie.Video>?,
     bottomPadding: Dp,
+    topPadding: Dp = 0.dp,
     onScrollDelta: ((Int) -> Unit)? = null,
     gridState: LazyGridState = rememberLazyGridState()
 ) {
@@ -150,7 +151,7 @@ fun UserCategoryScreen(
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 105.dp),
             state = gridState,
-            contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 6.dp, bottom = bottomPadding),
+            contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = topPadding + 6.dp, bottom = bottomPadding),
             verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.fillMaxSize()
@@ -370,6 +371,7 @@ fun GridCategoryScreen(
     sortData: MovieSort.SortData,
     controller: GridCategoryController,
     bottomPadding: Dp,
+    topPadding: Dp = 0.dp,
     onScrollDelta: ((Int) -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -395,7 +397,7 @@ fun GridCategoryScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 105.dp),
                     state = scrollState,
-                    contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 6.dp, bottom = bottomPadding),
+                    contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = topPadding + 6.dp, bottom = bottomPadding),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.fillMaxSize()
