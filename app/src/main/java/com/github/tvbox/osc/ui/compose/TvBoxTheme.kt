@@ -1,16 +1,29 @@
 package com.github.tvbox.osc.ui.compose
 
 import android.content.res.Configuration
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +36,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -197,6 +211,214 @@ fun TvBoxTopBar(
         ),
         modifier = modifier
     )
+}
+
+/**
+ * 标准居中管理顶栏 (收藏/下载/详情等统一顶栏组件):
+ * - 居中标题与已选择计数胶囊
+ * - 左侧返回箭头 (管理模式变为关闭叉号)
+ * - 右侧管理按钮 (管理模式变为完成按钮)
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TvBoxManageTopBar(
+    title: String,
+    isEditMode: Boolean,
+    selectedCount: Int = 0,
+    canManage: Boolean = true,
+    editTitle: String = "选择项目",
+    onBack: () -> Unit,
+    onToggleEditMode: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    CenterAlignedTopAppBar(
+        title = {
+            Text(
+                text = title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    painter = painterResource(
+                        if (isEditMode) R.drawable.ic_close_24 else R.drawable.ic_arrow_back
+                    ),
+                    contentDescription = if (isEditMode) "退出管理" else "返回",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        },
+        actions = {
+            if (canManage) {
+                if (isEditMode) {
+                    Button(
+                        onClick = onToggleEditMode,
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                        modifier = Modifier
+                            .height(32.dp)
+                            .padding(end = 6.dp)
+                    ) {
+                        Text(
+                            "完成",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                } else {
+                    FilledTonalButton(
+                        onClick = onToggleEditMode,
+                        shape = CircleShape,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                        modifier = Modifier
+                            .height(32.dp)
+                            .padding(end = 6.dp)
+                    ) {
+                        Text(
+                            "管理",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        },
+        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background
+        ),
+        modifier = modifier
+    )
+}
+
+/**
+ * M3 Expressive 悬浮多选管理胶囊岛 (全选/取消全选 + 删除(数量))
+ */
+@Composable
+fun FloatingActionIsland(
+    visible: Boolean,
+    isAllSelected: Boolean,
+    selectedCount: Int,
+    onToggleSelectAll: () -> Unit,
+    onDeleteClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isDark = isAppDarkTheme()
+    val colorScheme = MaterialTheme.colorScheme
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(
+            initialOffsetY = { it },
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMediumLow
+            )
+        ) + fadeIn() + scaleIn(initialScale = 0.85f),
+        exit = slideOutVertically(
+            targetOffsetY = { it },
+            animationSpec = spring(stiffness = Spring.StiffnessMedium)
+        ) + fadeOut() + scaleOut(targetScale = 0.85f),
+        modifier = modifier
+            .navigationBarsPadding()
+            .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = if (isDark) colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)
+            else Color.White.copy(alpha = 0.96f),
+            tonalElevation = 6.dp,
+            shadowElevation = 10.dp,
+            border = BorderStroke(
+                width = 1.dp,
+                color = colorScheme.outlineVariant.copy(alpha = 0.35f)
+            ),
+            modifier = Modifier
+                .wrapContentWidth()
+                .height(56.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+            ) {
+                // 全选 / 取消全选胶囊
+                FilledTonalButton(
+                    onClick = onToggleSelectAll,
+                    shape = CircleShape,
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (isAllSelected) colorScheme.secondaryContainer
+                        else colorScheme.surfaceContainerHighest,
+                        contentColor = if (isAllSelected) colorScheme.onSecondaryContainer
+                        else colorScheme.onSurface
+                    ),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.height(40.dp)
+                ) {
+                    Text(
+                        text = if (isAllSelected) "取消全选" else "全选",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                // 胶囊内部精致分隔线
+                Box(
+                    modifier = Modifier
+                        .height(20.dp)
+                        .width(1.dp)
+                        .background(colorScheme.outlineVariant.copy(alpha = 0.4f))
+                )
+
+                Spacer(Modifier.width(8.dp))
+
+                // 删除按钮 (危险色胶囊，带动态计数)
+                Button(
+                    onClick = onDeleteClick,
+                    enabled = selectedCount > 0,
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorScheme.error,
+                        contentColor = colorScheme.onError,
+                        disabledContainerColor = colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+                        disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+                    modifier = Modifier.height(40.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_delete_outline_24),
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (selectedCount == 0) "删除" else "删除 ($selectedCount)",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 /** 卡片分组小节标题 */

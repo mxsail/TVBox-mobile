@@ -64,6 +64,7 @@ import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 import com.github.tvbox.osc.ui.activity.BackupRestoreActivity
+import com.github.tvbox.osc.ui.activity.CacheActivity
 import com.github.tvbox.osc.ui.activity.CollectActivity
 import com.github.tvbox.osc.ui.activity.DetailActivity
 import com.github.tvbox.osc.ui.activity.HistoryActivity
@@ -597,7 +598,7 @@ class MyFragment : Fragment() {
                 title = "我的下载",
                 subtitle = "离线离网本地缓存",
                 accentColor = Color(0xFF1E88E5)
-            ) { onGoToTab?.invoke(2) ?: goMainTab(currentActivity, 2) },
+            ) { jumpActivity(currentActivity, CacheActivity::class.java) },
             FeatureTile(
                 icon = R.drawable.ic_database_48,
                 title = "订阅源",

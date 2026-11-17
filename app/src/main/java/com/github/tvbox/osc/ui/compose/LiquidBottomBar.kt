@@ -143,7 +143,7 @@ object LiquidBarSpec {
     const val PressedHeightDp: Int = 68   // 按下膨胀目标高 68dp (官方 64/56/78 链 x0.875, 68/48 ≈ 1.417x, 保证两端同心包络)
     const val HorizontalMarginDp: Int = 24 // 悬浮底栏左右外边距
     const val OccupiedHeightDp: Int = HeightDp + TopInsetDp // View 侧底部避让
-    const val IconTextGapDp: Int = 1     // 图标与文字间距 1dp
+    const val IconTextGapDp: Int = 2     // 图标与文字间距 2dp
 }
 
 data class BottomBarTabItem(
@@ -154,7 +154,6 @@ data class BottomBarTabItem(
 val MainBottomTabs = listOf(
     BottomBarTabItem(R.drawable.ic_home, "首页"),
     BottomBarTabItem(R.drawable.ic_live_tv_48, "直播"),
-    BottomBarTabItem(R.drawable.ic_download_nav, "下载"),
     BottomBarTabItem(R.drawable.ic_my, "我的")
 )
 
@@ -889,12 +888,15 @@ fun LiquidBottomBar(
     Box(
         modifier = modifier
             .then(
-                if (effectiveFloating) Modifier.widthIn(max = 400.dp) else Modifier
+                if (effectiveFloating) {
+                    Modifier
+                        .padding(horizontal = LiquidBarSpec.HorizontalMarginDp.dp)
+                        .widthIn(max = 280.dp)
+                } else {
+                    Modifier.fillMaxWidth()
+                }
             )
-            .fillMaxWidth()
             .padding(
-                start = if (effectiveFloating) LiquidBarSpec.HorizontalMarginDp.dp else 0.dp,
-                end = if (effectiveFloating) LiquidBarSpec.HorizontalMarginDp.dp else 0.dp,
                 top = if (effectiveFloating) LiquidBarSpec.TopInsetDp.dp else 0.dp,
                 bottom = if (effectiveFloating) (navInsetBottom + 10.dp) else 0.dp
             )
@@ -926,7 +928,7 @@ fun LiquidBottomBar(
                         painter = painterResource(item.iconRes),
                         contentDescription = item.title,
                         tint = iconTint,
-                        modifier = Modifier.size(if (showLabels) 18.dp else 20.dp)
+                        modifier = Modifier.size(if (showLabels) 20.dp else 24.dp)
                     )
                     if (showLabels) {
                         val labelColor = if (material == ThemeManager.MATERIAL_YOU) {

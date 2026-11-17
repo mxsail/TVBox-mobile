@@ -23,6 +23,7 @@ import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.download.DownloadTaskManager;
 import com.github.tvbox.osc.event.DownloadEvent;
+import com.github.tvbox.osc.ui.activity.CacheActivity;
 import com.github.tvbox.osc.ui.activity.MainActivity;
 
 import org.greenrobot.eventbus.EventBus;
@@ -232,11 +233,9 @@ public class DownloadService extends Service {
     }
 
     private PendingIntent contentIntent() {
-        // 点击直达底部"我的下载"tab(复用已存在的 MainActivity 实例)
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP
-                | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        intent.putExtra(MainActivity.EXTRA_TAB, 2);
+        // 点击直达"我的下载"独立页面(CacheActivity)
+        Intent intent = new Intent(this, CacheActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         return PendingIntent.getActivity(this, 10, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }

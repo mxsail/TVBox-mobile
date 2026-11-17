@@ -3,9 +3,16 @@ package com.github.tvbox.osc.ui.activity
 import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,18 +23,25 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -36,7 +50,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,7 +73,10 @@ import com.github.tvbox.osc.download.DownloadStorage
 import com.github.tvbox.osc.download.DownloadTaskManager
 import com.github.tvbox.osc.event.DownloadEvent
 import com.github.tvbox.osc.ui.adapter.DownloadAdapter
+import com.github.tvbox.osc.ui.compose.FloatingActionIsland
+import com.github.tvbox.osc.ui.compose.M3ConfirmDialog
 import com.github.tvbox.osc.ui.compose.PosterImage
+import com.github.tvbox.osc.ui.compose.TvBoxManageTopBar
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
 import com.github.tvbox.osc.ui.compose.TvBoxTopBar
 import com.github.tvbox.osc.ui.compose.isAppDarkTheme
@@ -99,10 +119,10 @@ class DownloadActivity : BaseActivity() {
     data class HeaderData(
         val seriesName: String,
         val pic: String,
-        val doneCount: Int,
-        val totalCount: Int,
-        val sizeText: String,
-        val failedCount: Int
+        val yearText: String?,
+        val typeText: String?,
+        val areaText: String?,
+        val actorText: String?
     )
 
     private val epRows = mutableStateOf<List<EpRow>>(emptyList())
@@ -130,8 +150,7 @@ class DownloadActivity : BaseActivity() {
     override fun init() {
         detailGroupKey = intent.getStringExtra(EXTRA_GROUP_KEY)
         if (detailGroupKey == null) {
-            val intent = Intent(this, MainActivity::class.java)
-            intent.putExtra(MainActivity.EXTRA_TAB, 2)
+            val intent = Intent(this, CacheActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             startActivity(intent)
             finish()
@@ -182,6 +201,34 @@ class DownloadActivity : BaseActivity() {
         startActivity(intent)
     }
 
+    private fun executeDeleteBatch(ids: Set<Int>, onFinished: () -> Unit = {}) {
+        if (ids.isEmpty()) return
+        loadExecutor.execute {
+            try {
+                for (id in ids) {
+                    DownloadTaskManager.get().cancel(id)
+                    val task = RoomDataManger.getDownloadEpisode(id)
+                    if (task != null) {
+                        if (task.localDir != null) {
+                            DownloadStorage.deleteRecursive(File(task.localDir))
+                            DownloadStorage.cleanEmptyParents(File(task.localDir))
+                        }
+                        RoomDataManger.deleteDownloadEpisode(task)
+                    }
+                }
+            } catch (th: Throwable) {
+                th.printStackTrace()
+            }
+            CacheActivity.markSizesDirty()
+            org.greenrobot.eventbus.EventBus.getDefault()
+                .post(com.github.tvbox.osc.event.DownloadEvent(com.github.tvbox.osc.event.DownloadEvent.TYPE_TASKS_CHANGED))
+            runOnUiThread {
+                onFinished()
+                loadData()
+            }
+        }
+    }
+
     private fun confirmDeleteSeries(groupKey: String?, seriesName: String?) {
         MaterialAlertDialogBuilder(this)
             .setTitle("删除下载")
@@ -202,7 +249,7 @@ class DownloadActivity : BaseActivity() {
                     } catch (th: Throwable) {
                         th.printStackTrace()
                     }
-                    com.github.tvbox.osc.ui.fragment.CacheFragment.markSizesDirty()
+                    CacheActivity.markSizesDirty()
                     // 通知缓存 tab 重查数据库(删除不产生下载事件, 不发则底部数量不刷新)
                     org.greenrobot.eventbus.EventBus.getDefault()
                         .post(com.github.tvbox.osc.event.DownloadEvent(com.github.tvbox.osc.event.DownloadEvent.TYPE_TASKS_CHANGED))
@@ -234,7 +281,7 @@ class DownloadActivity : BaseActivity() {
                     } catch (th: Throwable) {
                         th.printStackTrace()
                     }
-                    com.github.tvbox.osc.ui.fragment.CacheFragment.markSizesDirty()
+                    CacheActivity.markSizesDirty()
                     org.greenrobot.eventbus.EventBus.getDefault()
                         .post(com.github.tvbox.osc.event.DownloadEvent(com.github.tvbox.osc.event.DownloadEvent.TYPE_TASKS_CHANGED))
                     loadData()
@@ -250,7 +297,7 @@ class DownloadActivity : BaseActivity() {
         val now = System.currentTimeMillis()
         if (event.type == DownloadEvent.TYPE_DONE) {
             liveProgress.remove(event.episodeId)
-            com.github.tvbox.osc.ui.fragment.CacheFragment.markSizesDirty()
+            CacheActivity.markSizesDirty()
             loadData()
             return
         }
@@ -303,12 +350,12 @@ class DownloadActivity : BaseActivity() {
         val active = ep.status == DownloadEpisode.STATUS_DOWNLOADING
             || ep.status == DownloadEpisode.STATUS_RESOLVING
         if (!active) {
-            com.github.tvbox.osc.ui.fragment.CacheFragment.cachedEpisodeSize(ep.getId())?.let { return it }
+            CacheActivity.cachedEpisodeSize(ep.getId())?.let { return it }
         }
         val live = if (active) liveProgress[ep.getId()] else null
         val size = if (live != null && live.downloadedBytes > 0) live.downloadedBytes
-        else com.github.tvbox.osc.ui.fragment.CacheFragment.diskEpisodeSize(ep)
-        com.github.tvbox.osc.ui.fragment.CacheFragment.cacheEpisodeSize(ep.getId(), size)
+        else CacheActivity.diskEpisodeSize(ep)
+        CacheActivity.cacheEpisodeSize(ep.getId(), size)
         return size
     }
 
@@ -322,27 +369,24 @@ class DownloadActivity : BaseActivity() {
         }
         val sorted = eps.sortedBy { it.episodeIndex }
         if (detailSeriesName == null) {
-            detailSeriesName = com.github.tvbox.osc.ui.fragment.CacheFragment.displayNameOf(sorted[0])
+            detailSeriesName = CacheActivity.displayNameOf(sorted[0])
         }
         val first = sorted[0]
-        var done = 0
-        var size = 0L
-        var failed = 0
-        for (ep in sorted) {
-            if (ep.status == DownloadEpisode.STATUS_DONE) done++
-            if (ep.status == DownloadEpisode.STATUS_FAILED) failed++
-            size += episodeSize(ep)
-        }
+        val vodInfo = RoomDataManger.getVodInfo(first.sourceKey, first.vodId)
+        val yearStr = if (vodInfo != null && vodInfo.year > 0) "${vodInfo.year}" else null
+        val typeStr = vodInfo?.type?.takeIf { it.isNotBlank() }
+        val areaStr = vodInfo?.area?.takeIf { it.isNotBlank() }
+        val actorStr = vodInfo?.actor?.takeIf { it.isNotBlank() }
+
         runOnUiThread {
             titleState.value = detailSeriesName ?: "下载详情"
             header.value = HeaderData(
-                seriesName = (com.github.tvbox.osc.ui.fragment.CacheFragment.displayNameOf(first)
-                    + " · " + first.flag),
+                seriesName = CacheActivity.displayNameOf(first),
                 pic = first.vodPic ?: "",
-                doneCount = done,
-                totalCount = sorted.size,
-                sizeText = DownloadStorage.formatSize(size),
-                failedCount = failed
+                yearText = yearStr,
+                typeText = typeStr,
+                areaText = areaStr,
+                actorText = actorStr
             )
             epRows.value = sorted.map { ep -> toRow(ep) }
         }
@@ -412,161 +456,147 @@ class DownloadActivity : BaseActivity() {
 
     // ---------------- Compose 界面 ----------------
 
-    @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+    @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
     @Composable
     private fun DownloadScreen() {
         val isDark = isAppDarkTheme()
+        val isSelectionMode = remember { mutableStateOf(false) }
+        val selectedEpisodeIds = remember { mutableStateOf<Set<Int>>(emptySet()) }
+        var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
+        val allIds = remember(epRows.value) { epRows.value.map { it.id }.toSet() }
+        val isAllSelected = allIds.isNotEmpty() && selectedEpisodeIds.value.size == allIds.size
+
+        BackHandler(isSelectionMode.value) {
+            isSelectionMode.value = false
+            selectedEpisodeIds.value = emptySet()
+        }
+
         Scaffold(
             containerColor = colorScheme.background,
             topBar = {
-                TvBoxTopBar(
+                TvBoxManageTopBar(
                     title = titleState.value,
-                    onBack = { finish() },
-                    actions = {
-                        IconButton(onClick = { confirmDeleteSeries(detailGroupKey, detailSeriesName) }) {
-                            Icon(
-                                painterResource(R.drawable.ic_delete_outline_24),
-                                contentDescription = "删除全剧下载",
-                                tint = colorScheme.error
-                            )
+                    isEditMode = isSelectionMode.value,
+                    selectedCount = selectedEpisodeIds.value.size,
+                    canManage = epRows.value.isNotEmpty(),
+                    editTitle = "选择剧集",
+                    onBack = {
+                        if (isSelectionMode.value) {
+                            isSelectionMode.value = false
+                            selectedEpisodeIds.value = emptySet()
+                        } else {
+                            finish()
+                        }
+                    },
+                    onToggleEditMode = {
+                        if (isSelectionMode.value) {
+                            isSelectionMode.value = false
+                            selectedEpisodeIds.value = emptySet()
+                        } else {
+                            isSelectionMode.value = true
+                            selectedEpisodeIds.value = emptySet()
                         }
                     }
                 )
             }
         ) { padding ->
-            LazyColumn(
+            Box(
                 modifier = Modifier
                     .padding(padding)
-                    .fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .fillMaxSize()
             ) {
+                val listBottomPadding by animateDpAsState(
+                    targetValue = if (isSelectionMode.value) 92.dp else 16.dp,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "download_bottom_padding"
+                )
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = listBottomPadding),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                 header.value?.let { hd ->
                     item {
-                        // M3 Expressive 剧集信息 Hero 卡
-                        val progressFraction = if (hd.totalCount > 0) (hd.doneCount.toFloat() / hd.totalCount.toFloat()).coerceIn(0f, 1f) else 0f
+                        // M3 Expressive 剧集信息 Hero 卡 (更换成年份/类型/国家 以及演员列表)
                         Card(
                             colors = CardDefaults.cardColors(
                                 containerColor = if (isDark) colorScheme.surfaceContainerLow else Color.White
                             ),
                             shape = RoundedCornerShape(22.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                            border = if (!isDark) BorderStroke(1.dp, colorScheme.outlineVariant.copy(alpha = 0.4f)) else null
                         ) {
-                            Column(Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                PosterImage(
+                                    hd.pic,
+                                    Modifier
+                                        .width(88.dp)
+                                        .height(124.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(colorScheme.surfaceContainerHigh)
+                                )
+                                Column(
+                                    Modifier
+                                        .weight(1f)
+                                        .padding(start = 14.dp)
                                 ) {
-                                    PosterImage(
-                                        hd.pic,
-                                        Modifier
-                                            .width(88.dp)
-                                            .height(118.dp)
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(colorScheme.surfaceContainerHigh)
+                                    Text(
+                                        hd.seriesName,
+                                        color = colorScheme.onSurface,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
-                                    Column(Modifier.weight(1f).padding(start = 14.dp)) {
-                                        Text(
-                                            hd.seriesName,
-                                            color = colorScheme.onSurface,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        // 进度与占用胶囊
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(top = 6.dp)
-                                        ) {
-                                            Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = colorScheme.primaryContainer.copy(alpha = 0.6f)
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                                ) {
-                                                    Icon(
-                                                        painterResource(R.drawable.ic_check_circle),
-                                                        contentDescription = null,
-                                                        tint = colorScheme.primary,
-                                                        modifier = Modifier.size(12.dp)
-                                                    )
-                                                    Spacer(Modifier.width(4.dp))
-                                                    Text(
-                                                        "${hd.doneCount}/${hd.totalCount} 集 · ${hd.sizeText}",
-                                                        color = colorScheme.onPrimaryContainer,
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Medium
-                                                    )
-                                                }
-                                            }
-                                        }
 
-                                        if (hd.failedCount > 0) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                modifier = Modifier.padding(top = 4.dp)
-                                            ) {
-                                                Icon(
-                                                    painterResource(R.drawable.icon_error),
-                                                    contentDescription = null,
-                                                    tint = colorScheme.error,
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                                Spacer(Modifier.width(4.dp))
-                                                Text(
-                                                    "${hd.failedCount} 集下载失败",
-                                                    color = colorScheme.error,
-                                                    fontSize = 11.sp
-                                                )
-                                            }
-                                        }
-
+                                    // 年份 / 类型 / 国家 标签胶囊
+                                    val metaTags = listOfNotNull(
+                                        hd.yearText?.takeIf { it.isNotBlank() },
+                                        hd.typeText?.takeIf { it.isNotBlank() },
+                                        hd.areaText?.takeIf { it.isNotBlank() }
+                                    )
+                                    if (metaTags.isNotEmpty()) {
                                         Row(
-                                            modifier = Modifier.padding(top = 10.dp),
+                                            modifier = Modifier.padding(top = 8.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            FilledTonalButton(
-                                                onClick = { playFirstOfGroup(detailGroupKey ?: return@FilledTonalButton) },
-                                                shape = RoundedCornerShape(12.dp),
-                                                modifier = Modifier.height(34.dp)
-                                            ) {
-                                                Text("播放全部", fontSize = 12.sp)
-                                            }
-                                            if (hd.failedCount > 0) {
-                                                Spacer(Modifier.width(8.dp))
-                                                TextButton(
-                                                    onClick = {
-                                                        val n = DownloadTaskManager.get().retryAllFailed()
-                                                        if (n > 0) ToastUtils.showShort("已重新排队 $n 个失败集")
-                                                    },
-                                                    modifier = Modifier.height(34.dp)
+                                            metaTags.forEach { tag ->
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = if (isDark) colorScheme.surfaceContainerHigh else colorScheme.secondaryContainer.copy(alpha = 0.5f)
                                                 ) {
-                                                    Text("重试失败(${hd.failedCount})", color = colorScheme.error, fontSize = 12.sp)
+                                                    Text(
+                                                        tag,
+                                                        color = if (isDark) colorScheme.onSurfaceVariant else colorScheme.onSecondaryContainer,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
                                                 }
                                             }
                                         }
                                     }
-                                }
 
-                                // 底部平滑圆角进度条
-                                Spacer(Modifier.height(12.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(5.dp)
-                                        .clip(RoundedCornerShape(2.5.dp))
-                                        .background(colorScheme.surfaceContainerHighest)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth(fraction = progressFraction)
-                                            .fillMaxHeight()
-                                            .clip(RoundedCornerShape(2.5.dp))
-                                            .background(colorScheme.primary)
-                                    )
+                                    // 演员列表
+                                    if (!hd.actorText.isNullOrBlank()) {
+                                        Text(
+                                            text = "主演: ${hd.actorText}",
+                                            color = colorScheme.onSurfaceVariant,
+                                            fontSize = 12.sp,
+                                            lineHeight = 17.sp,
+                                            maxLines = 3,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(top = 8.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -574,29 +604,71 @@ class DownloadActivity : BaseActivity() {
                 }
                 items(epRows.value.size) { index ->
                     val row = epRows.value[index]
+                    val isSelected = selectedEpisodeIds.value.contains(row.id)
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = if (isDark) colorScheme.surfaceContainerLow else Color.White
+                            containerColor = if (isSelected) {
+                                colorScheme.primaryContainer.copy(alpha = if (isDark) 0.3f else 0.45f)
+                            } else if (isDark) {
+                                colorScheme.surfaceContainerLow
+                            } else {
+                                Color.White
+                            }
                         ),
                         shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        border = if (isSelected) {
+                            BorderStroke(1.5.dp, colorScheme.primary)
+                        } else if (!isDark) {
+                            BorderStroke(1.dp, colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        } else null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .combinedClickable(
+                                onClick = {
+                                    if (isSelectionMode.value) {
+                                        if (isSelected) selectedEpisodeIds.value = selectedEpisodeIds.value - row.id
+                                        else selectedEpisodeIds.value = selectedEpisodeIds.value + row.id
+                                    } else if (row.status == DownloadEpisode.STATUS_DONE) {
+                                        // 已下载集: 复用在线播放页,本地命中直接播
+                                        val ep = RoomDataManger.getDownloadEpisode(row.id) ?: return@combinedClickable
+                                        if (ep.localFilePath != null && File(ep.localFilePath).exists()) {
+                                            launchOnlinePlay(ep)
+                                        } else {
+                                            ToastUtils.showShort("下载文件不存在")
+                                        }
+                                    }
+                                },
+                                onLongClick = {
+                                    if (!isSelectionMode.value) {
+                                        isSelectionMode.value = true
+                                        selectedEpisodeIds.value = setOf(row.id)
+                                    }
+                                }
+                            )
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable(enabled = row.status == DownloadEpisode.STATUS_DONE) {
-                                    // 已下载集: 复用在线播放页,本地命中直接播
-                                    val ep = RoomDataManger.getDownloadEpisode(row.id)
-                                        ?: return@clickable
-                                    if (ep.localFilePath != null && File(ep.localFilePath).exists()) {
-                                        launchOnlinePlay(ep)
-                                    } else {
-                                        ToastUtils.showShort("下载文件不存在")
-                                    }
-                                }
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            if (isSelectionMode.value) {
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = { checked ->
+                                        if (checked) selectedEpisodeIds.value = selectedEpisodeIds.value + row.id
+                                        else selectedEpisodeIds.value = selectedEpisodeIds.value - row.id
+                                    },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = colorScheme.primary,
+                                        checkmarkColor = colorScheme.onPrimary
+                                    ),
+                                    modifier = Modifier.padding(end = 4.dp)
+                                )
+                            }
+
                             // 状态图标底座 (Squircle)
                             Box(
                                 modifier = Modifier
@@ -646,7 +718,7 @@ class DownloadActivity : BaseActivity() {
                                     )
                                 }
                             }
-                            if (row.actionVisible) {
+                            if (!isSelectionMode.value && row.actionVisible) {
                                 Surface(
                                     shape = CircleShape,
                                     color = if (row.actionText == "删除") colorScheme.errorContainer.copy(alpha = 0.15f)
@@ -673,7 +745,41 @@ class DownloadActivity : BaseActivity() {
                 }
                 item { Spacer(Modifier.height(20.dp)) }
             }
+
+            FloatingActionIsland(
+                visible = isSelectionMode.value && epRows.value.isNotEmpty(),
+                isAllSelected = isAllSelected,
+                selectedCount = selectedEpisodeIds.value.size,
+                onToggleSelectAll = {
+                    selectedEpisodeIds.value = if (isAllSelected) emptySet() else allIds
+                },
+                onDeleteClick = {
+                    if (selectedEpisodeIds.value.isNotEmpty()) {
+                        showDeleteConfirmDialog = true
+                    }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
+    }
+
+    M3ConfirmDialog(
+        visible = showDeleteConfirmDialog,
+        title = "删除确认",
+        message = "确定删除选中的 ${selectedEpisodeIds.value.size} 个剧集下载文件吗？",
+        confirmText = "删除",
+        cancelText = "取消",
+        isDestructive = true,
+        iconRes = R.drawable.ic_delete_outline_24,
+        onDismissRequest = { showDeleteConfirmDialog = false },
+        onConfirm = {
+            showDeleteConfirmDialog = false
+            val toDelete = selectedEpisodeIds.value
+            isSelectionMode.value = false
+            selectedEpisodeIds.value = emptySet()
+            executeDeleteBatch(toDelete) {}
+        }
+    )
     }
 
     /** 集数行状态图标 */

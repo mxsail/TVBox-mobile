@@ -375,48 +375,14 @@ fun VodGridScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    if (isEditMode) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = if (selectedKeys.isEmpty()) "选择项目" else "已选择",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = colorScheme.onSurface
-                            )
-                            if (selectedKeys.isNotEmpty()) {
-                                Spacer(Modifier.width(6.dp))
-                                Surface(
-                                    shape = CircleShape,
-                                    color = colorScheme.primaryContainer,
-                                    modifier = Modifier.height(22.dp)
-                                ) {
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier.padding(horizontal = 8.dp)
-                                    ) {
-                                        Text(
-                                            text = "${selectedKeys.size}",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = colorScheme.onPrimaryContainer
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        Text(
-                            text = title,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = title,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = {

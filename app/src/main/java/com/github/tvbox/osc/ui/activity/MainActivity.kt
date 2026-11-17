@@ -56,7 +56,6 @@ import com.github.tvbox.osc.ui.compose.LastViewedTip
 import com.github.tvbox.osc.ui.compose.LiquidBarSpec
 import com.github.tvbox.osc.ui.compose.LiquidBottomBar
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
-import com.github.tvbox.osc.ui.fragment.CacheFragment
 import com.github.tvbox.osc.ui.fragment.HomeFragment
 import com.github.tvbox.osc.ui.fragment.LiveFragment
 import com.github.tvbox.osc.ui.fragment.MyFragment
@@ -71,15 +70,13 @@ import kotlin.system.exitProcess
 class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBarHost {
 
     companion object {
-        /** 通知/页面跳转直达指定底部 tab(0=首页 1=直播 2=我的下载 3=我的) */
+        /** 通知/页面跳转直达指定底部 tab(0=首页 1=直播 2=我的) */
         const val EXTRA_TAB = "extra_tab"
     }
 
     var homeFragment = HomeFragment()
         private set
     var liveFragment = LiveFragment()
-        private set
-    var cacheFragment = CacheFragment()
         private set
     var myFragment = MyFragment()
         private set
@@ -132,7 +129,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         initBarInsets()
         applyBarStyle()
 
-        val initialTab = intent.getIntExtra(EXTRA_TAB, 0)
+        val initialTab = intent.getIntExtra(EXTRA_TAB, 0).coerceIn(0, 2)
         currentTabState.intValue = initialTab
 
         // 收养 FragmentManager 恢复的实例(activity 重建场景):
@@ -144,14 +141,12 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
         val byTag: (String) -> androidx.fragment.app.Fragment? = { fm.findFragmentByTag(it) }
         homeFragment = byTag("home") as? HomeFragment ?: HomeFragment()
         liveFragment = byTag("live") as? LiveFragment ?: LiveFragment()
-        cacheFragment = byTag("cache") as? CacheFragment ?: CacheFragment()
         myFragment = byTag("my") as? MyFragment ?: MyFragment()
 
         if (byTag("live") == null) {
             fm.beginTransaction()
                 .add(homeFragment, "home")
                 .add(liveFragment, "live")
-                .add(cacheFragment, "cache")
                 .add(myFragment, "my")
                 .commitNowAllowingStateLoss()
         }
@@ -176,7 +171,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
     @Composable
     private fun MainScreen(initialTab: Int) {
         val coroutineScope = rememberCoroutineScope()
-        val pagerState = rememberPagerState(initialPage = initialTab) { 4 }
+        val pagerState = rememberPagerState(initialPage = initialTab) { 3 }
 
         // 仅在 pager 未处于滚动状态且与目标 tab 不一致时(如外部入口调用 goToTab/onNewIntent)触发动画滚动
         LaunchedEffect(currentTabState.intValue) {
@@ -192,10 +187,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                 .collectLatest { settled ->
                     currentTabState.intValue = settled
                     liveFragment.setUserVisibleHint(settled == 1)
-                    // 缓存 tab 的可见性接线(Compose 壳绕过了 FragmentPagerAdapter 的派发):
-                    // 驱动 userVisible, 下载进度/删除后回到本 tab 才会重查数据库刷新数量
-                    cacheFragment.setUserVisibleHint(settled == 2)
-                    if (settled == 3) {
+                    if (settled == 2) {
                         myFragment.loadHistory(this@MainActivity)
                     }
                     if (settled == 0) {
@@ -229,7 +221,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
             ) {
                 HorizontalPager(
                     state = pagerState,
-                    beyondViewportPageCount = 3,
+                    beyondViewportPageCount = 2,
                     modifier = Modifier.fillMaxSize()
                 ) { pageIndex ->
                     when (pageIndex) {
@@ -248,11 +240,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
-                        2 -> cacheFragment.CacheScreen(
-                            bottomPadding = bottomPadding,
-                            onScrollDelta = { onMainScrollDelta(it) }
-                        )
-                        3 -> myFragment.MyScreen(
+                        2 -> myFragment.MyScreen(
                             bottomPadding = bottomPadding,
                             onScrollDelta = { onMainScrollDelta(it) },
                             onGoToTab = { goToTab(it) }
@@ -360,12 +348,12 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
 
     /** 切换底部 tab(直播标题栏返回/我的页入口/通知点击等统一入口) */
     fun goToTab(index: Int) {
-        if (index < 0 || index >= 4) return
-        if (index != 1 && currentTabState.intValue == 1) {
+        val safeIndex = index.coerceIn(0, 2)
+        if (safeIndex != 1 && currentTabState.intValue == 1) {
             liveFragment.userVisibleHint = false
         }
-        currentTabState.intValue = index
-        if (index == 0) {
+        currentTabState.intValue = safeIndex
+        if (safeIndex == 0) {
             homeFragment.showTopBar()
         } else if (lastViewedTipState.value != null) {
             lastViewedTipState.value = null
