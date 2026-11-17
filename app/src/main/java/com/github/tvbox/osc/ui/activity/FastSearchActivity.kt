@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -44,16 +46,31 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.ui.graphics.RectangleShape
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.isRenderEffectSupported
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -70,6 +87,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
@@ -108,8 +127,6 @@ import com.github.tvbox.osc.ui.adapter.FastSearchAdapter
 import com.github.tvbox.osc.ui.compose.HomeCategoryBar
 import com.github.tvbox.osc.ui.compose.PosterImage
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
-import com.github.tvbox.osc.ui.compose.VodCard
-import com.github.tvbox.osc.ui.compose.VodCardItem
 import com.github.tvbox.osc.ui.dialog.DoubanSuggestDialog
 import com.github.tvbox.osc.ui.dialog.SearchSuggestionsDialog
 import com.github.tvbox.osc.util.HawkConfig
@@ -569,6 +586,7 @@ class FastSearchActivity : BaseActivity() {
     @Composable
     private fun FastSearchScreen() {
         val isDark = isAppDarkTheme()
+        val coroutineScope = rememberCoroutineScope()
         val focusRequester = remember { FocusRequester() }
         val allSearchableSources = remember {
             ApiConfig.get().sourceBeanList.filter { it.isSearchable }
@@ -581,206 +599,70 @@ class FastSearchActivity : BaseActivity() {
             }
         }
 
-        Column(
+        val backdrop = rememberLayerBackdrop()
+        val resultListState = rememberLazyListState()
+        val suggestListState = rememberLazyListState()
+        val suggestScrollState = rememberScrollState()
+
+        val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val searchBarRowHeight = 48.dp
+        val sourceBarHeight = if (!showSuggestPage.value && sourceTabs.value.isNotEmpty()) 34.dp else 0.dp
+        val totalTopBarHeight = statusBarHeight + searchBarRowHeight + sourceBarHeight
+        val filterTopOffset = statusBarHeight + searchBarRowHeight
+
+        // 滚动感知：当建议页或结果页产生滑动偏移时，激活动态毛玻璃
+        val isScrolled by remember {
+            derivedStateOf {
+                if (showSuggestPage.value) {
+                    if (inputText.value.isNotBlank()) {
+                        suggestListState.firstVisibleItemIndex > 0 || suggestListState.firstVisibleItemScrollOffset > 4
+                    } else {
+                        suggestScrollState.value > 4
+                    }
+                } else {
+                    resultListState.firstVisibleItemIndex > 0 || resultListState.firstVisibleItemScrollOffset > 4
+                }
+            }
+        }
+
+        val blurAlpha by animateFloatAsState(
+            targetValue = if (isScrolled) 1f else 0f,
+            animationSpec = tween(durationMillis = 220),
+            label = "search_top_blur_alpha"
+        )
+
+        val isAnyDropdownOpen = isFilterExpandedState.value || isSourceTabsExpanded.value
+        val topBarBgColor by androidx.compose.animation.animateColorAsState(
+            targetValue = when {
+                isAnyDropdownOpen -> colorScheme.surface
+                isScrolled -> colorScheme.surface.copy(alpha = (if (isDark) 0.82f else 0.86f) * blurAlpha)
+                else -> Color.Transparent
+            },
+            animationSpec = tween(durationMillis = 200),
+            label = "top_bar_bg_color"
+        )
+        val isBackdropActive = !isAnyDropdownOpen && isScrolled && isRenderEffectSupported()
+
+        var showClearConfirmDialog by remember { mutableStateOf(false) }
+        var isHistoryDeleteMode by remember { mutableStateOf(false) }
+        var isHistoryCollapsed by remember { mutableStateOf(false) }
+
+        Box(
             Modifier
                 .fillMaxSize()
                 .background(colorScheme.background)
         ) {
-            // M3 Expressive 顶栏容器 (覆盖状态栏 + 搜索栏，背景统一为 surface 与首页顶栏/下拉面板完全一致)
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = colorScheme.surface,
-                shadowElevation = if (showSuggestPage.value) 0.dp else 1.dp
+            // 1. 底层：穿顶全屏内容层 (layerBackdrop 注册给 backdrop, 供顶栏采样真实模糊)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(backdrop)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // 独立返回按钮 (若在结果页按返回则退回搜索建议/历史页，若已在建议页则退出 Activity)
-                    IconButton(
-                        onClick = {
-                            if (!showSuggestPage.value) {
-                                showSuggestPage.value = true
-                                initHistorySearch()
-                            } else {
-                                finish()
-                            }
-                        },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                    Icon(
-                        painterResource(R.drawable.ic_arrow_back),
-                        contentDescription = "返回",
-                        tint = colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                Spacer(Modifier.width(4.dp))
-
-                // 搜索胶囊主容器 (36dp 高度，18dp 圆角 / percent = 50，复用首页 surfaceContainerHigh)
-                Surface(
-                    shape = RoundedCornerShape(percent = 50),
-                    color = colorScheme.surfaceContainerHigh,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(start = 12.dp, end = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_search_18),
-                            contentDescription = null,
-                            tint = colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
-
-                        Spacer(Modifier.width(6.dp))
-
-                        BasicTextField(
-                            value = inputText.value,
-                            onValueChange = { newText ->
-                                inputText.value = newText
-                                if (newText.isEmpty()) {
-                                    suggestWords.value = emptyList()
-                                    showSuggestPage.value = true
-                                } else {
-                                    getSuggest(newText)
-                                }
-                            },
-                            singleLine = true,
-                            textStyle = TextStyle(
-                                color = colorScheme.onSurface,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Normal
-                            ),
-                            cursorBrush = SolidColor(colorScheme.primary),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = { search(inputText.value) }),
-                            modifier = Modifier
-                                .weight(1f)
-                                .focusRequester(focusRequester),
-                            decorationBox = { innerTextField ->
-                                Box(contentAlignment = Alignment.CenterStart) {
-                                    if (inputText.value.isEmpty()) {
-                                        Text(
-                                            "搜索电影、电视剧、综艺…",
-                                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                                            fontSize = 13.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            }
-                        )
-
-                        // 清空按钮
-                        if (inputText.value.isNotEmpty()) {
-                            IconButton(
-                                onClick = {
-                                    inputText.value = ""
-                                    suggestWords.value = emptyList()
-                                    showSuggestPage.value = true
-                                    initHistorySearch()
-                                },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    painterResource(R.drawable.ic_clear),
-                                    contentDescription = "清空输入",
-                                    tint = colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-
-                        // 搜索按钮
-                        IconButton(
-                            onClick = { search(inputText.value) },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.ic_search_18),
-                                contentDescription = "搜索",
-                                tint = colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                // 右侧搜索源筛选按钮 (36dp 圆形，与首页完全一致的变色与状态指示)
-                val isFilterOpen = isFilterExpandedState.value
-                val isFilterActive = checkedKeysState.value.size < allSearchableSources.size && checkedKeysState.value.isNotEmpty()
-
-                val btnBg = if (isFilterOpen) {
-                    colorScheme.primary
-                } else if (isFilterActive) {
-                    colorScheme.primaryContainer
-                } else {
-                    colorScheme.surfaceContainerHigh
-                }
-
-                val iconTint = if (isFilterOpen) {
-                    colorScheme.onPrimary
-                } else if (isFilterActive) {
-                    colorScheme.onPrimaryContainer
-                } else {
-                    colorScheme.onSurface
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(btnBg)
-                        .clickable {
-                            if (isFilterOpen) {
-                                closeFilterAndApply()
-                            } else {
-                                isFilterExpandedState.value = true
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painterResource(R.drawable.ic_filter_list),
-                        contentDescription = "搜索源配置",
-                        tint = iconTint,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    if (isFilterActive && !isFilterOpen) {
-                        Box(
-                            Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(top = 4.dp, end = 4.dp)
-                                .size(6.dp)
-                                .background(colorScheme.primary, CircleShape)
-                        )
-                    }
-                }
-            }
-            }
-
-            var showClearConfirmDialog by remember { mutableStateOf(false) }
-            var isHistoryDeleteMode by remember { mutableStateOf(false) }
-            var isHistoryCollapsed by remember { mutableStateOf(false) }
-
-            Box(Modifier.fillMaxSize()) {
-                // 1. 底层主体: 联想历史页 or 结果页
                 if (showSuggestPage.value) {
                     SuggestPage(
+                        topBarHeight = totalTopBarHeight,
+                        listState = suggestListState,
+                        scrollState = suggestScrollState,
                         isHistoryCollapsed = isHistoryCollapsed,
                         onToggleHistoryCollapsed = { isHistoryCollapsed = !isHistoryCollapsed },
                         isHistoryDeleteMode = isHistoryDeleteMode,
@@ -788,62 +670,323 @@ class FastSearchActivity : BaseActivity() {
                         onShowClearConfirm = { showClearConfirmDialog = true }
                     )
                 } else {
-                    ResultPage()
-                }
-
-                // 2. 中层遮罩: 筛选面板展开时柔和渐变暗色遮罩
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = isFilterExpandedState.value,
-                    enter = fadeIn(tween(200)),
-                    exit = fadeOut(tween(180))
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(colorScheme.scrim.copy(alpha = 0.28f))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                closeFilterAndApply()
-                            }
+                    ResultPage(
+                        topBarHeight = totalTopBarHeight,
+                        listState = resultListState
                     )
                 }
+            }
 
-                // 3. 顶层: 顶部向下平滑展开的搜索源配置面板 (M3 Expressive 风格)
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = isFilterExpandedState.value,
-                    enter = expandVertically(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    ) + fadeIn(tween(180)),
-                    exit = shrinkVertically(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    ) + fadeOut(tween(150))
-                ) {
-                    SearchSourceFilterPanel(
-                        allSources = allSearchableSources,
-                        checkedKeys = checkedKeysState.value,
-                        onToggleKey = { key ->
-                            val cur = checkedKeysState.value
-                            checkedKeysState.value = if (cur.contains(key)) cur - key else cur + key
-                        },
-                        onSelectAll = {
-                            checkedKeysState.value = allSearchableSources.map { it.key }.toSet()
-                        },
-                        onClearAll = {
-                            checkedKeysState.value = emptySet()
-                        },
-                        onClose = {
+            // 2. 遮罩层 1: 搜索源分类展开时的柔和半透明遮罩
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isSourceTabsExpanded.value,
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(180))
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(colorScheme.scrim.copy(alpha = 0.28f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            isSourceTabsExpanded.value = false
+                        }
+                )
+            }
+
+            // 3. 遮罩层 2: 搜索源配置面板展开时柔和渐变暗色遮罩
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isFilterExpandedState.value,
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(180))
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(colorScheme.scrim.copy(alpha = 0.28f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
                             closeFilterAndApply()
                         }
+                )
+            }
+
+            // 4. 顶层悬浮一体化动态毛玻璃顶栏 (状态栏 + 搜索栏 + 搜索源栏)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {} // 防穿透点击
+                    .then(
+                        if (isBackdropActive) {
+                            Modifier.drawBackdrop(
+                                backdrop = backdrop,
+                                shape = { RectangleShape },
+                                effects = {
+                                    vibrancy()
+                                    blur(20f.dp.toPx() * blurAlpha)
+                                },
+                                highlight = null,
+                                shadow = null,
+                                onDrawSurface = {
+                                    drawRect(topBarBgColor)
+                                }
+                            )
+                        } else {
+                            Modifier.background(topBarBgColor)
+                        }
                     )
+            ) {
+                Column(Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+
+                    // 搜索输入栏行 (48dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 独立返回按钮 (若在结果页按返回则退回搜索建议/历史页，若已在建议页则退出 Activity)
+                        IconButton(
+                            onClick = {
+                                if (!showSuggestPage.value) {
+                                    showSuggestPage.value = true
+                                    initHistorySearch()
+                                } else {
+                                    finish()
+                                }
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_arrow_back),
+                                contentDescription = "返回",
+                                tint = colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Spacer(Modifier.width(4.dp))
+
+                        // 搜索胶囊主容器 (36dp 高度，18dp 圆角 / percent = 50，复用首页 surfaceContainerHigh)
+                        Surface(
+                            shape = RoundedCornerShape(percent = 50),
+                            color = colorScheme.surfaceContainerHigh,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(start = 12.dp, end = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painterResource(R.drawable.ic_search_18),
+                                    contentDescription = null,
+                                    tint = colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+
+                                Spacer(Modifier.width(6.dp))
+
+                                BasicTextField(
+                                    value = inputText.value,
+                                    onValueChange = { newText ->
+                                        inputText.value = newText
+                                        if (newText.isEmpty()) {
+                                            suggestWords.value = emptyList()
+                                            showSuggestPage.value = true
+                                        } else {
+                                            getSuggest(newText)
+                                        }
+                                    },
+                                    singleLine = true,
+                                    textStyle = TextStyle(
+                                        color = colorScheme.onSurface,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Normal
+                                    ),
+                                    cursorBrush = SolidColor(colorScheme.primary),
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                    keyboardActions = KeyboardActions(onSearch = { search(inputText.value) }),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .focusRequester(focusRequester),
+                                    decorationBox = { innerTextField ->
+                                        Box(contentAlignment = Alignment.CenterStart) {
+                                            if (inputText.value.isEmpty()) {
+                                                Text(
+                                                    "搜索电影、电视剧、综艺…",
+                                                    color = colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                                                    fontSize = 13.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                    }
+                                )
+
+                                // 清空按钮
+                                if (inputText.value.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = {
+                                            inputText.value = ""
+                                            suggestWords.value = emptyList()
+                                            showSuggestPage.value = true
+                                            initHistorySearch()
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            painterResource(R.drawable.ic_clear),
+                                            contentDescription = "清空输入",
+                                            tint = colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+
+                                // 搜索按钮
+                                IconButton(
+                                    onClick = { search(inputText.value) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_search_18),
+                                        contentDescription = "搜索",
+                                        tint = colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.width(8.dp))
+
+                        // 右侧搜索源筛选按钮 (36dp 圆形，与首页完全一致的变色与状态指示)
+                        val isFilterOpen = isFilterExpandedState.value
+                        val isFilterActive = checkedKeysState.value.size < allSearchableSources.size && checkedKeysState.value.isNotEmpty()
+
+                        val btnBg = if (isFilterOpen) {
+                            colorScheme.primary
+                        } else if (isFilterActive) {
+                            colorScheme.primaryContainer
+                        } else {
+                            colorScheme.surfaceContainerHigh
+                        }
+
+                        val iconTint = if (isFilterOpen) {
+                            colorScheme.onPrimary
+                        } else if (isFilterActive) {
+                            colorScheme.onPrimaryContainer
+                        } else {
+                            colorScheme.onSurface
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(btnBg)
+                                .clickable {
+                                    if (isFilterOpen) {
+                                        closeFilterAndApply()
+                                    } else {
+                                        isFilterExpandedState.value = true
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_filter_list),
+                                contentDescription = "搜索源配置",
+                                tint = iconTint,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            if (isFilterActive && !isFilterOpen) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 4.dp, end = 4.dp)
+                                        .size(6.dp)
+                                        .background(colorScheme.primary, CircleShape)
+                                )
+                            }
+                        }
+                    }
+
+                    // 搜索源栏 (HomeCategoryBar): 仅在结果页且有搜索源时显示
+                    if (!showSuggestPage.value && sourceTabs.value.isNotEmpty()) {
+                        val tabNames = sourceTabs.value.map { it.first }
+                        val currentTabIdx = sourceTabs.value.indexOfFirst { it.second == selectedTabKey.value }.coerceAtLeast(0)
+                        HomeCategoryBar(
+                            categories = tabNames,
+                            selectedIndex = currentTabIdx,
+                            onTabSelected = { idx ->
+                                if (idx in sourceTabs.value.indices) {
+                                    val item = sourceTabs.value[idx]
+                                    selectedTabKey.value = item.second
+                                    searchFilterKey = item.second
+                                    coroutineScope.launch {
+                                        try { resultListState.scrollToItem(0) } catch (_: Throwable) {}
+                                    }
+                                }
+                            },
+                            isExpanded = isSourceTabsExpanded.value,
+                            onExpandChanged = { isSourceTabsExpanded.value = it }
+                        )
+                    }
                 }
+            }
+
+            // 5. 顶部向下平滑展开的搜索源配置面板 (M3 Expressive 风格)
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isFilterExpandedState.value,
+                enter = expandVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                ) + fadeIn(tween(180)),
+                exit = shrinkVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                ) + fadeOut(tween(150)),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = filterTopOffset)
+            ) {
+                SearchSourceFilterPanel(
+                    allSources = allSearchableSources,
+                    checkedKeys = checkedKeysState.value,
+                    onToggleKey = { key ->
+                        val cur = checkedKeysState.value
+                        checkedKeysState.value = if (cur.contains(key)) cur - key else cur + key
+                    },
+                    onSelectAll = {
+                        checkedKeysState.value = allSearchableSources.map { it.key }.toSet()
+                    },
+                    onClearAll = {
+                        checkedKeysState.value = emptySet()
+                    },
+                    onClose = {
+                        closeFilterAndApply()
+                    }
+                )
             }
 
             // 清空搜索历史二次确认弹窗 (Material 3 Expressive 危险弹窗)
@@ -993,6 +1136,9 @@ class FastSearchActivity : BaseActivity() {
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     @Composable
     private fun SuggestPage(
+        topBarHeight: androidx.compose.ui.unit.Dp,
+        listState: LazyListState,
+        scrollState: ScrollState,
         isHistoryCollapsed: Boolean,
         onToggleHistoryCollapsed: () -> Unit,
         isHistoryDeleteMode: Boolean,
@@ -1007,9 +1153,9 @@ class FastSearchActivity : BaseActivity() {
             // 输入关键词时：隐藏搜索历史和热搜，仅展示实时联想词；若联想词为空则保持页面干净留白
             if (suggestions.isNotEmpty()) {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = topBarHeight + 6.dp, bottom = 20.dp)
                 ) {
                     itemsIndexed(suggestions) { _, suggest ->
                         Row(
@@ -1050,9 +1196,10 @@ class FastSearchActivity : BaseActivity() {
             Column(
                 Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp)
             ) {
+                Spacer(Modifier.height(topBarHeight + 8.dp))
                 if (historyWords.value.isNotEmpty()) {
                     // 搜索历史标题行
                     Row(
@@ -1289,81 +1436,204 @@ class FastSearchActivity : BaseActivity() {
         }
     }
 
-    /** 结果页: 顶部筛选栏(样式与首页分类栏一致，带独立平滑指示器与悬浮下拉筛选，不挤压内容) + 自适应多列卡片网格 */
+    /** 结果页: 穿顶全屏内容区 + M3 Expressive 图文横向卡片列表 */
     @Composable
-    private fun ResultPage() {
-        Box(Modifier.fillMaxSize()) {
-            // 1. 底层: 结果内容区 (顶部留出 38dp 给分类栏常态让位)
-            Column(Modifier.fillMaxSize()) {
-                if (sourceTabs.value.isNotEmpty()) {
-                    Spacer(Modifier.height(38.dp))
+    private fun ResultPage(
+        topBarHeight: androidx.compose.ui.unit.Dp,
+        listState: LazyListState
+    ) {
+        when {
+            loadState.value == 1 && displayed().isEmpty() -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = topBarHeight)
+                ) {
+                    SearchLoadingHint()
                 }
-                when {
-                    loadState.value == 1 && displayed().isEmpty() -> SearchLoadingHint()
-                    loadState.value == 3 && displayed().isEmpty() -> SearchEmptyHint()
-                    else -> {
-                        val list = displayed()
-                        LazyVerticalGrid(
-                            columns = GridCells.Adaptive(minSize = 105.dp),
-                            contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(list) { video ->
-                                val sourceName = try {
-                                    ApiConfig.get().getSource(video.sourceKey)?.name ?: ""
-                                } catch (_: Exception) { "" }
-                                VodCardItem(
-                                    card = VodCard(
-                                        key = video.id ?: "",
-                                        name = video.name ?: "",
-                                        pic = video.pic ?: "",
-                                        badge = sourceName,
-                                        note = video.note
-                                    ),
-                                    onClick = { openVideo(video) }
-                                )
-                            }
-                        }
+            }
+            loadState.value == 3 && displayed().isEmpty() -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = topBarHeight)
+                ) {
+                    SearchEmptyHint()
+                }
+            }
+            else -> {
+                val list = displayed()
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = topBarHeight + 8.dp, bottom = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(list) { video ->
+                        SearchResultItem(
+                            video = video,
+                            onClick = { openVideo(video) }
+                        )
                     }
                 }
             }
+        }
+    }
 
-            // 2. 中层: 分类展开时的半透明遮罩 (点击可直接收起展开菜单)
-            androidx.compose.animation.AnimatedVisibility(
-                visible = isSourceTabsExpanded.value,
-                enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(240)),
-                exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200))
+    /** M3 Expressive 图文搜索卡片: 左侧海报(含来源与更新集数) + 右侧自适应信息(标题、年份/类型/国家/语言、主演) */
+    @Composable
+    private fun SearchResultItem(
+        video: Movie.Video,
+        onClick: () -> Unit
+    ) {
+        val interactionSource = remember { MutableInteractionSource() }
+        val isPressed by interactionSource.collectIsPressedAsState()
+        val scale by animateFloatAsState(
+            targetValue = if (isPressed) 0.98f else 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            ),
+            label = "search_item_scale"
+        )
+
+        Surface(
+            onClick = onClick,
+            interactionSource = interactionSource,
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                },
+            shape = RoundedCornerShape(16.dp),
+            color = colorScheme.surfaceContainerLow,
+            tonalElevation = 1.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // 左侧海报区: 固定宽 85dp，纵横比 3:4 (高度约 113dp)
                 Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(colorScheme.scrim.copy(alpha = 0.28f))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { isSourceTabsExpanded.value = false }
-                )
-            }
+                    modifier = Modifier
+                        .width(85.dp)
+                        .aspectRatio(0.75f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colorScheme.surfaceContainer)
+                ) {
+                    PosterImage(
+                        url = video.pic ?: "",
+                        modifier = Modifier.fillMaxSize()
+                    )
 
-            // 3. 顶层: 悬浮的分类栏 (展开时自然向下悬浮延展，不挤压内容区)
-            if (sourceTabs.value.isNotEmpty()) {
-                val tabNames = sourceTabs.value.map { it.first }
-                val currentTabIdx = sourceTabs.value.indexOfFirst { it.second == selectedTabKey.value }.coerceAtLeast(0)
-                HomeCategoryBar(
-                    categories = tabNames,
-                    selectedIndex = currentTabIdx,
-                    onTabSelected = { idx ->
-                        if (idx in sourceTabs.value.indices) {
-                            val item = sourceTabs.value[idx]
-                            selectedTabKey.value = item.second
-                            searchFilterKey = item.second
+                    // 来源标签 (左上角)
+                    val sourceName = try {
+                        ApiConfig.get().getSource(video.sourceKey)?.name ?: ""
+                    } catch (_: Exception) { "" }
+                    if (sourceName.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = colorScheme.secondaryContainer.copy(alpha = 0.9f),
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(5.dp)
+                        ) {
+                            Text(
+                                text = sourceName,
+                                color = colorScheme.onSecondaryContainer,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
                         }
-                    },
-                    isExpanded = isSourceTabsExpanded.value,
-                    onExpandChanged = { isSourceTabsExpanded.value = it }
-                )
+                    }
+
+                    // 更新集数 / 状态备注 (右下角微磨砂渐变胶囊)
+                    if (!video.note.isNullOrEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(5.dp)
+                                .widthIn(max = 75.dp)
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color(0x99000000), Color(0xCC000000))
+                                    ),
+                                    RoundedCornerShape(5.dp)
+                                )
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = video.note,
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.width(12.dp))
+
+                // 右侧信息区: 高度 113dp 与海报高度对齐，垂直两端均分 (Arrangement.SpaceBetween)
+                Column(
+                    modifier = Modifier
+                        .height(113.dp)
+                        .weight(1f),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // 1. 顶部: 加粗影片名称 (最多2行)
+                    Text(
+                        text = video.name ?: "",
+                        color = colorScheme.onSurface,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 20.sp
+                    )
+
+                    // 2. 中间: 年份 · 类型 · 国家 · 语言 (自动过滤缺失项)
+                    val metaInfo = remember(video) {
+                        listOfNotNull(
+                            if (video.year > 0) video.year.toString() else null,
+                            video.type?.takeIf { it.isNotBlank() },
+                            video.area?.takeIf { it.isNotBlank() },
+                            video.lang?.takeIf { it.isNotBlank() }
+                        ).joinToString(" · ")
+                    }
+                    if (metaInfo.isNotEmpty()) {
+                        Text(
+                            text = metaInfo,
+                            color = colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    // 3. 底部: 主演 (不带前缀，最多2行)
+                    val actors = video.actor?.trim()
+                    if (!actors.isNullOrEmpty()) {
+                        Text(
+                            text = actors,
+                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                            fontSize = 12.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 16.sp
+                        )
+                    } else {
+                        Spacer(Modifier.height(0.dp))
+                    }
+                }
             }
         }
     }
