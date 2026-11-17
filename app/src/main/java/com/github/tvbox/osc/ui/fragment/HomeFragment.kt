@@ -880,7 +880,7 @@ class HomeFragment : Fragment() {
                                 stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
                             )
                         ) + fadeOut(tween(150)),
-                        modifier = Modifier.padding(top = 38.dp)
+                        modifier = Modifier.padding(top = 34.dp)
                     ) {
                         val curSort = mDisplaySortList.getOrNull(selectedTabState.intValue)
                         if (curSort != null && !curSort.filters.isNullOrEmpty()) {

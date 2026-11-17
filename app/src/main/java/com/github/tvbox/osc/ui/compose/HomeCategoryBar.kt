@@ -162,7 +162,7 @@ fun HomeCategoryBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(38.dp),
+                    .height(34.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val density = LocalDensity.current
@@ -237,7 +237,7 @@ fun HomeCategoryBar(
                 ) {
                     Row(
                         modifier = Modifier
-                            .height(38.dp)
+                            .height(34.dp)
                             .onGloballyPositioned { rowCoordinates = it },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -246,7 +246,7 @@ fun HomeCategoryBar(
                             val isSelected = index == currentActiveTab
                             Text(
                                 text = name,
-                                fontSize = if (isSelected) 18.sp else 15.sp,
+                                fontSize = if (isSelected) 17.sp else 15.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -270,7 +270,7 @@ fun HomeCategoryBar(
                                             onTabSelected(index)
                                         }
                                     }
-                                    .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 4.dp)
+                                    .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
                                     .onGloballyPositioned { coords ->
                                         rowCoordinates?.let { rowCoords ->
                                             if (rowCoords.isAttached && coords.isAttached) {
@@ -285,14 +285,15 @@ fun HomeCategoryBar(
                         Spacer(Modifier.width(4.dp))
                     }
 
-                    // 独立平滑滑动胶囊指示条: 独立于文字下方, 随切换平滑平移与伸缩
+                    // 独立平滑滑动胶囊指示条: 贴合于文字下方 (间距缩小为 2dp~3dp), 随切换平滑平移与伸缩
                     if (targetWidthPx > 0f || currentWidthPx > 0f) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
                                 .offset { IntOffset(currentOffsetPx.roundToInt(), 0) }
+                                .padding(bottom = 1.dp)
                                 .width(with(density) { currentWidthPx.toDp() })
-                                .height(3.dp)
+                                .height(2.5.dp)
                                 .background(
                                     color = MaterialTheme.colorScheme.primary,
                                     shape = RoundedCornerShape(percent = 50)
@@ -307,14 +308,14 @@ fun HomeCategoryBar(
                         onClick = { onExpandChanged(true) },
                         modifier = Modifier
                             .padding(end = 4.dp)
-                            .size(36.dp)
+                            .size(32.dp)
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.ic_arrow_down),
                             contentDescription = "展开分类",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
-                                .size(20.dp)
+                                .size(18.dp)
                                 .rotate(rotationAngle)
                         )
                     }
