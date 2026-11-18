@@ -42,9 +42,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -55,6 +52,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import com.github.tvbox.osc.ui.compose.GroupCard
 import com.github.tvbox.osc.ui.compose.M3ActionsCenterDialog
 import com.github.tvbox.osc.ui.compose.M3ItemAction
+import com.github.tvbox.osc.ui.compose.M3SlidingSegmentedPill
 import com.github.tvbox.osc.ui.compose.MenuRow
 import com.github.tvbox.osc.ui.compose.SectionTitle
 import com.github.tvbox.osc.ui.compose.SwitchRow
@@ -271,28 +269,19 @@ class AppearanceActivity : BaseActivity() {
                         fontSize = 16.sp,
                         modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 10.dp)
                     )
-                    SingleChoiceSegmentedButtonRow(
-                        Modifier
+                    M3SlidingSegmentedPill(
+                        items = THEME_MODES.toList(),
+                        selectedIndex = themeMode,
+                        onItemSelected = { index ->
+                            Hawk.put(HawkConfig.THEME_TAG, index)
+                            Utils.initTheme()
+                            themeMode = index
+                        },
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
-                    ) {
-                        THEME_MODES.forEachIndexed { index, label ->
-                            SegmentedButton(
-                                selected = themeMode == index,
-                                onClick = {
-                                    Hawk.put(HawkConfig.THEME_TAG, index)
-                                    Utils.initTheme()
-                                    themeMode = index
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = THEME_MODES.size
-                                )
-                            ) {
-                                Text(label, fontSize = 13.sp, maxLines = 1)
-                            }
-                        }
-                    }
+                            .padding(horizontal = 14.dp, vertical = 2.dp)
+                    )
+                    Spacer(Modifier.height(4.dp))
                     MenuRow(
                         icon = R.drawable.ic_palette_48,
                         title = "主题颜色",

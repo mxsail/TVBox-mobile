@@ -19,11 +19,14 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -1492,6 +1495,96 @@ fun <T> M3SingleChoiceCenterDialog(
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Text("取消", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Material Design 3 Expressive 浮动药丸滑块分段组件 (Sliding Pill Segmented Buttons)
+ * 外层为 surfaceContainer 浅底微圆角底槽，选中的项目形态为独立全圆角胶囊 (CircleShape / 20.dp)，并在切换时伴随平滑弹簧动效 (Spring Animation)
+ */
+@Composable
+fun M3SlidingSegmentedPill(
+    items: List<String>,
+    selectedIndex: Int,
+    onItemSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    indicatorColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    selectedContentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
+    unselectedContentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+) {
+    val count = items.size
+    if (count == 0) return
+
+    val animatedIndex by animateFloatAsState(
+        targetValue = selectedIndex.coerceIn(0, count - 1).toFloat(),
+        animationSpec = spring(
+            stiffness = Spring.StiffnessMediumLow,
+            dampingRatio = Spring.DampingRatioLowBouncy
+        ),
+        label = "m3_pill_slider_index"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = containerColor,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(48.dp)
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(4.dp)
+        ) {
+            val itemWidth = maxWidth / count
+            val indicatorOffset = itemWidth * animatedIndex
+
+            // 选中的独立全圆角胶囊指示器
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = indicatorColor,
+                shadowElevation = 1.dp,
+                tonalElevation = 2.dp,
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(itemWidth)
+                    .fillMaxHeight()
+            ) {}
+
+            // 文本与点击交互层
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items.forEachIndexed { index, label ->
+                    val isSelected = index == selectedIndex
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                if (index != selectedIndex) {
+                                    onItemSelected(index)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) selectedContentColor else unselectedContentColor,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1
+                        )
                     }
                 }
             }
