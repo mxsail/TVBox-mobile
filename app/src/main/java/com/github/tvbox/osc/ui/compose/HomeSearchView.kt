@@ -501,6 +501,12 @@ fun HomeSearchResultItem(
         label = "home_search_item_scale"
     )
 
+    val sourceName = remember(video.sourceKey) {
+        try {
+            ApiConfig.get().getSource(video.sourceKey)?.name ?: ""
+        } catch (_: Exception) { "" }
+    }
+
     Surface(
         onClick = onClick,
         interactionSource = interactionSource,
@@ -534,9 +540,6 @@ fun HomeSearchResultItem(
                 )
 
                 // 来源标签
-                val sourceName = try {
-                    ApiConfig.get().getSource(video.sourceKey)?.name ?: ""
-                } catch (_: Exception) { "" }
                 if (sourceName.isNotEmpty()) {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
@@ -604,10 +607,10 @@ fun HomeSearchResultItem(
                     lineHeight = 20.sp
                 )
 
-                // 2. 年份 · 类型 · 国家 · 语言
+                // 2. 年份 · 类型 · 国家 · 语言 (带智能优雅降级)
                 val metaInfo = remember(video) {
                     listOfNotNull(
-                        if (video.year > 0) video.year.toString() else null,
+                        if (video.year > 0) "${video.year}" else null,
                         video.type?.takeIf { it.isNotBlank() },
                         video.area?.takeIf { it.isNotBlank() },
                         video.lang?.takeIf { it.isNotBlank() }
@@ -621,21 +624,73 @@ fun HomeSearchResultItem(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                } else {
+                    // 无主要元数据时的备选信息行
+                    val fallbackState = video.state?.takeIf { it.isNotBlank() && it != "0" }
+                    if (fallbackState != null) {
+                        Text(
+                            text = "状态: $fallbackState",
+                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else {
+                        Text(
+                            text = "暂无类别与年份信息",
+                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
-                // 3. 主演
+                // 3. 主演 / 导演 / 点击进入播放源提示
                 val actors = video.actor?.trim()
+                val director = video.director?.trim()
                 if (!actors.isNullOrEmpty()) {
                     Text(
-                        text = actors,
+                        text = "主演: $actors",
                         color = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                         fontSize = 12.sp,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         lineHeight = 16.sp
                     )
+                } else if (!director.isNullOrEmpty()) {
+                    Text(
+                        text = "导演: $director",
+                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 } else {
-                    Spacer(Modifier.height(0.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = colorScheme.surfaceContainerHigh.copy(alpha = 0.8f)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_m3_play_arrow),
+                                contentDescription = null,
+                                tint = colorScheme.primary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "点击查看详情与播放列表",
+                                color = colorScheme.primary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
         }

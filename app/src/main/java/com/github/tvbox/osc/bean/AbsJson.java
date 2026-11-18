@@ -1,8 +1,12 @@
 package com.github.tvbox.osc.bean;
 
+import com.google.gson.annotations.SerializedName;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @author pj567
@@ -13,6 +17,7 @@ public class AbsJson implements Serializable {
 
     public int code;    // : 1
     public String limit;    // : "20"
+    @SerializedName(value = "list", alternate = {"data"})
     public ArrayList<AbsJsonVod> list; // : [{vod_id: 71930, type_id: 22, type_id_1: 20, group_id: 0, vod_name: "意式情歌",…},…]
     public String msg;  // : "数据列表"
     public int page;    // : "2"
@@ -22,20 +27,28 @@ public class AbsJson implements Serializable {
 
     public class AbsJsonVod implements Serializable {
         public int group_id; //: 0
+        @SerializedName(value = "type_id", alternate = {"tid"})
         public int type_id; //: 32
         public int type_id_1; //: 31
+        @SerializedName(value = "type_name", alternate = {"type", "typeName", "vod_type", "type_id_name"})
         public String type_name; //: "国产剧"
+        @SerializedName(value = "vod_actor", alternate = {"actor", "actors"})
         public String vod_actor; //: "黄小戈,赵旭东,时男,傅隽,张佳琳"
+        @SerializedName(value = "vod_area", alternate = {"area"})
         public String vod_area; //: "中国大陆"
         public String vod_author; //: ""
         public String vod_behind; //: ""
+        @SerializedName(value = "vod_blurb", alternate = {"blurb"})
         public String vod_blurb; //: "本剧通过讲述咸鱼馆神秘店主灵叔以咸鱼和rose为主角虚构的十六种不同人生故事，展现了在不同故事中的咸鱼和rose犹如千千万万生活在世界上的青年男女一样，拥有着不同的性格和不同背景，怀揣着不同梦想和欲望"
         public String vod_class; //: "剧情,爱情,科幻,悬疑,惊悚,国产剧"
         public String vod_color; //: ""
+        @SerializedName(value = "vod_content", alternate = {"content", "desc", "description"})
         public String vod_content; //: "<p>本剧通过讲述咸鱼馆神秘店主灵叔以咸鱼和rose为主角虚构的十六种不同人生故事，展现了在不同故事中的咸鱼和rose犹如千千万万生活在世界上的青年男女一样，拥有着不同的性格和不同背景，怀揣着不同梦想和欲望，在充满机遇挑战又布满荆棘的人生旅途中，积极面对人生困惑，努力走出困惑和绝境的故事。十六个小故事有神奇，有烦恼，有笑声，有感动，对爱情的向外，对亲情的追忆，对人生的徘徊，对未来的恐惧，构成了一幅咸鱼和rose生命多种可能性的美丽画卷，犹如人生百味，柴米油盐酱醋茶，酸甜苦辣咸，喜怒哀乐怨。人生总是在希望中面临困惑走向绝望，又从绝望中坚强不息走向希望，故事中咸鱼和rose心底善良，拼搏向上，于人生困境中搏出一片青天，体验了生命的各种美好，传递了人生应该坚持希望，积极向上拥抱美好的乐观精神，表达了生命不止，自强不息的内涵思想。</p>"
         public String vod_copyright; //: 0
+        @SerializedName(value = "vod_director", alternate = {"director", "directors"})
         public String vod_director; //: "王凯阳,Kaiyang,Wang"
         public String vod_douban_id; //: 35373052
+        @SerializedName(value = "vod_douban_score", alternate = {"score", "douban_score"})
         public String vod_douban_score; //: "4.4"
         public String vod_down; //: 0
         public String vod_down_from; //: ""
@@ -48,14 +61,18 @@ public class AbsJson implements Serializable {
         public String vod_hits_day; //: 0
         public String vod_hits_month; //: 0
         public String vod_hits_week; //: 0
+        @SerializedName(value = "vod_id", alternate = {"id"})
         public String vod_id; //: 71989
         public String vod_isend; //: 0
         public String vod_jumpurl; //: ""
+        @SerializedName(value = "vod_lang", alternate = {"lang"})
         public String vod_lang; //: "汉语普通话"
         public String vod_letter; //: "X"
         public String vod_level; //: 0
         public String vod_lock; //: 0
+        @SerializedName(value = "vod_name", alternate = {"name", "title"})
         public String vod_name; //: "咸鱼先生，Rose小姐之彗星来了"
+        @SerializedName(value = "vod_pic", alternate = {"pic", "pic_url", "picture"})
         public String vod_pic; //: "https://img.52swat.cn/upload/vod/20210410-1/c8a9342fff893c85e4a255da90fdbe3f.jpg"
         public String vod_pic_screenshot; //: null
         public String vod_pic_slide; //: ""
@@ -79,6 +96,7 @@ public class AbsJson implements Serializable {
         public String vod_pwd_url; //: ""
         public String vod_rel_art; //: ""
         public String vod_rel_vod; //: ""
+        @SerializedName(value = "vod_remarks", alternate = {"remarks", "note"})
         public String vod_remarks; //: "共30集,更新至12集"
         public String vod_reurl; //: ""
         public String vod_score; //: "4.4"
@@ -88,6 +106,7 @@ public class AbsJson implements Serializable {
         public String vod_state; //: ""
         public String vod_status; //: 1
         public String vod_sub; //: "Mr.Salted Fish Miss Ross 2,咸鱼先生，Rose小姐 第二季,咸鱼先生，Rose小姐之彗星来了"
+        @SerializedName(value = "vod_tag", alternate = {"tag"})
         public String vod_tag; //: ""
         public String vod_time; //: "2021-04-12 19:13:27"
         public String vod_time_add; //: 1618053726
@@ -103,6 +122,7 @@ public class AbsJson implements Serializable {
         public String vod_version; //: ""
         public String vod_weekday; //: ""
         public String vod_writer; //: "周炎青,刘恒,支雅雪,孙露军,李璐,王梦璇"
+        @SerializedName(value = "vod_year", alternate = {"year"})
         public String vod_year; //: "2021"
 
         public Movie.Video toXmlVideo() {
@@ -117,15 +137,24 @@ public class AbsJson implements Serializable {
             video.pic = vod_pic;
             video.lang = vod_lang;
             video.area = vod_area;
-            try {
-                video.year = Integer.parseInt(vod_year);
-            } catch (Throwable th) {
+            if (vod_year != null && !vod_year.isEmpty()) {
+                try {
+                    Matcher m = Pattern.compile("(?:19|20)\\d{2}").matcher(vod_year);
+                    if (m.find()) {
+                        video.year = Integer.parseInt(m.group());
+                    } else {
+                        video.year = Integer.parseInt(vod_year.trim());
+                    }
+                } catch (Throwable th) {
+                    video.year = 0;
+                }
+            } else {
                 video.year = 0;
             }
             video.state = vod_state;
             video.note = vod_remarks;
-            video.actor = vod_actor;
-            video.director = vod_director;
+            video.actor = vod_actor != null ? vod_actor.replace("&nbsp;", " ").trim() : null;
+            video.director = vod_director != null ? vod_director.replace("&nbsp;", " ").trim() : null;
             Movie.Video.UrlBean urlBean = new Movie.Video.UrlBean();
             if (vod_play_from != null && vod_play_url != null) {
                 String[] playFlags = vod_play_from.split("\\$\\$\\$");
@@ -160,11 +189,15 @@ public class AbsJson implements Serializable {
         }
         movie.recordcount = total;
         List<Movie.Video> videoList = new ArrayList<>();
-        for (AbsJsonVod vod : list) {
-            try {
-                videoList.add(vod.toXmlVideo());
-            } catch (Throwable th) {
-                movie.pagesize = 0;
+        if (list != null) {
+            for (AbsJsonVod vod : list) {
+                if (vod != null) {
+                    try {
+                        videoList.add(vod.toXmlVideo());
+                    } catch (Throwable th) {
+                        th.printStackTrace();
+                    }
+                }
             }
         }
         movie.videoList = videoList;
