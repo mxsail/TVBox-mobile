@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -92,11 +93,12 @@ fun LastViewedTip(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .widthIn(max = 480.dp)
+                    .widthIn(max = 440.dp)
+                    .height(36.dp)
                     .materialGlass(
                         material = material,
                         backdrop = backdrop,
-                        shape = RoundedCornerShape(22.dp)
+                        shape = RoundedCornerShape(18.dp)
                     )
                     .onGloballyPositioned { coords ->
                         val b = coords.boundsInWindow()
@@ -113,54 +115,56 @@ fun LastViewedTip(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) { onOpen(vod) }
-                    .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
+                    .padding(start = 12.dp, end = 5.dp)
             ) {
                 // 左侧历史图标
                 Icon(
                     painter = painterResource(R.drawable.ic_history_18),
                     contentDescription = null,
                     tint = colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(15.dp)
                 )
 
                 // 片名与进度文案
                 Text(
                     text = vod.name + (vod.note?.let { " $it" } ?: ""),
                     color = colorScheme.onSurface,
-                    fontSize = 13.sp,
+                    fontSize = 12.5.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .weight(1f, fill = false)
-                        .padding(start = 8.dp, end = 10.dp)
+                        .padding(start = 6.dp, end = 8.dp)
                 )
 
                 // 右侧「继续播放」高亮行动按钮
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(13.dp),
                     color = colorScheme.primary,
                     contentColor = colorScheme.onPrimary,
-                    modifier = Modifier.clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { onOpen(vod) }
+                    modifier = Modifier
+                        .height(26.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onOpen(vod) }
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 9.dp)
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.ic_play),
                             contentDescription = null,
                             tint = colorScheme.onPrimary,
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(11.dp)
                         )
                         Spacer(Modifier.width(3.dp))
                         Text(
                             text = "继续播放",
                             color = colorScheme.onPrimary,
-                            fontSize = 12.sp,
+                            fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
