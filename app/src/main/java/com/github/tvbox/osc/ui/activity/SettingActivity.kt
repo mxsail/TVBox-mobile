@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -231,130 +233,141 @@ class SettingActivity : BaseActivity() {
                     .fillMaxSize()
                     .verticalScroll(scrollState)
                     .layerBackdrop(backdrop)
-                    .padding(horizontal = 14.dp)
+                    .padding(horizontal = 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(Modifier.height(topBarPadding + 8.dp))
-                GroupCard {
-                    MenuRow(R.drawable.ic_palette_48, "外观设置", appearanceValue) { openAppearance() }
-                    MenuRow(R.drawable.ic_home, "主页内容", homeRecValue) {
-                        showM3Select("主页内容显示", listOf("豆瓣热播", "站点推荐", "关闭"), Hawk.get(HawkConfig.HOME_REC, 0)) { pos ->
-                            Hawk.put(HawkConfig.HOME_REC, pos)
-                            homeRecValue = homeRecName(pos)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 680.dp)
+                ) {
+                    SectionTitle("常规")
+                    GroupCard {
+                        MenuRow(R.drawable.ic_palette_48, "外观设置", appearanceValue, showDivider = true) { openAppearance() }
+                        MenuRow(R.drawable.ic_home, "主页内容", homeRecValue, showDivider = true) {
+                            showM3Select("主页内容显示", listOf("豆瓣热播", "站点推荐", "关闭"), Hawk.get(HawkConfig.HOME_REC, 0)) { pos ->
+                                Hawk.put(HawkConfig.HOME_REC, pos)
+                                homeRecValue = homeRecName(pos)
+                            }
+                        }
+                        SwitchRow(R.drawable.ic_incognito_48, "无痕浏览", privateBrowsing, showDivider = false) { newValue ->
+                            privateBrowsing = newValue
+                            Hawk.put(HawkConfig.PRIVATE_BROWSING, newValue)
                         }
                     }
-                    SwitchRow(R.drawable.ic_incognito_48, "无痕浏览", privateBrowsing) { newValue ->
-                        privateBrowsing = newValue
-                        Hawk.put(HawkConfig.PRIVATE_BROWSING, newValue)
-                    }
-                }
 
-                Spacer(Modifier.height(14.dp))
-                GroupCard {
-                    MenuRow(R.drawable.ic_database_48, "订阅源", subSourceSummaryState.value) {
-                        jumpActivity(SubscriptionActivity::class.java)
+                    Spacer(Modifier.height(10.dp))
+                    SectionTitle("数据源")
+                    GroupCard {
+                        MenuRow(R.drawable.ic_database_48, "订阅源", subSourceSummaryState.value, showDivider = true) {
+                            jumpActivity(SubscriptionActivity::class.java)
+                        }
+                        MenuRow(R.drawable.ic_live_tv_48, "直播源", liveSourceSummaryState.value, showDivider = false) {
+                            jumpActivity(LiveSourceActivity::class.java)
+                        }
                     }
-                    MenuRow(R.drawable.ic_live_tv_48, "直播源", liveSourceSummaryState.value) {
-                        jumpActivity(LiveSourceActivity::class.java)
-                    }
-                }
 
-                Spacer(Modifier.height(14.dp))
-                GroupCard {
-                    MenuRow(R.drawable.ic_m3_play_arrow, "播放器", playValue) {
-                        val players = PlayerHelper.getExistPlayerTypes()
-                        val names = players.map { PlayerHelper.getPlayerName(it) }
-                        val playerType = Hawk.get(HawkConfig.PLAY_TYPE, 0)
-                        var defaultPos = 0
-                        players.indices.forEach { if (players[it] == playerType) defaultPos = it }
-                        showM3Select("请选择默认播放器", names, defaultPos) { pos ->
-                            Hawk.put(HawkConfig.PLAY_TYPE, players[pos])
-                            playValue = PlayerHelper.getPlayerName(players[pos])
-                            PlayerHelper.init()
+                    Spacer(Modifier.height(10.dp))
+                    SectionTitle("播放与下载")
+                    GroupCard {
+                        MenuRow(R.drawable.ic_m3_play_arrow, "播放器", playValue, showDivider = true) {
+                            val players = PlayerHelper.getExistPlayerTypes()
+                            val names = players.map { PlayerHelper.getPlayerName(it) }
+                            val playerType = Hawk.get(HawkConfig.PLAY_TYPE, 0)
+                            var defaultPos = 0
+                            players.indices.forEach { if (players[it] == playerType) defaultPos = it }
+                            showM3Select("请选择默认播放器", names, defaultPos) { pos ->
+                                Hawk.put(HawkConfig.PLAY_TYPE, players[pos])
+                                playValue = PlayerHelper.getPlayerName(players[pos])
+                                PlayerHelper.init()
+                            }
+                        }
+                        SwitchRow(R.drawable.ic_filter_list, "广告过滤", videoPurify, showDivider = true) { newValue ->
+                            videoPurify = newValue
+                            Hawk.put(HawkConfig.VIDEO_PURIFY, newValue)
+                        }
+                        val currentConcurrent = Hawk.get(HawkConfig.DOWNLOAD_MAX_CONCURRENT, 1)
+                        val wifiOnlyDesc = if (Hawk.get(HawkConfig.DOWNLOAD_WIFI_ONLY, false)) " · 仅Wi-Fi" else ""
+                        MenuRow(R.drawable.ic_download_18, "下载设置", "${currentConcurrent}任务并发$wifiOnlyDesc", showDivider = true) {
+                            downloadSettingsSheetVisible = true
+                        }
+                        MenuRow(R.drawable.ic_speed_48, "长按倍速", speedValue, showDivider = true) {
+                            val types = listOf("2.0", "3.0", "4.0", "5.0", "6.0", "8.0", "10.0")
+                            val defaultPos = types.indexOf(Hawk.get(HawkConfig.VIDEO_SPEED, 2.0f).toString())
+                            showM3Select("请选择倍速", types, if (defaultPos < 0) 0 else defaultPos) { pos ->
+                                Hawk.put(HawkConfig.VIDEO_SPEED, types[pos].toFloat())
+                                speedValue = types[pos]
+                            }
+                        }
+                        MenuRow(R.drawable.ic_m3_pip, "后台播放", bgPlayValue, showDivider = true) {
+                            val types = listOf("关闭", "开启", "画中画")
+                            showM3Select("后台播放", types, Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0)) { pos ->
+                                Hawk.put(HawkConfig.BACKGROUND_PLAY_TYPE, pos)
+                                bgPlayValue = types[pos]
+                                com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
+                            }
+                        }
+                        MenuRow(R.drawable.ic_memory_48, "解码方式", ijkCodecValue, showDivider = true) {
+                            val ijkCodes = ApiConfig.get().ijkCodes
+                            if (!ijkCodes.isNullOrEmpty()) {
+                                ijkCodesSheetVisible = true
+                            }
+                        }
+                        MenuRow(R.drawable.ic_material_48, "渲染方式", renderValue, showDivider = true) {
+                            val renderTypes = PlayerHelper.getRenderTypes()
+                            val renderNames = renderTypes.map { PlayerHelper.getRenderName(it) }
+                            val currentRender = Hawk.get(HawkConfig.PLAY_RENDER, PlayerHelper.RENDER_TEXTURE_VIEW)
+                            var defaultPos = renderTypes.indexOf(currentRender)
+                            if (defaultPos < 0) defaultPos = 0
+                            showM3Select("请选择默认渲染方式", renderNames, defaultPos) { pos ->
+                                val selectedType = renderTypes[pos]
+                                Hawk.put(HawkConfig.PLAY_RENDER, selectedType)
+                                renderValue = PlayerHelper.getRenderName(selectedType)
+                                PlayerHelper.init()
+                                com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
+                            }
+                        }
+                        MenuRow(R.drawable.ic_scale_48, "画面缩放", scaleValue, showDivider = false) {
+                            val scales = (0..5).toList()
+                            showM3Select(
+                                "请选择画面缩放",
+                                scales.map { PlayerHelper.getScaleName(it) },
+                                Hawk.get(HawkConfig.PLAY_SCALE, 0)
+                            ) { pos ->
+                                Hawk.put(HawkConfig.PLAY_SCALE, pos)
+                                scaleValue = PlayerHelper.getScaleName(pos)
+                                com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
+                            }
                         }
                     }
-                    SwitchRow(R.drawable.ic_filter_list, "广告过滤", videoPurify) { newValue ->
-                        videoPurify = newValue
-                        Hawk.put(HawkConfig.VIDEO_PURIFY, newValue)
-                    }
-                    val currentConcurrent = Hawk.get(HawkConfig.DOWNLOAD_MAX_CONCURRENT, 1)
-                    val wifiOnlyDesc = if (Hawk.get(HawkConfig.DOWNLOAD_WIFI_ONLY, false)) " · 仅Wi-Fi" else ""
-                    MenuRow(R.drawable.ic_download_18, "下载设置", "${currentConcurrent}任务并发$wifiOnlyDesc") {
-                        downloadSettingsSheetVisible = true
-                    }
-                    MenuRow(R.drawable.ic_speed_48, "长按倍速", speedValue) {
-                        val types = listOf("2.0", "3.0", "4.0", "5.0", "6.0", "8.0", "10.0")
-                        val defaultPos = types.indexOf(Hawk.get(HawkConfig.VIDEO_SPEED, 2.0f).toString())
-                        showM3Select("请选择倍速", types, if (defaultPos < 0) 0 else defaultPos) { pos ->
-                            Hawk.put(HawkConfig.VIDEO_SPEED, types[pos].toFloat())
-                            speedValue = types[pos]
-                        }
-                    }
-                    MenuRow(R.drawable.ic_m3_pip, "后台播放", bgPlayValue) {
-                        val types = listOf("关闭", "开启", "画中画")
-                        showM3Select("后台播放", types, Hawk.get(HawkConfig.BACKGROUND_PLAY_TYPE, 0)) { pos ->
-                            Hawk.put(HawkConfig.BACKGROUND_PLAY_TYPE, pos)
-                            bgPlayValue = types[pos]
-                            com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
-                        }
-                    }
-                    MenuRow(R.drawable.ic_memory_48, "解码方式", ijkCodecValue) {
-                        val ijkCodes = ApiConfig.get().ijkCodes
-                        if (!ijkCodes.isNullOrEmpty()) {
-                            ijkCodesSheetVisible = true
-                        }
-                    }
-                    MenuRow(R.drawable.ic_material_48, "渲染方式", renderValue) {
-                        val renderTypes = PlayerHelper.getRenderTypes()
-                        val renderNames = renderTypes.map { PlayerHelper.getRenderName(it) }
-                        val currentRender = Hawk.get(HawkConfig.PLAY_RENDER, PlayerHelper.RENDER_TEXTURE_VIEW)
-                        var defaultPos = renderTypes.indexOf(currentRender)
-                        if (defaultPos < 0) defaultPos = 0
-                        showM3Select("请选择默认渲染方式", renderNames, defaultPos) { pos ->
-                            val selectedType = renderTypes[pos]
-                            Hawk.put(HawkConfig.PLAY_RENDER, selectedType)
-                            renderValue = PlayerHelper.getRenderName(selectedType)
-                            PlayerHelper.init()
-                            com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
-                        }
-                    }
-                    MenuRow(R.drawable.ic_scale_48, "画面缩放", scaleValue) {
-                        val scales = (0..5).toList()
-                        showM3Select(
-                            "请选择画面缩放",
-                            scales.map { PlayerHelper.getScaleName(it) },
-                            Hawk.get(HawkConfig.PLAY_SCALE, 0)
-                        ) { pos ->
-                            Hawk.put(HawkConfig.PLAY_SCALE, pos)
-                            scaleValue = PlayerHelper.getScaleName(pos)
-                            com.tvbox.sync.adapter.AppRoomSyncAdapter.recordPlayerSettingsUpsert()
-                        }
-                    }
-                }
 
-                Spacer(Modifier.height(14.dp))
-                GroupCard {
-                    MenuRow(R.drawable.ic_backup_48, "备份与恢复", backupSyncSummaryState.value) { openBackupRestore() }
-                    MenuRow(R.drawable.ic_dns_48, "安全DNS", dnsValue) {
-                        val dohUrl = Hawk.get(HawkConfig.DOH_URL, 0)
-                        showM3Select("请选择安全DNS", OkGoHelper.dnsHttpsList, dohUrl) { pos ->
-                            Hawk.put(HawkConfig.DOH_URL, pos)
-                            dnsValue = OkGoHelper.dnsHttpsList[pos]
-                            OkGoHelper.updateDns()
+                    Spacer(Modifier.height(10.dp))
+                    SectionTitle("数据与系统")
+                    GroupCard {
+                        MenuRow(R.drawable.ic_backup_48, "备份与恢复", backupSyncSummaryState.value, showDivider = true) { openBackupRestore() }
+                        MenuRow(R.drawable.ic_dns_48, "安全DNS", dnsValue, showDivider = true) {
+                            val dohUrl = Hawk.get(HawkConfig.DOH_URL, 0)
+                            showM3Select("请选择安全DNS", OkGoHelper.dnsHttpsList, dohUrl) { pos ->
+                                Hawk.put(HawkConfig.DOH_URL, pos)
+                                dnsValue = OkGoHelper.dnsHttpsList[pos]
+                                OkGoHelper.updateDns()
+                            }
                         }
-                    }
-                    MenuRow(R.drawable.ic_history_48, "历史记录", historyValue) {
-                        showM3Select(
-                            "保留历史记录数量",
-                            listOf(0, 1, 2).map { HistoryHelper.getHistoryNumName(it) },
-                            Hawk.get(HawkConfig.HISTORY_NUM, 0)
-                        ) { pos ->
-                            Hawk.put(HawkConfig.HISTORY_NUM, pos)
-                            historyValue = HistoryHelper.getHistoryNumName(pos)
+                        MenuRow(R.drawable.ic_history_48, "历史记录", historyValue, showDivider = true) {
+                            showM3Select(
+                                "保留历史记录数量",
+                                listOf(0, 1, 2).map { HistoryHelper.getHistoryNumName(it) },
+                                Hawk.get(HawkConfig.HISTORY_NUM, 0)
+                            ) { pos ->
+                                Hawk.put(HawkConfig.HISTORY_NUM, pos)
+                                historyValue = HistoryHelper.getHistoryNumName(pos)
+                            }
                         }
+                        MenuRow(R.drawable.ic_clear, "清空缓存", null, showDivider = false) { clearCacheDialogVisible = true }
                     }
-                    MenuRow(R.drawable.ic_clear, "清空缓存", null) { clearCacheDialogVisible = true }
+                    Spacer(Modifier.height(28.dp))
                 }
-                Spacer(Modifier.height(28.dp))
             }
 
             TvBoxTopBar(

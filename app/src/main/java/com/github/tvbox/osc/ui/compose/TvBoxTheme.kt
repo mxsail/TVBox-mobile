@@ -22,8 +22,10 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.offset
@@ -50,6 +52,7 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -559,77 +562,99 @@ fun SectionTitle(text: String) {
     )
 }
 
-/** M3 卡片分组容器(行竖排) - HyperOS 风格 */
+/** M3 Expressive 卡片分组容器 (柔和20dp圆角 + 边界波纹裁剪 + surfaceContainerLow) */
 @Composable
 fun GroupCard(
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable ColumnScope.() -> Unit
 ) {
     val isDark = isAppDarkTheme()
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp)),
         colors = CardDefaults.cardColors(
             containerColor = if (isDark) MaterialTheme.colorScheme.surfaceContainerLow else Color.White
         ),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column { content() }
     }
 }
 
-/** 列表行: 图标+标题+(右侧当前值+chevron), 与 View 版 M3MenuRow 同构 (HyperOS 风格) */
+/** 列表行: M3 Expressive 徽章胶囊风格 (图标微容器 + 标题 + 右侧值 + 可选内缩分割线) */
 @Composable
 fun MenuRow(
     icon: Int,
     title: String,
     value: String? = null,
+    showDivider: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     val isDark = isAppDarkTheme()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = onClick != null) { onClick?.invoke() }
-            .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painterResource(icon),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp)
-        )
-        Text(
-            title,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
             modifier = Modifier
-                .padding(start = 16.dp)
-                .weight(1f)
-        )
-        if (value != null) {
+                .fillMaxWidth()
+                .clickable(enabled = onClick != null) { onClick?.invoke() }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(icon),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(19.dp)
+                )
+            }
             Text(
-                value,
-                color = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF8E8E93),
-                fontSize = 14.sp,
-                maxLines = 1,
-                modifier = Modifier.padding(end = 4.dp)
+                text = title,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .padding(start = 14.dp)
+                    .weight(1f)
             )
+            if (value != null) {
+                Text(
+                    text = value,
+                    color = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF8E8E93),
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .padding(start = 8.dp, end = 4.dp)
+                        .widthIn(max = 160.dp)
+                )
+            }
+            if (onClick != null) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_chevron_right),
+                    contentDescription = null,
+                    tint = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else Color(0xFFC7C7CC),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
-        if (onClick != null) {
-            Icon(
-                painterResource(R.drawable.ic_chevron_right),
-                contentDescription = null,
-                tint = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else Color(0xFFC7C7CC),
-                modifier = Modifier.size(16.dp)
+        if (showDivider) {
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 66.dp, end = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
             )
         }
     }
 }
 
-/** 开关列表行 (HyperOS 风格) */
+/** 开关列表行: M3 Expressive 徽章胶囊风格 */
 @Composable
 fun SwitchRow(
     icon: Int,
@@ -637,45 +662,66 @@ fun SwitchRow(
     checked: Boolean,
     subtitle: String? = null,
     enabled: Boolean = true,
+    showDivider: Boolean = false,
     onToggle: (Boolean) -> Unit
 ) {
     val isDark = isAppDarkTheme()
     val alpha = if (enabled) 1f else 0.42f
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled) { onToggle(!checked) }
-            .padding(start = 16.dp, end = 16.dp, top = if (subtitle != null) 12.dp else 10.dp, bottom = if (subtitle != null) 12.dp else 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painterResource(icon),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
-            modifier = Modifier.size(22.dp)
-        )
-        Column(
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
             modifier = Modifier
-                .padding(start = 16.dp)
-                .weight(1f)
+                .fillMaxWidth()
+                .clickable(enabled = enabled) { onToggle(!checked) }
+                .padding(horizontal = 16.dp, vertical = if (subtitle != null) 10.dp else 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                title,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium
-            )
-            if (subtitle != null) {
-                Text(
-                    subtitle,
-                    color = (if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF8E8E93)).copy(alpha = alpha),
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    modifier = Modifier.padding(top = 2.dp)
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f * alpha)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(icon),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
+                    modifier = Modifier.size(19.dp)
                 )
             }
+            Column(
+                modifier = Modifier
+                    .padding(start = 14.dp)
+                    .weight(1f)
+            ) {
+                Text(
+                    text = title,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        color = (if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF8E8E93)).copy(alpha = alpha),
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+            Switch(
+                checked = checked,
+                enabled = enabled,
+                onCheckedChange = if (enabled) onToggle else null
+            )
         }
-        Switch(checked = checked, enabled = enabled, onCheckedChange = if (enabled) onToggle else null)
+        if (showDivider) {
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 66.dp, end = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+            )
+        }
     }
 }
 

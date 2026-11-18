@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -237,13 +238,19 @@ class AppearanceActivity : BaseActivity() {
                 )
             }
         ) { padding ->
-            Column(
+            Box(
                 modifier = Modifier
-                    .padding(padding)
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 14.dp)
+                    .padding(padding),
+                contentAlignment = Alignment.TopCenter
             ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 680.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
                 SectionTitle("预览")
                 PreviewCard(
                     themeMode = themeMode,
@@ -452,6 +459,7 @@ class AppearanceActivity : BaseActivity() {
                         checked = if (isLiquidMode) true else barFloating,
                         subtitle = if (isLiquidMode) "液态玻璃仅支持悬浮形态" else "开启时为 M3 悬浮胶囊，关闭时为平直贴底栏",
                         enabled = !isLiquidMode,
+                        showDivider = true,
                         onToggle = { newValue ->
                             barFloating = newValue
                             Hawk.put(HawkConfig.BAR_FLOATING, newValue)
@@ -462,6 +470,7 @@ class AppearanceActivity : BaseActivity() {
                         icon = R.drawable.ic_label_48,
                         title = "底栏显示名称",
                         checked = barLabels,
+                        showDivider = true,
                         onToggle = { newValue ->
                             barLabels = newValue
                             Hawk.put(HawkConfig.BAR_SHOW_LABELS, newValue)
@@ -535,6 +544,7 @@ class AppearanceActivity : BaseActivity() {
                         icon = R.drawable.ic_font_48,
                         title = "自定义字体",
                         value = if (fontPath.isEmpty()) "系统默认" else File(fontPath).name,
+                        showDivider = true,
                         onClick = {
                             com.lxj.xpopup.XPopup.Builder(this@AppearanceActivity)
                                 .hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
@@ -570,6 +580,7 @@ class AppearanceActivity : BaseActivity() {
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
     }
 
     private fun pickThemeColor(id: String, update: (String) -> Unit) {

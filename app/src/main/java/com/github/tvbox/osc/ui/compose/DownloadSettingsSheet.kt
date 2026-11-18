@@ -16,10 +16,14 @@ import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -73,21 +77,6 @@ fun DownloadSettingsSheet(
     }
     var lowStorageLimit by remember {
         mutableLongStateOf(Hawk.get(HawkConfig.DOWNLOAD_LOW_STORAGE_LIMIT, 500L * 1024 * 1024L))
-    }
-
-    // 子选项弹窗状态
-    var subSheetTitle by remember { mutableStateOf("") }
-    var subSheetOptions by remember { mutableStateOf<List<String>>(emptyList()) }
-    var subSheetSelectedPos by remember { mutableIntStateOf(0) }
-    var onSubSheetPick by remember { mutableStateOf<(Int) -> Unit>({}) }
-    var isSubSheetVisible by remember { mutableStateOf(false) }
-
-    fun openSubSheet(title: String, options: List<String>, selectedPos: Int, onPick: (Int) -> Unit) {
-        subSheetTitle = title
-        subSheetOptions = options
-        subSheetSelectedPos = selectedPos
-        onSubSheetPick = onPick
-        isSubSheetVisible = true
     }
 
     ModalBottomSheet(
@@ -148,7 +137,7 @@ fun DownloadSettingsSheet(
 
             // 设置卡片
             Card(
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isDark) colorScheme.surfaceContainerHigh else Color.White
                 ),
@@ -157,22 +146,71 @@ fun DownloadSettingsSheet(
             ) {
                 Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     // 1. 同时下载任务数
-                    DownloadSettingItem(
-                        iconRes = R.drawable.ic_speed_48,
-                        title = "最大同时下载任务数",
-                        subtitle = "设置允许同时并行下载的影片/集数",
-                        trailingText = "${concurrentCount} 个任务",
-                        onClick = {
-                            val options = listOf("1 个任务 (推荐)", "2 个任务", "3 个任务", "5 个任务 (高性能)")
-                            val counts = listOf(1, 2, 3, 5)
-                            val curPos = counts.indexOf(concurrentCount).let { if (it < 0) 0 else it }
-                            openSubSheet("最大同时下载任务数", options, curPos) { pos ->
-                                val count = counts[pos]
-                                concurrentCount = count
-                                Hawk.put(HawkConfig.DOWNLOAD_MAX_CONCURRENT, count)
-                                DownloadTaskManager.get().onConfigChanged()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(colorScheme.primaryContainer.copy(alpha = 0.55f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_speed_48),
+                                    contentDescription = null,
+                                    tint = colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = "最大同时下载任务数",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "设置允许同时并行下载的影片/集数",
+                                    fontSize = 12.sp,
+                                    color = colorScheme.onSurfaceVariant
+                                )
                             }
                         }
+                        Spacer(Modifier.height(10.dp))
+                        val concurrentOptions = listOf(1, 2, 3, 5)
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            concurrentOptions.forEachIndexed { index, count ->
+                                SegmentedButton(
+                                    selected = concurrentCount == count,
+                                    onClick = {
+                                        concurrentCount = count
+                                        Hawk.put(HawkConfig.DOWNLOAD_MAX_CONCURRENT, count)
+                                        DownloadTaskManager.get().onConfigChanged()
+                                    },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = index,
+                                        count = concurrentOptions.size
+                                    )
+                                ) {
+                                    Text(text = "$count 个", fontSize = 13.sp, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 64.dp, end = 16.dp),
+                        color = colorScheme.outlineVariant.copy(alpha = 0.45f)
                     )
 
                     // 2. 仅 Wi-Fi 下下载
@@ -185,34 +223,34 @@ fun DownloadSettingsSheet(
                                 Hawk.put(HawkConfig.DOWNLOAD_WIFI_ONLY, next)
                                 DownloadTaskManager.get().onConfigChanged()
                             }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(colorScheme.surfaceContainerHighest),
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(colorScheme.primaryContainer.copy(alpha = 0.55f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_download_18),
                                 contentDescription = null,
                                 tint = colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
                                 text = "仅在 Wi-Fi 下下载",
-                                fontSize = 14.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = colorScheme.onSurface
                             )
                             Text(
                                 text = "脱离 Wi-Fi 时自动保护暂停，防止消耗移动流量",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 color = colorScheme.onSurfaceVariant
                             )
                         }
@@ -230,124 +268,148 @@ fun DownloadSettingsSheet(
                         )
                     }
 
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 64.dp, end = 16.dp),
+                        color = colorScheme.outlineVariant.copy(alpha = 0.45f)
+                    )
+
                     // 3. HLS 单集切片下载并发数
-                    DownloadSettingItem(
-                        iconRes = R.drawable.ic_memory_48,
-                        title = "HLS 单任务切片并发数",
-                        subtitle = "单集 M3U8 切片并发线程数，提速下载",
-                        trailingText = "${hlsThreads} 个线程",
-                        onClick = {
-                            val options = listOf("2 线程 (省流稳定)", "3 线程 (默认均衡)", "5 线程 (疾速)")
-                            val counts = listOf(2, 3, 5)
-                            val curPos = counts.indexOf(hlsThreads).let { if (it < 0) 1 else it }
-                            openSubSheet("HLS 单任务切片并发数", options, curPos) { pos ->
-                                val count = counts[pos]
-                                hlsThreads = count
-                                Hawk.put(HawkConfig.DOWNLOAD_HLS_THREADS, count)
-                                DownloadTaskManager.get().onConfigChanged()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(colorScheme.primaryContainer.copy(alpha = 0.55f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_memory_48),
+                                    contentDescription = null,
+                                    tint = colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = "HLS 单任务切片并发数",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "单集 M3U8 切片并发线程数，提速下载",
+                                    fontSize = 12.sp,
+                                    color = colorScheme.onSurfaceVariant
+                                )
                             }
                         }
+                        Spacer(Modifier.height(10.dp))
+                        val hlsOptions = listOf(2, 3, 5)
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            hlsOptions.forEachIndexed { index, count ->
+                                SegmentedButton(
+                                    selected = hlsThreads == count,
+                                    onClick = {
+                                        hlsThreads = count
+                                        Hawk.put(HawkConfig.DOWNLOAD_HLS_THREADS, count)
+                                        DownloadTaskManager.get().onConfigChanged()
+                                    },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = index,
+                                        count = hlsOptions.size
+                                    )
+                                ) {
+                                    Text(text = "$count 线程", fontSize = 13.sp, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 64.dp, end = 16.dp),
+                        color = colorScheme.outlineVariant.copy(alpha = 0.45f)
                     )
 
                     // 4. 存储空间保护阈值
-                    val storageDesc = when (lowStorageLimit) {
-                        0L -> "关闭"
-                        500L * 1024 * 1024L -> "500 MB (推荐)"
-                        1024L * 1024 * 1024L -> "1 GB"
-                        2048L * 1024 * 1024L -> "2 GB"
-                        else -> "500 MB"
-                    }
-                    DownloadSettingItem(
-                        iconRes = R.drawable.ic_material_48,
-                        title = "低可用存储空间保护",
-                        subtitle = "设备可用容量低于设定阈值时自动暂停",
-                        trailingText = storageDesc,
-                        onClick = {
-                            val options = listOf("关闭 (不保护)", "500 MB (推荐)", "1 GB", "2 GB")
-                            val limits = listOf(0L, 500L * 1024 * 1024L, 1024L * 1024 * 1024L, 2048L * 1024 * 1024L)
-                            val curPos = limits.indexOf(lowStorageLimit).let { if (it < 0) 1 else it }
-                            openSubSheet("低可用存储空间保护", options, curPos) { pos ->
-                                val limit = limits[pos]
-                                lowStorageLimit = limit
-                                Hawk.put(HawkConfig.DOWNLOAD_LOW_STORAGE_LIMIT, limit)
-                                DownloadTaskManager.get().onConfigChanged()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(colorScheme.primaryContainer.copy(alpha = 0.55f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_material_48),
+                                    contentDescription = null,
+                                    tint = colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = "低可用存储空间保护",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "设备可用容量低于设定阈值时自动暂停",
+                                    fontSize = 12.sp,
+                                    color = colorScheme.onSurfaceVariant
+                                )
                             }
                         }
-                    )
+                        Spacer(Modifier.height(10.dp))
+                        val storageLimits = listOf(
+                            0L to "关闭",
+                            500L * 1024 * 1024L to "500MB",
+                            1024L * 1024 * 1024L to "1GB",
+                            2048L * 1024 * 1024L to "2GB"
+                        )
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            storageLimits.forEachIndexed { index, (limit, label) ->
+                                SegmentedButton(
+                                    selected = lowStorageLimit == limit,
+                                    onClick = {
+                                        lowStorageLimit = limit
+                                        Hawk.put(HawkConfig.DOWNLOAD_LOW_STORAGE_LIMIT, limit)
+                                        DownloadTaskManager.get().onConfigChanged()
+                                    },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = index,
+                                        count = storageLimits.size
+                                    )
+                                ) {
+                                    Text(text = label, fontSize = 13.sp, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
-    }
-
-    // 二级选择抽屉
-    M3SingleChoiceBottomSheet(
-        visible = isSubSheetVisible,
-        title = subSheetTitle,
-        options = subSheetOptions,
-        selectedPos = subSheetSelectedPos,
-        onDismissRequest = { isSubSheetVisible = false },
-        onSelected = { pos, _ ->
-            onSubSheetPick(pos)
-        }
-    )
-}
-
-@Composable
-private fun DownloadSettingItem(
-    iconRes: Int,
-    title: String,
-    subtitle: String,
-    trailingText: String,
-    onClick: () -> Unit
-) {
-    val colorScheme = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                painter = painterResource(iconRes),
-                contentDescription = null,
-                tint = colorScheme.primary,
-                modifier = Modifier.size(16.dp)
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = colorScheme.onSurface
-            )
-            Text(
-                text = subtitle,
-                fontSize = 11.sp,
-                color = colorScheme.onSurfaceVariant
-            )
-        }
-        Text(
-            text = trailingText,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = colorScheme.primary
-        )
-        Spacer(Modifier.width(4.dp))
-        Icon(
-            painter = painterResource(R.drawable.ic_chevron_right),
-            contentDescription = null,
-            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.size(16.dp)
-        )
     }
 }
