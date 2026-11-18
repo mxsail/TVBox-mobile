@@ -55,6 +55,8 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.foundation.layout.Spacer
@@ -562,7 +564,56 @@ fun SectionTitle(text: String) {
     )
 }
 
-/** M3 Expressive 卡片分组容器 (柔和20dp圆角 + 边界波纹裁剪 + surfaceContainerLow) */
+/**
+ * M3 Expressive 变形连续胶囊卡片（Connected Shapes）位置枚举:
+ * - TOP: 顶部大圆角 (20dp), 底部微圆角 (4dp)
+ * - MIDDLE: 四角微圆角 (4dp)
+ * - BOTTOM: 顶部微圆角 (4dp), 底部大圆角 (20dp)
+ * - SINGLE / STANDALONE: 四角大圆角 (20dp)
+ */
+enum class ItemPosition {
+    TOP, MIDDLE, BOTTOM, SINGLE, STANDALONE
+}
+
+fun expressiveItemShape(
+    position: ItemPosition,
+    largeRadius: androidx.compose.ui.unit.Dp = 20.dp,
+    smallRadius: androidx.compose.ui.unit.Dp = 4.dp
+): androidx.compose.ui.graphics.Shape = when (position) {
+    ItemPosition.TOP -> RoundedCornerShape(
+        topStart = largeRadius,
+        topEnd = largeRadius,
+        bottomStart = smallRadius,
+        bottomEnd = smallRadius
+    )
+    ItemPosition.MIDDLE -> RoundedCornerShape(smallRadius)
+    ItemPosition.BOTTOM -> RoundedCornerShape(
+        topStart = smallRadius,
+        topEnd = smallRadius,
+        bottomStart = largeRadius,
+        bottomEnd = largeRadius
+    )
+    ItemPosition.SINGLE, ItemPosition.STANDALONE -> RoundedCornerShape(largeRadius)
+}
+
+/**
+ * M3 Expressive 变形连续胶囊分组容器:
+ * 组内各行通过 3dp 物理微间隙自然区隔，透出底色形成连续卡片视觉。
+ */
+@Composable
+fun ConnectedGroup(
+    modifier: Modifier = Modifier,
+    spacing: androidx.compose.ui.unit.Dp = 3.dp,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(spacing),
+        content = content
+    )
+}
+
+/** 兼容性常规单体大卡片容器 */
 @Composable
 fun GroupCard(
     modifier: Modifier = Modifier,
@@ -583,78 +634,85 @@ fun GroupCard(
     }
 }
 
-/** 列表行: M3 Expressive 徽章胶囊风格 (图标微容器 + 标题 + 右侧值 + 可选内缩分割线) */
+/** M3 原生 ListItem 列表行: 变形胶囊卡片 (原生 ListItem + 36dp 徽章胶囊图标 + 自动适配) */
 @Composable
 fun MenuRow(
     icon: Int,
     title: String,
     value: String? = null,
+    position: ItemPosition = ItemPosition.STANDALONE,
+    containerColor: Color? = null,
     showDivider: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     val isDark = isAppDarkTheme()
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = onClick != null) { onClick?.invoke() }
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(icon),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(19.dp)
-                )
-            }
-            Text(
-                text = title,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .padding(start = 14.dp)
-                    .weight(1f)
-            )
-            if (value != null) {
+    val colorScheme = MaterialTheme.colorScheme
+    val shape = expressiveItemShape(position)
+    val finalContainerColor = containerColor ?: if (isDark) colorScheme.surfaceContainerLow else Color.White
+
+    Surface(
+        shape = shape,
+        color = finalContainerColor,
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        ListItem(
+            headlineContent = {
                 Text(
-                    text = value,
-                    color = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF8E8E93),
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    text = title,
+                    color = colorScheme.onSurface,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            },
+            leadingContent = {
+                Box(
                     modifier = Modifier
-                        .padding(start = 8.dp, end = 4.dp)
-                        .widthIn(max = 160.dp)
-                )
-            }
-            if (onClick != null) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_chevron_right),
-                    contentDescription = null,
-                    tint = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else Color(0xFFC7C7CC),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-        if (showDivider) {
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 66.dp, end = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(colorScheme.primaryContainer.copy(alpha = 0.55f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(icon),
+                        contentDescription = null,
+                        tint = colorScheme.primary,
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+            },
+            trailingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (value != null) {
+                        Text(
+                            text = value,
+                            color = colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 160.dp)
+                        )
+                    }
+                    if (onClick != null) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            painter = painterResource(R.drawable.ic_chevron_right),
+                            contentDescription = null,
+                            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            },
+            colors = ListItemDefaults.colors(
+                containerColor = Color.Transparent
             )
-        }
+        )
     }
 }
 
-/** 开关列表行: M3 Expressive 徽章胶囊风格 */
+/** M3 原生 ListItem 开关列表行: 变形胶囊卡片 (原生 ListItem + Switch) */
 @Composable
 fun SwitchRow(
     icon: Int,
@@ -662,66 +720,70 @@ fun SwitchRow(
     checked: Boolean,
     subtitle: String? = null,
     enabled: Boolean = true,
+    position: ItemPosition = ItemPosition.STANDALONE,
+    containerColor: Color? = null,
     showDivider: Boolean = false,
     onToggle: (Boolean) -> Unit
 ) {
     val isDark = isAppDarkTheme()
+    val colorScheme = MaterialTheme.colorScheme
+    val shape = expressiveItemShape(position)
+    val finalContainerColor = containerColor ?: if (isDark) colorScheme.surfaceContainerLow else Color.White
     val alpha = if (enabled) 1f else 0.42f
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = enabled) { onToggle(!checked) }
-                .padding(horizontal = 16.dp, vertical = if (subtitle != null) 10.dp else 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f * alpha)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(icon),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
-                    modifier = Modifier.size(19.dp)
-                )
-            }
-            Column(
-                modifier = Modifier
-                    .padding(start = 14.dp)
-                    .weight(1f)
-            ) {
+
+    Surface(
+        shape = shape,
+        color = finalContainerColor,
+        onClick = { onToggle(!checked) },
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        ListItem(
+            headlineContent = {
                 Text(
                     text = title,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+                    color = colorScheme.onSurface.copy(alpha = alpha),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
                 )
-                if (subtitle != null) {
+            },
+            supportingContent = subtitle?.let {
+                {
                     Text(
-                        text = subtitle,
-                        color = (if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF8E8E93)).copy(alpha = alpha),
+                        text = it,
+                        color = (if (isDark) colorScheme.onSurfaceVariant else Color(0xFF8E8E93)).copy(alpha = alpha),
                         fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        modifier = Modifier.padding(top = 2.dp)
+                        lineHeight = 16.sp
                     )
                 }
-            }
-            Switch(
-                checked = checked,
-                enabled = enabled,
-                onCheckedChange = if (enabled) onToggle else null
+            },
+            leadingContent = {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(colorScheme.primaryContainer.copy(alpha = 0.55f * alpha)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(icon),
+                        contentDescription = null,
+                        tint = colorScheme.primary.copy(alpha = alpha),
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+            },
+            trailingContent = {
+                Switch(
+                    checked = checked,
+                    enabled = enabled,
+                    onCheckedChange = if (enabled) onToggle else null
+                )
+            },
+            colors = ListItemDefaults.colors(
+                containerColor = Color.Transparent
             )
-        }
-        if (showDivider) {
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 66.dp, end = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
-            )
-        }
+        )
     }
 }
 

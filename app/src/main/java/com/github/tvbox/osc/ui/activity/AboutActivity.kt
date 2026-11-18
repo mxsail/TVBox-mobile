@@ -30,7 +30,7 @@ import com.blankj.utilcode.util.ToastUtils
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.base.BaseActivity
 import com.github.tvbox.osc.download.PlayUrlResolver
-import com.github.tvbox.osc.ui.compose.GroupCard
+import com.github.tvbox.osc.ui.compose.ConnectedGroup
 import com.github.tvbox.osc.ui.compose.MenuRow
 import com.github.tvbox.osc.ui.compose.SectionTitle
 import com.github.tvbox.osc.ui.compose.TvBoxTheme
@@ -141,7 +141,7 @@ class AboutActivity : BaseActivity() {
                     .padding(horizontal = 14.dp)
             ) {
                 SectionTitle("版本")
-                GroupCard {
+                ConnectedGroup {
                     MenuRow(
                         R.drawable.ic_about_48,
                         "TVBox-Mobile v" + AppUtils.getAppVersionName(),
@@ -149,7 +149,7 @@ class AboutActivity : BaseActivity() {
                     ) { checkUpdate() }
                 }
                 SectionTitle("项目")
-                GroupCard {
+                ConnectedGroup {
                     MenuRow(R.drawable.ic_copyright_48, "开源地址", value = "GitHub") {
                         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)))
                     }

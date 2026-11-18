@@ -298,7 +298,8 @@ class AppearanceActivity : BaseActivity() {
                         icon = R.drawable.ic_palette_48,
                         title = "主题颜色",
                         value = if (themeColor == ThemeManager.COLOR_DYNAMIC) "动态取色"
-                        else ThemeManager.presetOf(themeColor)?.label ?: "动态取色"
+                        else ThemeManager.presetOf(themeColor)?.label ?: "动态取色",
+                        containerColor = Color.Transparent
                     )
                 }
                 // 色板
@@ -459,7 +460,7 @@ class AppearanceActivity : BaseActivity() {
                         checked = if (isLiquidMode) true else barFloating,
                         subtitle = if (isLiquidMode) "液态玻璃仅支持悬浮形态" else "开启时为 M3 悬浮胶囊，关闭时为平直贴底栏",
                         enabled = !isLiquidMode,
-                        showDivider = true,
+                        containerColor = Color.Transparent,
                         onToggle = { newValue ->
                             barFloating = newValue
                             Hawk.put(HawkConfig.BAR_FLOATING, newValue)
@@ -470,7 +471,7 @@ class AppearanceActivity : BaseActivity() {
                         icon = R.drawable.ic_label_48,
                         title = "底栏显示名称",
                         checked = barLabels,
-                        showDivider = true,
+                        containerColor = Color.Transparent,
                         onToggle = { newValue ->
                             barLabels = newValue
                             Hawk.put(HawkConfig.BAR_SHOW_LABELS, newValue)
@@ -481,6 +482,7 @@ class AppearanceActivity : BaseActivity() {
                         icon = R.drawable.ic_auto_hide_48,
                         title = "底栏随滚动隐藏",
                         checked = barAutoHide,
+                        containerColor = Color.Transparent,
                         onToggle = { newValue ->
                             barAutoHide = newValue
                             Hawk.put(HawkConfig.BAR_AUTO_HIDE, newValue)
@@ -544,7 +546,7 @@ class AppearanceActivity : BaseActivity() {
                         icon = R.drawable.ic_font_48,
                         title = "自定义字体",
                         value = if (fontPath.isEmpty()) "系统默认" else File(fontPath).name,
-                        showDivider = true,
+                        containerColor = Color.Transparent,
                         onClick = {
                             com.lxj.xpopup.XPopup.Builder(this@AppearanceActivity)
                                 .hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
@@ -571,6 +573,7 @@ class AppearanceActivity : BaseActivity() {
                         icon = R.drawable.ic_gesture_48,
                         title = "预见性返回手势",
                         checked = predictive,
+                        containerColor = Color.Transparent,
                         onToggle = { newValue ->
                             predictive = newValue
                             Hawk.put(HawkConfig.PREDICTIVE_BACK, newValue)
