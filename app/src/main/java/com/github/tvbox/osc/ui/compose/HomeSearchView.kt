@@ -33,6 +33,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -85,7 +90,7 @@ fun HomeSearchView(
 ) {
     val suggestListState = rememberLazyListState()
     val suggestScrollState = rememberScrollState()
-    val resultListState = rememberLazyListState()
+    val resultGridState = rememberLazyGridState()
 
     var showClearConfirmDialog by remember { mutableStateOf(false) }
     var isHistoryDeleteMode by remember { mutableStateOf(false) }
@@ -112,7 +117,7 @@ fun HomeSearchView(
             HomeResultPage(
                 controller = controller,
                 topBarHeight = topBarHeight,
-                listState = resultListState,
+                gridState = resultGridState,
                 onOpenVideo = onOpenVideo
             )
         }
@@ -444,7 +449,7 @@ private fun HomeSuggestPage(
 private fun HomeResultPage(
     controller: HomeSearchController,
     topBarHeight: Dp,
-    listState: LazyListState,
+    gridState: LazyGridState,
     onOpenVideo: (Movie.Video) -> Unit
 ) {
     val items = controller.displayed()
@@ -468,14 +473,21 @@ private fun HomeResultPage(
             }
         }
         else -> {
-            LazyColumn(
-                state = listState,
-                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = topBarHeight + 8.dp, bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 105.dp),
+                state = gridState,
+                contentPadding = PaddingValues(
+                    start = 12.dp,
+                    end = 12.dp,
+                    top = topBarHeight + 8.dp,
+                    bottom = 32.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(items) { video ->
-                    HomeSearchResultItem(
+                    HomeSearchResultGridItem(
                         video = video,
                         onClick = { onOpenVideo(video) }
                     )
@@ -486,19 +498,19 @@ private fun HomeResultPage(
 }
 
 @Composable
-fun HomeSearchResultItem(
+fun HomeSearchResultGridItem(
     video: Movie.Video,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.98f else 1f,
+        targetValue = if (isPressed) 0.95f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium
         ),
-        label = "home_search_item_scale"
+        label = "home_search_grid_scale"
     )
 
     val sourceName = remember(video.sourceKey) {
@@ -507,193 +519,91 @@ fun HomeSearchResultItem(
         } catch (_: Exception) { "" }
     }
 
-    Surface(
-        onClick = onClick,
-        interactionSource = interactionSource,
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-            },
-        shape = RoundedCornerShape(16.dp),
-        color = colorScheme.surfaceContainerLow,
-        tonalElevation = 1.dp
+            }
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .aspectRatio(0.75f)
+                .clip(RoundedCornerShape(16.dp))
+                .background(colorScheme.surfaceContainer)
         ) {
-            // 左侧海报区: 固定宽 85dp，纵横比 3:4
-            Box(
-                modifier = Modifier
-                    .width(85.dp)
-                    .aspectRatio(0.75f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(colorScheme.surfaceContainer)
-            ) {
-                PosterImage(
-                    url = video.pic ?: "",
-                    modifier = Modifier.fillMaxSize()
-                )
+            PosterImage(
+                url = video.pic ?: "",
+                modifier = Modifier.fillMaxSize()
+            )
 
-                // 来源标签
-                if (sourceName.isNotEmpty()) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = colorScheme.secondaryContainer.copy(alpha = 0.9f),
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(5.dp)
-                    ) {
-                        Text(
-                            text = sourceName,
-                            color = colorScheme.onSecondaryContainer,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-
-                // 备注/集数
-                if (!video.note.isNullOrEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(5.dp)
-                            .widthIn(max = 75.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color(0x99000000), Color(0xCC000000))
-                                ),
-                                RoundedCornerShape(5.dp)
-                            )
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = video.note,
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+            // 左上角徽章: 搜索源名称（若无则显示年份）
+            val badgeText = sourceName.ifEmpty {
+                if (video.year > 0) video.year.toString() else ""
+            }
+            if (badgeText.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = colorScheme.secondaryContainer.copy(alpha = 0.92f),
+                    modifier = Modifier.padding(6.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        color = colorScheme.onSecondaryContainer,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
+                    )
                 }
             }
 
-            Spacer(Modifier.width(12.dp))
-
-            // 右侧信息区
-            Column(
-                modifier = Modifier
-                    .height(113.dp)
-                    .weight(1f),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                // 1. 标题
-                Text(
-                    text = video.name ?: "",
-                    color = colorScheme.onSurface,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 20.sp
-                )
-
-                // 2. 年份 · 类型 · 国家 · 语言 (带智能优雅降级)
-                val metaInfo = remember(video) {
-                    listOfNotNull(
-                        if (video.year > 0) "${video.year}" else null,
-                        video.type?.takeIf { it.isNotBlank() },
-                        video.area?.takeIf { it.isNotBlank() },
-                        video.lang?.takeIf { it.isNotBlank() }
-                    ).joinToString(" · ")
-                }
-                if (metaInfo.isNotEmpty()) {
+            // 右下角徽章: 备注/集数/清晰度 (磨砂半透黑渐变胶囊)
+            if (!video.note.isNullOrEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(6.dp)
+                        .widthIn(max = 100.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0x99000000), Color(0xCC000000))
+                            ),
+                            RoundedCornerShape(6.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.5.dp)
+                ) {
                     Text(
-                        text = metaInfo,
-                        color = colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
+                        text = video.note,
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                } else {
-                    // 无主要元数据时的备选信息行
-                    val fallbackState = video.state?.takeIf { it.isNotBlank() && it != "0" }
-                    if (fallbackState != null) {
-                        Text(
-                            text = "状态: $fallbackState",
-                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    } else {
-                        Text(
-                            text = "暂无类别与年份信息",
-                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                // 3. 主演 / 导演 / 点击进入播放源提示
-                val actors = video.actor?.trim()
-                val director = video.director?.trim()
-                if (!actors.isNullOrEmpty()) {
-                    Text(
-                        text = "主演: $actors",
-                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                        fontSize = 12.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 16.sp
-                    )
-                } else if (!director.isNullOrEmpty()) {
-                    Text(
-                        text = "导演: $director",
-                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                } else {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = colorScheme.surfaceContainerHigh.copy(alpha = 0.8f)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_m3_play_arrow),
-                                contentDescription = null,
-                                tint = colorScheme.primary,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = "点击查看详情与播放列表",
-                                color = colorScheme.primary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1
-                            )
-                        }
-                    }
                 }
             }
         }
+
+        // 下方标题
+        Text(
+            text = video.name ?: "",
+            color = colorScheme.onSurface,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp)
+        )
     }
 }
 
