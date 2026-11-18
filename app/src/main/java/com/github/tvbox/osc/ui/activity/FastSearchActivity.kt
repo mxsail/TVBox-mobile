@@ -53,13 +53,18 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
@@ -600,7 +605,7 @@ class FastSearchActivity : BaseActivity() {
         }
 
         val backdrop = rememberLayerBackdrop()
-        val resultListState = rememberLazyListState()
+        val resultGridState = rememberLazyGridState()
         val suggestListState = rememberLazyListState()
         val suggestScrollState = rememberScrollState()
 
@@ -620,7 +625,7 @@ class FastSearchActivity : BaseActivity() {
                         suggestScrollState.value > 4
                     }
                 } else {
-                    resultListState.firstVisibleItemIndex > 0 || resultListState.firstVisibleItemScrollOffset > 4
+                    resultGridState.firstVisibleItemIndex > 0 || resultGridState.firstVisibleItemScrollOffset > 4
                 }
             }
         }
@@ -672,7 +677,7 @@ class FastSearchActivity : BaseActivity() {
                 } else {
                     ResultPage(
                         topBarHeight = totalTopBarHeight,
-                        listState = resultListState
+                        gridState = resultGridState
                     )
                 }
             }
@@ -940,7 +945,7 @@ class FastSearchActivity : BaseActivity() {
                                     selectedTabKey.value = item.second
                                     searchFilterKey = item.second
                                     coroutineScope.launch {
-                                        try { resultListState.scrollToItem(0) } catch (_: Throwable) {}
+                                        try { resultGridState.scrollToItem(0) } catch (_: Throwable) {}
                                     }
                                 }
                             },
@@ -1436,11 +1441,11 @@ class FastSearchActivity : BaseActivity() {
         }
     }
 
-    /** 结果页: 穿顶全屏内容区 + M3 Expressive 图文横向卡片列表 */
+    /** 结果页: 穿顶全屏内容区 + M3 Expressive 自适应海报网格 (3列) */
     @Composable
     private fun ResultPage(
         topBarHeight: androidx.compose.ui.unit.Dp,
-        listState: LazyListState
+        gridState: LazyGridState
     ) {
         when {
             loadState.value == 1 && displayed().isEmpty() -> {
@@ -1463,14 +1468,21 @@ class FastSearchActivity : BaseActivity() {
             }
             else -> {
                 val list = displayed()
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = topBarHeight + 8.dp, bottom = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 105.dp),
+                    state = gridState,
+                    contentPadding = PaddingValues(
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = topBarHeight + 8.dp,
+                        bottom = 28.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(list) { video ->
-                        SearchResultItem(
+                        SearchResultGridItem(
                             video = video,
                             onClick = { openVideo(video) }
                         )
@@ -1480,161 +1492,114 @@ class FastSearchActivity : BaseActivity() {
         }
     }
 
-    /** M3 Expressive 图文搜索卡片: 左侧海报(含来源与更新集数) + 右侧自适应信息(标题、年份/类型/国家/语言、主演) */
+    /** M3 Expressive 自适应海报网格卡片: 3:4海报 + 左上角搜索源徽章 + 右下角备注 + 下方单行片名 */
     @Composable
-    private fun SearchResultItem(
+    private fun SearchResultGridItem(
         video: Movie.Video,
         onClick: () -> Unit
     ) {
         val interactionSource = remember { MutableInteractionSource() }
         val isPressed by interactionSource.collectIsPressedAsState()
         val scale by animateFloatAsState(
-            targetValue = if (isPressed) 0.98f else 1f,
+            targetValue = if (isPressed) 0.95f else 1f,
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
                 stiffness = Spring.StiffnessMedium
             ),
-            label = "search_item_scale"
+            label = "fast_search_grid_scale"
         )
 
-        Surface(
-            onClick = onClick,
-            interactionSource = interactionSource,
+        val sourceName = remember(video.sourceKey) {
+            try {
+                ApiConfig.get().getSource(video.sourceKey)?.name ?: ""
+            } catch (_: Exception) { "" }
+        }
+
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
-                },
-            shape = RoundedCornerShape(16.dp),
-            color = colorScheme.surfaceContainerLow,
-            tonalElevation = 1.dp
+                }
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
+                )
         ) {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .aspectRatio(0.75f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(colorScheme.surfaceContainer)
             ) {
-                // 左侧海报区: 固定宽 85dp，纵横比 3:4 (高度约 113dp)
-                Box(
-                    modifier = Modifier
-                        .width(85.dp)
-                        .aspectRatio(0.75f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(colorScheme.surfaceContainer)
-                ) {
-                    PosterImage(
-                        url = video.pic ?: "",
-                        modifier = Modifier.fillMaxSize()
-                    )
+                PosterImage(
+                    url = video.pic ?: "",
+                    modifier = Modifier.fillMaxSize()
+                )
 
-                    // 来源标签 (左上角)
-                    val sourceName = try {
-                        ApiConfig.get().getSource(video.sourceKey)?.name ?: ""
-                    } catch (_: Exception) { "" }
-                    if (sourceName.isNotEmpty()) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = colorScheme.secondaryContainer.copy(alpha = 0.9f),
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(5.dp)
-                        ) {
-                            Text(
-                                text = sourceName,
-                                color = colorScheme.onSecondaryContainer,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-
-                    // 更新集数 / 状态备注 (右下角微磨砂渐变胶囊)
-                    if (!video.note.isNullOrEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(5.dp)
-                                .widthIn(max = 75.dp)
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(Color(0x99000000), Color(0xCC000000))
-                                    ),
-                                    RoundedCornerShape(5.dp)
-                                )
-                                .padding(horizontal = 5.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = video.note,
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+                // 左上角徽章: 搜索源名称 (若无则显示年份)
+                val badgeText = sourceName.ifEmpty {
+                    if (video.year > 0) video.year.toString() else ""
+                }
+                if (badgeText.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = colorScheme.secondaryContainer.copy(alpha = 0.92f),
+                        modifier = Modifier.padding(6.dp)
+                    ) {
+                        Text(
+                            text = badgeText,
+                            color = colorScheme.onSecondaryContainer,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
+                        )
                     }
                 }
 
-                Spacer(Modifier.width(12.dp))
-
-                // 右侧信息区: 高度 113dp 与海报高度对齐，垂直两端均分 (Arrangement.SpaceBetween)
-                Column(
-                    modifier = Modifier
-                        .height(113.dp)
-                        .weight(1f),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // 1. 顶部: 加粗影片名称 (最多2行)
-                    Text(
-                        text = video.name ?: "",
-                        color = colorScheme.onSurface,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 20.sp
-                    )
-
-                    // 2. 中间: 年份 · 类型 · 国家 · 语言 (自动过滤缺失项)
-                    val metaInfo = remember(video) {
-                        listOfNotNull(
-                            if (video.year > 0) video.year.toString() else null,
-                            video.type?.takeIf { it.isNotBlank() },
-                            video.area?.takeIf { it.isNotBlank() },
-                            video.lang?.takeIf { it.isNotBlank() }
-                        ).joinToString(" · ")
-                    }
-                    if (metaInfo.isNotEmpty()) {
+                // 右下角徽章: 备注/集数/清晰度 (磨砂半透黑渐变胶囊)
+                if (!video.note.isNullOrEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp)
+                            .widthIn(max = 100.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0x99000000), Color(0xCC000000))
+                                ),
+                                RoundedCornerShape(6.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.5.dp)
+                    ) {
                         Text(
-                            text = metaInfo,
-                            color = colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp,
+                            text = video.note,
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-
-                    // 3. 底部: 主演 (不带前缀，最多2行)
-                    val actors = video.actor?.trim()
-                    if (!actors.isNullOrEmpty()) {
-                        Text(
-                            text = actors,
-                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                            fontSize = 12.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            lineHeight = 16.sp
-                        )
-                    } else {
-                        Spacer(Modifier.height(0.dp))
-                    }
                 }
             }
+
+            // 下方标题
+            Text(
+                text = video.name ?: "",
+                color = colorScheme.onSurface,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp)
+            )
         }
     }
 
