@@ -418,14 +418,18 @@ class SubscriptionActivity : BaseActivity() {
                 }
             }
         ) { padding ->
-            if (rows.value.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .padding(padding)
-                        .fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                if (rows.value.isEmpty()) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
                     Box(
                         modifier = Modifier
                             .size(80.dp)
@@ -551,6 +555,7 @@ class SubscriptionActivity : BaseActivity() {
                 }
             }
         }
+    }
 
         // 更多操作卡片居中弹窗
         itemForActions?.let { row ->
