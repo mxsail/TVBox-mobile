@@ -1,5 +1,6 @@
 package com.github.tvbox.osc.ui.compose
 
+import android.graphics.Rect
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -11,12 +12,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,14 +41,14 @@ import androidx.compose.ui.unit.sp
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.bean.VodInfo
 import com.kyant.backdrop.Backdrop
-import android.graphics.Rect
 import kotlin.math.roundToInt
 
 /**
- * 「上次观看」悬浮条 (Compose 版, 替代 XPopup LastViewedDialog):
- * 悬浮在底栏上方, 背景按外观设置的材质套液态玻璃(采样底栏同一 backdrop);
- * 进场自底滑入 + 淡入; 不自动消失, 由宿主在点击他处/滚动/切页时调 onDismiss;
- * 点击本条进详情页。
+ * 「上次观看」悬浮提示 (Material Design 3 Expressive 浮动 Snackbar):
+ * 悬浮在底栏上方，采用无边框轻量微胶囊容器 (2dp 浅浮阴影)；
+ * 左侧展示 [ 历史图标 片名与进度 ]，右侧带 [ 继续播放 ] 高亮操作胶囊；
+ * 保持长显，当用户滑动页面或点击其他页面元素时自动轻柔淡出；
+ * 点击整条或行动按钮均直接进入详情/播放页。
  */
 @Composable
 fun LastViewedTip(
@@ -63,10 +68,12 @@ fun LastViewedTip(
         if (tip == null) onBounds(null)
     }
 
+    val colorScheme = MaterialTheme.colorScheme
+
     AnimatedVisibility(
         visible = tip != null && shown != null,
         enter = slideInVertically(
-            animationSpec = spring(dampingRatio = 0.9f, stiffness = 380f),
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
             initialOffsetY = { it / 2 }
         ) + fadeIn(tween(200)),
         exit = slideOutVertically(
@@ -85,10 +92,11 @@ fun LastViewedTip(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
+                    .widthIn(max = 480.dp)
                     .materialGlass(
                         material = material,
                         backdrop = backdrop,
-                        shape = CircleShape
+                        shape = RoundedCornerShape(22.dp)
                     )
                     .onGloballyPositioned { coords ->
                         val b = coords.boundsInWindow()
@@ -105,23 +113,58 @@ fun LastViewedTip(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) { onOpen(vod) }
-                    .padding(horizontal = 18.dp, vertical = 12.dp)
+                    .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
             ) {
+                // 左侧历史图标
                 Icon(
-                    painterResource(R.drawable.ic_play),
+                    painter = painterResource(R.drawable.ic_history_18),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
+
+                // 片名与进度文案
                 Text(
-                    text = "上次看到: " + vod.name + (vod.note?.let { " " + it } ?: ""),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 14.sp,
+                    text = vod.name + (vod.note?.let { " $it" } ?: ""),
+                    color = colorScheme.onSurface,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 8.dp)
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .padding(start = 8.dp, end = 10.dp)
                 )
+
+                // 右侧「继续播放」高亮行动按钮
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = colorScheme.primary,
+                    contentColor = colorScheme.onPrimary,
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onOpen(vod) }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_play),
+                            contentDescription = null,
+                            tint = colorScheme.onPrimary,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(3.dp))
+                        Text(
+                            text = "继续播放",
+                            color = colorScheme.onPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
     }

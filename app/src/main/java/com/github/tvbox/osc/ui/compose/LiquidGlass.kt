@@ -63,13 +63,17 @@ fun Modifier.materialGlass(
     chromaticAberration: Boolean = Hawk.get(HawkConfig.LIQUID_DISPERSION, true),
     containerColor: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)
 ): Modifier {
-    // Material Design: 实底 M3 Expressive 表面容器, 辅以微描边与柔和阴影
+    // Material Design: 实底 M3 Expressive 表面容器, 纯净色调海拔与柔和微阴影
     if (material == ThemeManager.MATERIAL_YOU || !isLiquidGlassSupported) {
         val colorScheme = MaterialTheme.colorScheme
         return this
-            .shadow(elevation = 6.dp, shape = shape, spotColor = colorScheme.outline.copy(alpha = 0.2f))
+            .shadow(
+                elevation = 2.dp,
+                shape = shape,
+                spotColor = colorScheme.outline.copy(alpha = 0.2f),
+                ambientColor = colorScheme.outline.copy(alpha = 0.1f)
+            )
             .background(colorScheme.surfaceContainerHigh, shape)
-            .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.4f), shape)
     }
 
     // 液态玻璃: 物理折射(Android 14+)+色散+高光+模糊
