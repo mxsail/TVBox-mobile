@@ -51,6 +51,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import com.github.tvbox.osc.ui.compose.GroupCard
 import com.github.tvbox.osc.ui.compose.M3ActionsCenterDialog
+import com.github.tvbox.osc.ui.compose.M3ExpressiveButtonGroup
 import com.github.tvbox.osc.ui.compose.M3ItemAction
 import com.github.tvbox.osc.ui.compose.M3SlidingSegmentedPill
 import com.github.tvbox.osc.ui.compose.MenuRow
@@ -269,7 +270,7 @@ class AppearanceActivity : BaseActivity() {
                         fontSize = 16.sp,
                         modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 10.dp)
                     )
-                    M3SlidingSegmentedPill(
+                    M3ExpressiveButtonGroup(
                         items = THEME_MODES.toList(),
                         selectedIndex = themeMode,
                         onItemSelected = { index ->

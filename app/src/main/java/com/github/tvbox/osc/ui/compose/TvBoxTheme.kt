@@ -2,7 +2,9 @@ package com.github.tvbox.osc.ui.compose
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -1503,91 +1505,168 @@ fun <T> M3SingleChoiceCenterDialog(
 }
 
 /**
- * Material Design 3 Expressive 浮动药丸滑块分段组件 (Sliding Pill Segmented Buttons)
- * 外层为 surfaceContainer 浅底微圆角底槽，选中的项目形态为独立全圆角胶囊 (CircleShape / 20.dp)，并在切换时伴随平滑弹簧动效 (Spring Animation)
+ * Material Design 3 Expressive 变形分段按钮组 (Connected Shape Morphing Button Group)
+ * 依据 Google I/O 2026 M3 Expressive Connected Shapes 官方规范：
+ * - 按钮之间保留 3dp 物理微间隙
+ * - 未选中项保持首端大圆角 (24dp)、尾端大圆角 (24dp)、中间段微圆角 (8dp) 的连续形态
+ * - 选中项独立形变为完整的全椭圆胶囊 (RoundedCornerShape(24.dp))
+ * - 选项切换时所有 4 个圆角 (topStart/topEnd/bottomStart/bottomEnd) 及背景色彩均伴随 Spring 弹性形变物理动效
  */
+@Composable
+fun M3ExpressiveButtonGroup(
+    items: List<String>,
+    selectedIndex: Int,
+    onItemSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    icons: List<Int>? = null,
+    selectedContainerColor: Color = MaterialTheme.colorScheme.primary,
+    selectedContentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    unselectedContainerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    unselectedContentColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    val count = items.size
+    if (count == 0) return
+
+    val pillRadius = 24.dp
+    val innerRadius = 8.dp
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(46.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items.forEachIndexed { index, label ->
+            val isSelected = index == selectedIndex
+            val isFirst = index == 0
+            val isLast = index == count - 1
+
+            val targetTopStart = when {
+                isSelected -> pillRadius
+                isFirst -> pillRadius
+                else -> innerRadius
+            }
+            val targetBottomStart = when {
+                isSelected -> pillRadius
+                isFirst -> pillRadius
+                else -> innerRadius
+            }
+            val targetTopEnd = when {
+                isSelected -> pillRadius
+                isLast -> pillRadius
+                else -> innerRadius
+            }
+            val targetBottomEnd = when {
+                isSelected -> pillRadius
+                isLast -> pillRadius
+                else -> innerRadius
+            }
+
+            val topStart by animateDpAsState(
+                targetValue = targetTopStart,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy),
+                label = "m3_btn_ts_$index"
+            )
+            val bottomStart by animateDpAsState(
+                targetValue = targetBottomStart,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy),
+                label = "m3_btn_bs_$index"
+            )
+            val topEnd by animateDpAsState(
+                targetValue = targetTopEnd,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy),
+                label = "m3_btn_te_$index"
+            )
+            val bottomEnd by animateDpAsState(
+                targetValue = targetBottomEnd,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy),
+                label = "m3_btn_be_$index"
+            )
+
+            val animatedBgColor by animateColorAsState(
+                targetValue = if (isSelected) selectedContainerColor else unselectedContainerColor,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                label = "m3_btn_bg_$index"
+            )
+            val animatedContentColor by animateColorAsState(
+                targetValue = if (isSelected) selectedContentColor else unselectedContentColor,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                label = "m3_btn_content_$index"
+            )
+
+            val shape = RoundedCornerShape(
+                topStart = topStart,
+                topEnd = topEnd,
+                bottomEnd = bottomEnd,
+                bottomStart = bottomStart
+            )
+
+            Surface(
+                shape = shape,
+                color = animatedBgColor,
+                shadowElevation = if (isSelected) 1.dp else 0.dp,
+                tonalElevation = if (isSelected) 2.dp else 0.dp,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                onClick = {
+                    if (index != selectedIndex) {
+                        onItemSelected(index)
+                    }
+                }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val iconRes = icons?.getOrNull(index)
+                    if (iconRes != null) {
+                        Icon(
+                            painter = painterResource(iconRes),
+                            contentDescription = null,
+                            tint = animatedContentColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    } else if (isSelected) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_check_16),
+                            contentDescription = null,
+                            tint = animatedContentColor,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(
+                        text = label,
+                        color = animatedContentColor,
+                        fontSize = 13.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 兼容旧命名 */
 @Composable
 fun M3SlidingSegmentedPill(
     items: List<String>,
     selectedIndex: Int,
     onItemSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
-    indicatorColor: Color = MaterialTheme.colorScheme.primaryContainer,
-    selectedContentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
-    unselectedContentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+    modifier: Modifier = Modifier
 ) {
-    val count = items.size
-    if (count == 0) return
-
-    val animatedIndex by animateFloatAsState(
-        targetValue = selectedIndex.coerceIn(0, count - 1).toFloat(),
-        animationSpec = spring(
-            stiffness = Spring.StiffnessMediumLow,
-            dampingRatio = Spring.DampingRatioLowBouncy
-        ),
-        label = "m3_pill_slider_index"
-    )
-
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = containerColor,
+    M3ExpressiveButtonGroup(
+        items = items,
+        selectedIndex = selectedIndex,
+        onItemSelected = onItemSelected,
         modifier = modifier
-            .fillMaxWidth()
-            .height(48.dp)
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(4.dp)
-        ) {
-            val itemWidth = maxWidth / count
-            val indicatorOffset = itemWidth * animatedIndex
-
-            // 选中的独立全圆角胶囊指示器
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = indicatorColor,
-                shadowElevation = 1.dp,
-                tonalElevation = 2.dp,
-                modifier = Modifier
-                    .offset(x = indicatorOffset)
-                    .width(itemWidth)
-                    .fillMaxHeight()
-            ) {}
-
-            // 文本与点击交互层
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                items.forEachIndexed { index, label ->
-                    val isSelected = index == selectedIndex
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                if (index != selectedIndex) {
-                                    onItemSelected(index)
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = label,
-                            color = if (isSelected) selectedContentColor else unselectedContentColor,
-                            fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-        }
-    }
+    )
 }
