@@ -53,6 +53,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import com.github.tvbox.osc.ui.compose.GroupCard
+import com.github.tvbox.osc.ui.compose.M3ActionsCenterDialog
+import com.github.tvbox.osc.ui.compose.M3ItemAction
 import com.github.tvbox.osc.ui.compose.MenuRow
 import com.github.tvbox.osc.ui.compose.SectionTitle
 import com.github.tvbox.osc.ui.compose.SwitchRow
@@ -87,10 +89,6 @@ import com.github.tvbox.osc.R
 import com.github.tvbox.osc.base.BaseActivity
 import com.github.tvbox.osc.base.ThemeManager
 import com.github.tvbox.osc.event.AppearanceChangedEvent
-import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter
-import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
-import com.github.tvbox.osc.ui.dialog.FontDialog
-import com.github.tvbox.osc.ui.dialog.SelectDialog
 import com.github.tvbox.osc.util.FastClickCheckUtil
 import com.github.tvbox.osc.util.FontApplier
 import com.github.tvbox.osc.util.HawkConfig
@@ -220,6 +218,7 @@ class AppearanceActivity : BaseActivity() {
         var liquidRefractionAmount by remember { mutableFloatStateOf(Hawk.get(HawkConfig.LIQUID_REFRACTION_AMOUNT, 14f)) }
         var liquidDispersion by remember { mutableStateOf(Hawk.get(HawkConfig.LIQUID_DISPERSION, true)) }
         var fontPath by remember { mutableStateOf(Hawk.get(HawkConfig.FONT_PATH, "")) }
+        var showFontDialog by remember { mutableStateOf(false) }
         var predictive by remember { mutableStateOf(Hawk.get(HawkConfig.PREDICTIVE_BACK, false)) }
         var barFloating by remember { mutableStateOf(ThemeManager.barFloating()) }
         var barLabels by remember { mutableStateOf(Hawk.get(HawkConfig.BAR_SHOW_LABELS, true)) }
@@ -227,7 +226,7 @@ class AppearanceActivity : BaseActivity() {
 
         val presets = ThemeManager.PRESETS
         val isDark = isAppDarkTheme()
-        val pageBg = if (isDark) colorScheme.background else Color(0xFFF3F3F4)
+        val pageBg = if (isDark) colorScheme.background else colorScheme.surfaceContainerLow
 
         Scaffold(
             containerColor = pageBg,
@@ -548,25 +547,7 @@ class AppearanceActivity : BaseActivity() {
                         value = if (fontPath.isEmpty()) "系统默认" else File(fontPath).name,
                         containerColor = Color.Transparent,
                         onClick = {
-                            com.lxj.xpopup.XPopup.Builder(this@AppearanceActivity)
-                                .hasBlurBg(com.github.tvbox.osc.view.MaterialBarHelper.popupBlurEnabled())
-                                .asCustom(
-                                    FontDialog(this@AppearanceActivity, object : FontDialog.Callback {
-                                        override fun onImport() {
-                                            launchFontPicker()
-                                        }
-
-                                        override fun onReset() {
-                                            Hawk.put(HawkConfig.FONT_PATH, "")
-                                            FontApplier.invalidate()
-                                            fontPath = ""
-                                            EventBus.getDefault()
-                                                .post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_RECREATE))
-                                            recreate()
-                                        }
-                                    })
-                                )
-                                .show()
+                            showFontDialog = true
                         }
                     )
                     SwitchRow(
@@ -584,6 +565,38 @@ class AppearanceActivity : BaseActivity() {
             }
         }
     }
+
+        if (showFontDialog) {
+            M3ActionsCenterDialog(
+                visible = showFontDialog,
+                title = "自定义字体设置",
+                subtitle = if (fontPath.isEmpty()) "当前使用系统默认字体" else "当前应用: ${File(fontPath).name}",
+                actions = listOf(
+                    M3ItemAction(
+                        title = "导入新字体文件 (.ttf / .otf)",
+                        iconRes = R.drawable.ic_add_24,
+                        onClick = {
+                            showFontDialog = false
+                            launchFontPicker()
+                        }
+                    ),
+                    M3ItemAction(
+                        title = "恢复系统默认字体",
+                        iconRes = R.drawable.ic_clear,
+                        isDestructive = true,
+                        onClick = {
+                            showFontDialog = false
+                            Hawk.put(HawkConfig.FONT_PATH, "")
+                            FontApplier.invalidate()
+                            fontPath = ""
+                            EventBus.getDefault().post(AppearanceChangedEvent(AppearanceChangedEvent.TYPE_RECREATE))
+                            recreate()
+                        }
+                    )
+                ),
+                onDismissRequest = { showFontDialog = false }
+            )
+        }
     }
 
     private fun pickThemeColor(id: String, update: (String) -> Unit) {

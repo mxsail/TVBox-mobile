@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -37,6 +39,8 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.OutlinedTextField
@@ -468,79 +472,80 @@ class SubscriptionActivity : BaseActivity() {
             } else {
                 LazyColumn(
                     modifier = Modifier
-                        .padding(padding)
-                        .fillMaxSize()
+                        .fillMaxWidth()
+                        .widthIn(max = 680.dp)
                         .nestedScroll(nestedScrollConnection)
                         .padding(horizontal = 14.dp),
-                    contentPadding = PaddingValues(bottom = 88.dp)
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     itemsIndexed(rows.value) { _, row ->
                         val selected = row.checked
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 5.dp)
-                                .then(
-                                    if (selected) Modifier.border(
-                                        1.5.dp, colorScheme.primary, RoundedCornerShape(18.dp)
-                                    ) else Modifier
-                                ),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (selected) colorScheme.secondaryContainer
-                                else colorScheme.surfaceContainerLow
-                            ),
+                        Surface(
                             shape = RoundedCornerShape(18.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                            color = if (selected) colorScheme.secondaryContainer else colorScheme.surfaceContainerLow,
+                            border = if (selected) BorderStroke(1.5.dp, colorScheme.primary) else null,
+                            onClick = { indexOfUrl(row.url).takeIf { it >= 0 }?.let { pickSubscription(it) } },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .clickable { indexOfUrl(row.url).takeIf { it >= 0 }?.let { pickSubscription(it) } }
-                                    .padding(start = 16.dp, top = 10.dp, bottom = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(Modifier.weight(1f)) {
+                            ListItem(
+                                headlineContent = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (row.isTop) {
-                                            Text(
-                                                "置顶",
-                                                color = colorScheme.primary,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = colorScheme.primaryContainer,
                                                 modifier = Modifier.padding(end = 6.dp)
-                                            )
+                                            ) {
+                                                Text(
+                                                    "置顶",
+                                                    color = colorScheme.onPrimaryContainer,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                )
+                                            }
                                         }
                                         Text(
                                             row.name,
                                             color = colorScheme.onSurface,
                                             fontSize = 15.sp,
-                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     }
+                                },
+                                supportingContent = {
                                     Text(
                                         row.url,
                                         color = colorScheme.onSurfaceVariant,
                                         fontSize = 12.sp,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(top = 2.dp)
+                                        overflow = TextOverflow.Ellipsis
                                     )
-                                }
-                                RadioButton(
-                                    selected = selected,
-                                    onClick = { indexOfUrl(row.url).takeIf { it >= 0 }?.let { pickSubscription(it) } },
-                                    colors = RadioButtonDefaults.colors(selectedColor = colorScheme.primary)
+                                },
+                                trailingContent = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        RadioButton(
+                                            selected = selected,
+                                            onClick = { indexOfUrl(row.url).takeIf { it >= 0 }?.let { pickSubscription(it) } },
+                                            colors = RadioButtonDefaults.colors(selectedColor = colorScheme.primary)
+                                        )
+                                        IconButton(onClick = { itemForActions = row }) {
+                                            Icon(
+                                                painterResource(R.drawable.ic_more_vert),
+                                                contentDescription = "操作",
+                                                tint = colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                },
+                                colors = ListItemDefaults.colors(
+                                    containerColor = Color.Transparent
                                 )
-                                IconButton(onClick = { itemForActions = row }) {
-                                    Icon(
-                                        painterResource(R.drawable.ic_more_vert),
-                                        contentDescription = "操作",
-                                        tint = colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
+                            )
                         }
                     }
                 }

@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -286,7 +287,9 @@ class CacheActivity : BaseActivity() {
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         state = listState,
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth()
+                            .widthIn(max = 680.dp)
+                            .align(Alignment.TopCenter)
                             .layerBackdrop(backdrop)
                     ) {
                     items(cards.value, key = { it.groupKey }) { card ->
@@ -414,7 +417,7 @@ class CacheActivity : BaseActivity() {
                                         } else if (card.totalCount > 0 && card.doneCount == card.totalCount) {
                                             Surface(
                                                 shape = RoundedCornerShape(8.dp),
-                                                color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF0F0F2)
+                                                color = if (isDark) colorScheme.surfaceContainerHigh else colorScheme.surfaceContainerLow
                                             ) {
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,

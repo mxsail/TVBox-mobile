@@ -9,9 +9,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +36,8 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -44,6 +49,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -426,182 +432,178 @@ class LiveSourceActivity : BaseActivity() {
                 }
             }
         ) { padding ->
-            LazyColumn(
+            Box(
                 modifier = Modifier
-                    .padding(padding)
                     .fillMaxSize()
-                    .nestedScroll(nestedScrollConnection)
-                    .padding(horizontal = 14.dp),
-                contentPadding = PaddingValues(bottom = 88.dp)
+                    .padding(padding),
+                contentAlignment = Alignment.TopCenter
             ) {
-                // 1. 顶部常驻单选项：跟随当前订阅源
-                item {
-                    Text(
-                        "默认源",
-                        color = colorScheme.primary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 6.dp, start = 4.dp)
-                    )
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .then(
-                                if (isFollowSelected) Modifier.border(
-                                    1.5.dp, colorScheme.primary, RoundedCornerShape(18.dp)
-                                ) else Modifier
-                            ),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isFollowSelected) colorScheme.secondaryContainer
-                            else colorScheme.surfaceContainerLow
-                        ),
-                        shape = RoundedCornerShape(18.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .clickable { selectSource(LiveSource.FOLLOW_SUBSCRIPTION) }
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    "跟随当前订阅源",
-                                    color = colorScheme.onSurface,
-                                    fontSize = 15.sp,
-                                    fontWeight = if (isFollowSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                                Text(
-                                    subLiveSummaryState.value,
-                                    color = colorScheme.onSurfaceVariant,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                            RadioButton(
-                                selected = isFollowSelected,
-                                onClick = { selectSource(LiveSource.FOLLOW_SUBSCRIPTION) },
-                                colors = RadioButtonDefaults.colors(selectedColor = colorScheme.primary)
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "自定义直播源",
-                        color = colorScheme.primary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 6.dp, start = 4.dp)
-                    )
-                }
-
-                // 2. 自定义直播源列表
-                if (rows.isEmpty()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 680.dp)
+                        .nestedScroll(nestedScrollConnection)
+                        .padding(horizontal = 14.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // 1. 顶部常驻单选项：跟随当前订阅源
                     item {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Text(
+                            "默认源",
+                            color = colorScheme.primary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 6.dp, start = 4.dp)
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = if (isFollowSelected) colorScheme.secondaryContainer else colorScheme.surfaceContainerLow,
+                            border = if (isFollowSelected) BorderStroke(1.5.dp, colorScheme.primary) else null,
+                            onClick = { selectSource(LiveSource.FOLLOW_SUBSCRIPTION) },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                "暂无自定义直播源",
-                                color = colorScheme.onSurfaceVariant,
-                                fontSize = 14.sp
+                            ListItem(
+                                headlineContent = {
+                                    Text(
+                                        "跟随当前订阅源",
+                                        color = colorScheme.onSurface,
+                                        fontSize = 15.sp,
+                                        fontWeight = if (isFollowSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                },
+                                supportingContent = {
+                                    Text(
+                                        subLiveSummaryState.value,
+                                        color = colorScheme.onSurfaceVariant,
+                                        fontSize = 12.sp
+                                    )
+                                },
+                                trailingContent = {
+                                    RadioButton(
+                                        selected = isFollowSelected,
+                                        onClick = { selectSource(LiveSource.FOLLOW_SUBSCRIPTION) },
+                                        colors = RadioButtonDefaults.colors(selectedColor = colorScheme.primary)
+                                    )
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                             )
-                            Spacer(Modifier.height(12.dp))
-                            Button(
-                                onClick = { showAddDialog() },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = colorScheme.primary,
-                                    contentColor = colorScheme.onPrimary
-                                ),
-                                shape = RoundedCornerShape(20.dp)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "自定义直播源",
+                            color = colorScheme.primary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 6.dp, start = 4.dp)
+                        )
+                    }
+
+                    // 2. 自定义直播源列表
+                    if (rows.isEmpty()) {
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Icon(
-                                    painterResource(R.drawable.ic_add_24),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                                Text(
+                                    "暂无自定义直播源",
+                                    color = colorScheme.onSurfaceVariant,
+                                    fontSize = 14.sp
                                 )
-                                Spacer(Modifier.width(8.dp))
-                                Text("添加直播源", fontSize = 14.sp)
+                                Spacer(Modifier.height(12.dp))
+                                Button(
+                                    onClick = { showAddDialog() },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = colorScheme.primary,
+                                        contentColor = colorScheme.onPrimary
+                                    ),
+                                    shape = RoundedCornerShape(20.dp)
+                                ) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_add_24),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("添加直播源", fontSize = 14.sp)
+                                }
                             }
                         }
-                    }
-                } else {
-                    itemsIndexed(rows) { _, row ->
-                        val selected = row.isChecked
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 5.dp)
-                                .then(
-                                    if (selected) Modifier.border(
-                                        1.5.dp, colorScheme.primary, RoundedCornerShape(18.dp)
-                                    ) else Modifier
-                                ),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (selected) colorScheme.secondaryContainer
-                                else colorScheme.surfaceContainerLow
-                            ),
-                            shape = RoundedCornerShape(18.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .clickable { selectSource(row.url) }
-                                    .padding(start = 16.dp, top = 10.dp, bottom = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                    } else {
+                        itemsIndexed(rows) { _, row ->
+                            val selected = row.isChecked
+                            Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = if (selected) colorScheme.secondaryContainer else colorScheme.surfaceContainerLow,
+                                border = if (selected) BorderStroke(1.5.dp, colorScheme.primary) else null,
+                                onClick = { selectSource(row.url) },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        if (row.isTop) {
+                                ListItem(
+                                    headlineContent = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            if (row.isTop) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = colorScheme.primaryContainer,
+                                                    modifier = Modifier.padding(end = 6.dp)
+                                                ) {
+                                                    Text(
+                                                        "置顶",
+                                                        color = colorScheme.onPrimaryContainer,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
                                             Text(
-                                                "置顶",
-                                                color = colorScheme.primary,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(end = 6.dp)
+                                                row.name,
+                                                color = colorScheme.onSurface,
+                                                fontSize = 15.sp,
+                                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
+                                    },
+                                    supportingContent = {
                                         Text(
-                                            row.name,
-                                            color = colorScheme.onSurface,
-                                            fontSize = 15.sp,
-                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                            row.url,
+                                            color = colorScheme.onSurfaceVariant,
+                                            fontSize = 12.sp,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
-                                    }
-                                    Text(
-                                        row.url,
-                                        color = colorScheme.onSurfaceVariant,
-                                        fontSize = 12.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(top = 2.dp)
-                                    )
-                                }
-                                RadioButton(
-                                    selected = selected,
-                                    onClick = { selectSource(row.url) },
-                                    colors = RadioButtonDefaults.colors(selectedColor = colorScheme.primary)
+                                    },
+                                    trailingContent = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            RadioButton(
+                                                selected = selected,
+                                                onClick = { selectSource(row.url) },
+                                                colors = RadioButtonDefaults.colors(selectedColor = colorScheme.primary)
+                                            )
+                                            IconButton(onClick = { itemForActions = row }) {
+                                                Icon(
+                                                    painterResource(R.drawable.ic_more_vert),
+                                                    contentDescription = "操作",
+                                                    tint = colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                                 )
-                                IconButton(onClick = { itemForActions = row }) {
-                                    Icon(
-                                        painterResource(R.drawable.ic_more_vert),
-                                        contentDescription = "操作",
-                                        tint = colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
                             }
                         }
                     }
-                }
-                item {
-                    Spacer(Modifier.height(32.dp))
+                    item {
+                        Spacer(Modifier.height(32.dp))
+                    }
                 }
             }
         }

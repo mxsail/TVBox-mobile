@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -248,32 +249,39 @@ class MyFragment : Fragment() {
             }
         }
 
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(colorScheme.background)
-                .verticalScroll(scrollState)
-                .statusBarsPadding()
-                .padding(bottom = bottomPadding)
+                .background(colorScheme.background),
+            contentAlignment = Alignment.TopCenter
         ) {
-            // 1. M3 Expressive Hero 头部卡片
-            Box(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                HeroCard(currentActivity)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 680.dp)
+                    .verticalScroll(scrollState)
+                    .statusBarsPadding()
+                    .padding(bottom = bottomPadding)
+            ) {
+                // 1. M3 Expressive Hero 头部卡片
+                Box(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                    HeroCard(currentActivity)
+                }
+
+                // 2. 观看历史卡片
+                Box(Modifier.padding(horizontal = 14.dp)) {
+                    HistoryCard(currentActivity, onGoToTab)
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                // 3. 常用功能 2 列 Expressive 磁贴
+                Box(Modifier.padding(horizontal = 14.dp)) {
+                    FunctionsTilesCard(currentActivity, onGoToTab)
+                }
+
+                Spacer(Modifier.height(16.dp))
             }
-
-            // 2. 观看历史卡片
-            Box(Modifier.padding(horizontal = 14.dp)) {
-                HistoryCard(currentActivity, onGoToTab)
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            // 3. 常用功能 2 列 Expressive 磁贴
-            Box(Modifier.padding(horizontal = 14.dp)) {
-                FunctionsTilesCard(currentActivity, onGoToTab)
-            }
-
-            Spacer(Modifier.height(16.dp))
         }
     }
 
@@ -350,14 +358,13 @@ class MyFragment : Fragment() {
 
                 // 右上角: 进关于页
                 IconButton(
-                    onClick = { jumpActivity(currentActivity, AboutActivity::class.java) },
-                    modifier = Modifier.size(36.dp)
+                    onClick = { jumpActivity(currentActivity, AboutActivity::class.java) }
                 ) {
                     Icon(
                         painterResource(R.drawable.ic_about_48),
                         contentDescription = "关于应用",
                         tint = colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -404,7 +411,7 @@ class MyFragment : Fragment() {
                     // 全部胶囊
                     Surface(
                         shape = CircleShape,
-                        color = if (isDark) colorScheme.surfaceContainerHigh else Color(0xFFF3F3F4),
+                        color = if (isDark) colorScheme.surfaceContainerHigh else colorScheme.surfaceContainerLow,
                         modifier = Modifier
                             .clip(CircleShape)
                             .clickable { jumpActivity(currentActivity, HistoryActivity::class.java) }
@@ -591,37 +598,37 @@ class MyFragment : Fragment() {
                 icon = R.drawable.ic_collect_48,
                 title = "我的收藏",
                 subtitle = "常看与心仪剧集",
-                accentColor = Color(0xFFE91E63)
+                accentColor = colorScheme.tertiary
             ) { jumpActivity(currentActivity, CollectActivity::class.java) },
             FeatureTile(
                 icon = R.drawable.ic_download_nav,
                 title = "我的下载",
                 subtitle = "离线离网本地缓存",
-                accentColor = Color(0xFF1E88E5)
+                accentColor = colorScheme.primary
             ) { jumpActivity(currentActivity, CacheActivity::class.java) },
             FeatureTile(
                 icon = R.drawable.ic_database_48,
                 title = "订阅源",
                 subtitle = "多源站点接口配置",
-                accentColor = Color(0xFF43A047)
+                accentColor = colorScheme.secondary
             ) { jumpActivity(currentActivity, SubscriptionActivity::class.java) },
             FeatureTile(
                 icon = R.drawable.ic_live_tv_48,
                 title = "直播源",
                 subtitle = "电视网络直播列表",
-                accentColor = Color(0xFFFB8C00)
+                accentColor = colorScheme.tertiary
             ) { jumpActivity(currentActivity, LiveSourceActivity::class.java) },
             FeatureTile(
                 icon = R.drawable.ic_sync_48,
                 title = "备份与同步",
                 subtitle = "WebDAV/快照管理",
-                accentColor = Color(0xFF8E24AA)
+                accentColor = colorScheme.primary
             ) { jumpActivity(currentActivity, BackupRestoreActivity::class.java) },
             FeatureTile(
                 icon = R.drawable.ic_settings,
                 title = "系统设置",
                 subtitle = "播放内核与偏好",
-                accentColor = Color(0xFF546E7A)
+                accentColor = colorScheme.secondary
             ) { jumpActivity(currentActivity, SettingActivity::class.java) }
         )
 
@@ -663,7 +670,7 @@ class MyFragment : Fragment() {
         val isDark = isAppDarkTheme()
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = if (isDark) colorScheme.surfaceContainerHigh.copy(alpha = 0.6f) else Color(0xFFF7F7F8),
+            color = if (isDark) colorScheme.surfaceContainerHigh.copy(alpha = 0.6f) else colorScheme.surfaceContainerLow,
             modifier = modifier
                 .clip(RoundedCornerShape(16.dp))
                 .clickable { tile.action() }

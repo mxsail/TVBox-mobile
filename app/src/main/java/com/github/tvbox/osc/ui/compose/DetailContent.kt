@@ -41,6 +41,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -286,12 +288,17 @@ fun DetailScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 680.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
         // 1. 顶部影片信息卡片 (M3 Expressive surfaceContainerLow 容器)
         VideoInfoHeroCard(
             state = state,
@@ -516,6 +523,7 @@ fun DetailScreen(
             }
         }
     }
+}
 
     // 6. 全集展开半屏抽屉 (带分段快速切片 1-50, 51-100)
     if (state.showAllEpisodesSheet) {
@@ -760,31 +768,36 @@ private fun LineCapsuleTab(
     onClick: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val containerColor = if (isSelected) colorScheme.primaryContainer else colorScheme.surfaceContainerLow
-    val contentColor = if (isSelected) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant
-    val borderColor = if (isSelected) colorScheme.primary.copy(alpha = 0.5f) else colorScheme.outlineVariant.copy(alpha = 0.35f)
-
-    Box(
-        modifier = Modifier
-            .height(34.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(containerColor)
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = name,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 13.sp
-            ),
-            color = contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
+    FilterChip(
+        selected = isSelected,
+        onClick = onClick,
+        label = {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    fontSize = 13.sp
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        shape = RoundedCornerShape(12.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = colorScheme.surfaceContainerLow,
+            labelColor = colorScheme.onSurfaceVariant,
+            selectedContainerColor = colorScheme.primaryContainer,
+            selectedLabelColor = colorScheme.onPrimaryContainer
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = isSelected,
+            borderColor = colorScheme.outlineVariant.copy(alpha = 0.35f),
+            selectedBorderColor = colorScheme.primary.copy(alpha = 0.5f),
+            borderWidth = 1.dp
+        ),
+        modifier = Modifier.height(34.dp)
+    )
 }
 
 /**
