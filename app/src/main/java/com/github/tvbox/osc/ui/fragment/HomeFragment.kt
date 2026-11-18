@@ -43,14 +43,28 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import com.github.tvbox.osc.ui.compose.HomeFilterPanel
+import com.github.tvbox.osc.ui.compose.HomeSearchController
+import com.github.tvbox.osc.ui.compose.HomeSearchView
+import com.github.tvbox.osc.ui.compose.HomeSearchSourceFilterPanel
 import com.github.tvbox.osc.ui.compose.isAppDarkTheme
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
@@ -93,11 +107,14 @@ import com.github.tvbox.osc.bean.AbsSortXml
 import com.github.tvbox.osc.bean.Movie
 import com.github.tvbox.osc.bean.MovieSort.SortData
 import com.github.tvbox.osc.bean.SourceBean
+import com.github.tvbox.osc.bean.AbsXml
 import com.github.tvbox.osc.bean.VodInfo
 import com.github.tvbox.osc.cache.RoomDataManger
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.event.AppearanceChangedEvent
+import com.github.tvbox.osc.event.RefreshEvent
 import com.github.tvbox.osc.server.ControlManager
+import com.github.tvbox.osc.ui.activity.DetailActivity
 import com.github.tvbox.osc.ui.activity.FastSearchActivity
 import com.github.tvbox.osc.ui.activity.HistoryActivity
 import com.github.tvbox.osc.ui.activity.MainActivity
@@ -177,6 +194,10 @@ class HomeFragment : Fragment() {
 
     /** 由内容列表的滚动增量驱动(MainActivity 转发, 仅主页 tab) */
     fun onHomeContentScroll(dy: Int) {
+        if (searchController.isSearchActive.value) {
+            topBarVisibleState.value = true
+            return
+        }
         if (dy > 8 && topBarVisibleState.value) topBarVisibleState.value = false
         else if (dy < -8 && !topBarVisibleState.value) topBarVisibleState.value = true
     }
@@ -184,6 +205,19 @@ class HomeFragment : Fragment() {
     /** 强制呼出顶栏(切回主页 tab/展开分类面板) */
     fun showTopBar() {
         topBarVisibleState.value = true
+    }
+
+    val searchController by lazy { HomeSearchController { this } }
+
+    fun handleSearchBack(): Boolean = searchController.handleBack()
+
+    val isSearchActive: androidx.compose.runtime.State<Boolean> get() = searchController.isSearchActive
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    fun onRefreshEvent(event: RefreshEvent) {
+        if (event.type == RefreshEvent.TYPE_SEARCH_RESULT) {
+            searchController.onSearchResult(event.obj as? AbsXml)
+        }
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -469,6 +503,7 @@ class HomeFragment : Fragment() {
 
     override fun onDestroy() {
         super.onDestroy()
+        searchController.destroy()
         if (eventBusRegistered) {
             EventBus.getDefault().unregister(this)
             eventBusRegistered = false
@@ -596,13 +631,31 @@ class HomeFragment : Fragment() {
             }
         }
 
+        val isSearchActive = searchController.isSearchActive.value
+        val searchFocusRequester = remember { FocusRequester() }
+
+        LaunchedEffect(isSearchActive) {
+            if (isSearchActive) {
+                showTopBar()
+                if (searchController.inputText.value.isEmpty()) {
+                    kotlinx.coroutines.delay(180)
+                    try { searchFocusRequester.requestFocus() } catch (_: Throwable) {}
+                }
+            }
+        }
+
         val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         // 初态顶部避让：状态栏 + 搜索行(44dp) + 分类栏(38dp)
         val initialTopPadding = statusBarHeight + 44.dp + 38.dp
 
+        val hasSearchSourceTabs = isSearchActive && !searchController.showSuggestPage.value && searchController.sourceTabs.value.isNotEmpty()
+        val searchSourceTabsHeight = if (hasSearchSourceTabs) 38.dp else 0.dp
+        val totalSearchTopBarHeight = statusBarHeight + 44.dp + searchSourceTabsHeight
+
         // 滚动感知：搜索栏收起，或者主页网格产生滑动偏移，即激活动态毛玻璃
         val isScrolled by remember {
             derivedStateOf {
+                isSearchActive ||
                 !topBarVisibleState.value ||
                 userCategoryGridState.firstVisibleItemIndex > 0 ||
                 userCategoryGridState.firstVisibleItemScrollOffset > 4
@@ -615,10 +668,11 @@ class HomeFragment : Fragment() {
             label = "home_top_blur_alpha"
         )
 
-        val isAnyDropdownOpen = isAnyDropdownExpanded.value
+        val isAnyDropdownOpen = isAnyDropdownExpanded.value || (isSearchActive && (searchController.isFilterExpandedState.value || searchController.isSourceTabsExpanded.value))
         val topBarBgColor by androidx.compose.animation.animateColorAsState(
             targetValue = when {
                 isAnyDropdownOpen -> colorScheme.surface
+                isSearchActive -> colorScheme.surface
                 isScrolled -> colorScheme.surface.copy(alpha = (if (isDark) 0.82f else 0.86f) * blurAlpha)
                 else -> Color.Transparent
             },
@@ -675,12 +729,29 @@ class HomeFragment : Fragment() {
                         }
                     }
                 }
+
+                // 搜索展开时的全屏 Search View 覆盖层
+                if (isSearchActive) {
+                    HomeSearchView(
+                        controller = searchController,
+                        topBarHeight = totalSearchTopBarHeight,
+                        onOpenVideo = { video ->
+                            val act = activity ?: return@HomeSearchView
+                            val intent = Intent(act, DetailActivity::class.java).apply {
+                                putExtra("id", video.id)
+                                putExtra("sourceKey", video.sourceKey)
+                            }
+                            act.startActivity(intent)
+                        }
+                    )
+                }
             }
 
-            // 2. 遮罩层 (分类展开或筛选展开时的柔和遮罩)
-            val isAnyExpanded = isTabsExpandedState.value || isFilterExpandedState.value
+            // 2. 遮罩层 (分类展开、筛选展开或搜索源下拉时的柔和遮罩)
+            val isSearchScrimVisible = isSearchActive && (searchController.isFilterExpandedState.value || searchController.isSourceTabsExpanded.value)
+            val isNormalScrimVisible = !isSearchActive && (isTabsExpandedState.value || isFilterExpandedState.value)
             androidx.compose.animation.AnimatedVisibility(
-                visible = isAnyExpanded,
+                visible = isNormalScrimVisible || isSearchScrimVisible,
                 enter = fadeIn(tween(200)),
                 exit = fadeOut(tween(180))
             ) {
@@ -692,8 +763,17 @@ class HomeFragment : Fragment() {
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
-                            setTabsExpanded(false)
-                            setFilterExpanded(false)
+                            if (isSearchActive) {
+                                if (searchController.isFilterExpandedState.value) {
+                                    searchController.closeFilterAndApply()
+                                }
+                                if (searchController.isSourceTabsExpanded.value) {
+                                    searchController.isSourceTabsExpanded.value = false
+                                }
+                            } else {
+                                setTabsExpanded(false)
+                                setFilterExpanded(false)
+                            }
                         }
                 )
             }
@@ -743,80 +823,188 @@ class HomeFragment : Fragment() {
                                 .padding(horizontal = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 数据源名称: 点击切源, 长按刷新订阅
-                            Row(
-                                Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.75f))
-                                    .combinedClickable(
-                                        onClick = {
-                                            if (dataInitOk && jarInitOk) {
-                                                showSiteSwitch()
-                                            } else {
-                                                ToastUtils.showShort("数据源未加载，长按刷新或切换订阅")
-                                            }
-                                        },
-                                        onLongClick = { refreshHomeSources() }
-                                    )
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    sourceNameState.value,
-                                    color = colorScheme.onSurface,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Clip,
-                                    modifier = Modifier
-                                        .widthIn(max = 76.dp)
-                                        .basicMarquee(iterations = Int.MAX_VALUE)
-                                )
-                                Icon(
-                                    painterResource(R.drawable.ic_arrow_down),
-                                    contentDescription = "切换数据源",
-                                    tint = colorScheme.onSurfaceVariant,
-                                    modifier = Modifier
-                                        .padding(start = 4.dp)
-                                        .size(13.dp)
-                                )
-                            }
-
-                            // 搜索入口
-                            Box(
-                                Modifier
-                                    .weight(1f)
-                                    .padding(start = 8.dp)
-                                    .height(38.dp)
-                                    .clip(RoundedCornerShape(percent = 50))
-                                    .background(colorScheme.surfaceContainerHigh)
-                                    .clickable {
-                                        val act = activity ?: return@clickable
-                                        act.startActivity(Intent(act, FastSearchActivity::class.java))
-                                    }
+                            // 数据源名称 (常态显示，搜索展开时平滑水平收起)
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = !isSearchActive,
+                                enter = expandHorizontally(
+                                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f)
+                                ) + fadeIn(tween(150)),
+                                exit = shrinkHorizontally(
+                                    animationSpec = spring(dampingRatio = 1f, stiffness = 400f)
+                                ) + fadeOut(tween(150))
                             ) {
                                 Row(
                                     Modifier
-                                        .fillMaxSize()
-                                        .padding(horizontal = 10.dp),
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.75f))
+                                        .combinedClickable(
+                                            onClick = {
+                                                if (dataInitOk && jarInitOk) {
+                                                    showSiteSwitch()
+                                                } else {
+                                                    ToastUtils.showShort("数据源未加载，长按刷新或切换订阅")
+                                                }
+                                            },
+                                            onLongClick = { refreshHomeSources() }
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        painterResource(R.drawable.ic_search_18),
-                                        contentDescription = "搜索",
-                                        tint = colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(Modifier.width(6.dp))
                                     Text(
-                                        "搜索影视",
-                                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                        sourceNameState.value,
+                                        color = colorScheme.onSurface,
                                         fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
                                         softWrap = false,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Clip,
+                                        modifier = Modifier
+                                            .widthIn(max = 76.dp)
+                                            .basicMarquee(iterations = Int.MAX_VALUE)
                                     )
+                                    Icon(
+                                        painterResource(R.drawable.ic_arrow_down),
+                                        contentDescription = "切换数据源",
+                                        tint = colorScheme.onSurfaceVariant,
+                                        modifier = Modifier
+                                            .padding(start = 4.dp)
+                                            .size(13.dp)
+                                    )
+                                }
+                            }
+
+                            // 搜索栏 (常态为胶囊，聚焦时向两侧变宽展开为全宽搜索栏)
+                            val searchPaddingStart by animateDpAsState(
+                                targetValue = if (isSearchActive) 0.dp else 8.dp,
+                                animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+                                label = "home_search_padding_start"
+                            )
+
+                            Surface(
+                                shape = RoundedCornerShape(percent = 50),
+                                color = colorScheme.surfaceContainerHigh,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = searchPaddingStart)
+                                    .height(38.dp)
+                            ) {
+                                if (!isSearchActive) {
+                                    Row(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .clickable { searchController.openSearch() }
+                                            .padding(horizontal = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            painterResource(R.drawable.ic_search_18),
+                                            contentDescription = "搜索",
+                                            tint = colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            "搜索影视",
+                                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                            fontSize = 13.sp,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                } else {
+                                    Row(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .padding(start = 2.dp, end = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        IconButton(
+                                            onClick = { searchController.handleBack() },
+                                            modifier = Modifier.size(34.dp)
+                                        ) {
+                                            Icon(
+                                                painterResource(R.drawable.ic_arrow_back),
+                                                contentDescription = "返回",
+                                                tint = colorScheme.onSurface,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+
+                                        BasicTextField(
+                                            value = searchController.inputText.value,
+                                            onValueChange = { newText ->
+                                                searchController.inputText.value = newText
+                                                if (newText.isEmpty()) {
+                                                    searchController.suggestWords.value = emptyList()
+                                                    searchController.showSuggestPage.value = true
+                                                } else {
+                                                    searchController.getSuggest(newText)
+                                                }
+                                            },
+                                            singleLine = true,
+                                            textStyle = TextStyle(
+                                                color = colorScheme.onSurface,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Normal
+                                            ),
+                                            cursorBrush = SolidColor(colorScheme.primary),
+                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                            keyboardActions = KeyboardActions(onSearch = {
+                                                searchController.search(searchController.inputText.value)
+                                            }),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .focusRequester(searchFocusRequester),
+                                            decorationBox = { innerTextField ->
+                                                Box(contentAlignment = Alignment.CenterStart) {
+                                                    if (searchController.inputText.value.isEmpty()) {
+                                                        Text(
+                                                            "搜索电影、电视剧、综艺…",
+                                                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                                                            fontSize = 13.sp,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                    innerTextField()
+                                                }
+                                            }
+                                        )
+
+                                        if (searchController.inputText.value.isNotEmpty()) {
+                                            IconButton(
+                                                onClick = {
+                                                    searchController.inputText.value = ""
+                                                    searchController.suggestWords.value = emptyList()
+                                                    searchController.showSuggestPage.value = true
+                                                    searchController.initHistorySearch()
+                                                },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    painterResource(R.drawable.ic_clear),
+                                                    contentDescription = "清空输入",
+                                                    tint = colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                searchController.search(searchController.inputText.value)
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                painterResource(R.drawable.ic_search_18),
+                                                contentDescription = "搜索",
+                                                tint = colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
@@ -825,7 +1013,7 @@ class HomeFragment : Fragment() {
                                 hasCurrentCategoryFilters()
                             }
                             AnimatedVisibility(
-                                visible = hasFilters,
+                                visible = !isSearchActive && hasFilters,
                                 enter = expandHorizontally(
                                     animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
                                     expandFrom = Alignment.End
@@ -892,67 +1080,172 @@ class HomeFragment : Fragment() {
                             }
 
                             // 观看历史入口
-                            Box(
-                                Modifier
-                                    .padding(start = 8.dp)
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(percent = 50))
-                                    .background(colorScheme.surfaceContainerHigh)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null
-                                    ) {
-                                        val act = activity ?: return@clickable
-                                        act.startActivity(Intent(act, HistoryActivity::class.java))
-                                    },
-                                contentAlignment = Alignment.Center
+                            AnimatedVisibility(
+                                visible = !isSearchActive,
+                                enter = expandHorizontally(
+                                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+                                    expandFrom = Alignment.End
+                                ) + fadeIn(tween(150)),
+                                exit = shrinkHorizontally(
+                                    animationSpec = spring(dampingRatio = 1f, stiffness = 400f),
+                                    shrinkTowards = Alignment.End
+                                ) + fadeOut(tween(150))
                             ) {
-                                Icon(
-                                    painterResource(R.drawable.ic_history_18),
-                                    contentDescription = "观看历史",
-                                    tint = colorScheme.onSurface,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Box(
+                                    Modifier
+                                        .padding(start = 8.dp)
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(percent = 50))
+                                        .background(colorScheme.surfaceContainerHigh)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) {
+                                            val act = activity ?: return@clickable
+                                            act.startActivity(Intent(act, HistoryActivity::class.java))
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_history_18),
+                                        contentDescription = "观看历史",
+                                        tint = colorScheme.onSurface,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            // 搜索激活态下的【搜索源配置】入口
+                            AnimatedVisibility(
+                                visible = isSearchActive,
+                                enter = expandHorizontally(
+                                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+                                    expandFrom = Alignment.End
+                                ) + scaleIn(
+                                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+                                    initialScale = 0.8f
+                                ) + fadeIn(tween(180)),
+                                exit = shrinkHorizontally(
+                                    animationSpec = spring(dampingRatio = 1f, stiffness = 400f),
+                                    shrinkTowards = Alignment.End
+                                ) + scaleOut(
+                                    animationSpec = tween(150),
+                                    targetScale = 0.8f
+                                ) + fadeOut(tween(150))
+                            ) {
+                                val isFilterOpen = searchController.isFilterExpandedState.value
+                                val allSearchable = searchController.allSearchableSources
+                                val isFilterActive = searchController.checkedKeysState.value.size < allSearchable.size && searchController.checkedKeysState.value.isNotEmpty()
+
+                                val btnBg = if (isFilterOpen) {
+                                    colorScheme.primary
+                                } else if (isFilterActive) {
+                                    colorScheme.primaryContainer
+                                } else {
+                                    colorScheme.surfaceContainerHigh
+                                }
+
+                                val iconTint = if (isFilterOpen) {
+                                    colorScheme.onPrimary
+                                } else if (isFilterActive) {
+                                    colorScheme.onPrimaryContainer
+                                } else {
+                                    colorScheme.onSurface
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .padding(start = 8.dp)
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(btnBg)
+                                        .clickable {
+                                            if (isFilterOpen) {
+                                                searchController.closeFilterAndApply()
+                                            } else {
+                                                searchController.isFilterExpandedState.value = true
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_filter_list),
+                                        contentDescription = "搜索源配置",
+                                        tint = iconTint,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    if (isFilterActive && !isFilterOpen) {
+                                        Box(
+                                            Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(top = 4.dp, end = 4.dp)
+                                                .size(6.dp)
+                                                .background(colorScheme.primary, CircleShape)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
 
-                    // 常驻分类栏 (HomeCategoryBar)
-                    HomeCategoryBar(
-                        categories = categoriesState.value,
-                        selectedIndex = selectedTabState.intValue,
-                        onTabSelected = { pos ->
-                            selectedTabState.intValue = pos
-                            setTabsExpanded(false)
-                            setFilterExpanded(false)
-                            coroutineScope.launch {
-                                isProgrammaticScroll = true
-                                try {
-                                    categoryPagerState.animateScrollToPage(pos)
-                                } finally {
-                                    isProgrammaticScroll = false
+                    // 常驻分类栏 (未激活搜索时显示首页分类，激活搜索且在结果页时显示搜索源分类)
+                    if (!isSearchActive) {
+                        HomeCategoryBar(
+                            categories = categoriesState.value,
+                            selectedIndex = selectedTabState.intValue,
+                            onTabSelected = { pos ->
+                                selectedTabState.intValue = pos
+                                setTabsExpanded(false)
+                                setFilterExpanded(false)
+                                coroutineScope.launch {
+                                    isProgrammaticScroll = true
+                                    try {
+                                        categoryPagerState.animateScrollToPage(pos)
+                                    } finally {
+                                        isProgrammaticScroll = false
+                                    }
                                 }
-                            }
-                        },
-                        onTabDoubleClicked = { pos ->
-                            scrollJob?.cancel()
-                            scrollJob = coroutineScope.launch {
-                                val sortData = mDisplaySortList.getOrNull(pos) ?: return@launch
-                                if (sortData.id == "my0") {
-                                    userCategoryGridState.smoothScrollToTop()
-                                } else {
-                                    gridControllers[sortData.id]?.gridScrollState?.smoothScrollToTop()
+                            },
+                            onTabDoubleClicked = { pos ->
+                                scrollJob?.cancel()
+                                scrollJob = coroutineScope.launch {
+                                    val sortData = mDisplaySortList.getOrNull(pos) ?: return@launch
+                                    if (sortData.id == "my0") {
+                                        userCategoryGridState.smoothScrollToTop()
+                                    } else {
+                                        gridControllers[sortData.id]?.gridScrollState?.smoothScrollToTop()
+                                    }
                                 }
+                            },
+                            material = materialState.value,
+                            isExpanded = isTabsExpandedState.value,
+                            onExpandChanged = { expanded ->
+                                setTabsExpanded(expanded)
+                            },
+                            pagerState = categoryPagerState,
+                            isProgrammaticScroll = isProgrammaticScroll
+                        )
+                    } else if (!searchController.showSuggestPage.value && searchController.sourceTabs.value.isNotEmpty()) {
+                        val tabNames = searchController.sourceTabs.value.map { it.first }
+                        val currentTabIdx = searchController.sourceTabs.value.indexOfFirst { it.second == searchController.selectedTabKey.value }.coerceAtLeast(0)
+                        HomeCategoryBar(
+                            categories = tabNames,
+                            selectedIndex = currentTabIdx,
+                            onTabSelected = { idx ->
+                                if (idx in searchController.sourceTabs.value.indices) {
+                                    val item = searchController.sourceTabs.value[idx]
+                                    searchController.selectedTabKey.value = item.second
+                                    searchController.searchFilterKey = item.second
+                                }
+                            },
+                            material = materialState.value,
+                            isExpanded = searchController.isSourceTabsExpanded.value,
+                            onExpandChanged = { expanded ->
+                                searchController.isSourceTabsExpanded.value = expanded
+                                if (expanded) searchController.isFilterExpandedState.value = false
                             }
-                        },
-                        material = materialState.value,
-                        isExpanded = isTabsExpandedState.value,
-                        onExpandChanged = { expanded ->
-                            setTabsExpanded(expanded)
-                        },
-                        pagerState = categoryPagerState,
-                        isProgrammaticScroll = isProgrammaticScroll
-                    )
+                        )
+                    }
                 }
 
                 // 底部柔和扩散淡阴影
@@ -978,7 +1271,7 @@ class HomeFragment : Fragment() {
             // 4. 顶部分类高级筛选下拉面板 (悬浮在毛玻璃外壳与遮罩之上)
             val filterTopOffset = statusBarHeight + (if (topBarVisibleState.value) 44.dp else 0.dp) + 38.dp
             androidx.compose.animation.AnimatedVisibility(
-                visible = isFilterExpandedState.value,
+                visible = !isSearchActive && isFilterExpandedState.value,
                 enter = expandVertically(
                     animationSpec = spring(
                         dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
@@ -1008,6 +1301,46 @@ class HomeFragment : Fragment() {
                         }
                     )
                 }
+            }
+
+            // 5. 顶部搜索源配置下拉面板 (当搜索展开且点击搜索源配置按钮时显示)
+            val searchFilterTopOffset = statusBarHeight + 44.dp
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isSearchActive && searchController.isFilterExpandedState.value,
+                enter = expandVertically(
+                    animationSpec = spring(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
+                ) + fadeIn(tween(180)),
+                exit = shrinkVertically(
+                    animationSpec = spring(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
+                ) + fadeOut(tween(150)),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = searchFilterTopOffset)
+            ) {
+                HomeSearchSourceFilterPanel(
+                    allSources = searchController.allSearchableSources,
+                    checkedKeys = searchController.checkedKeysState.value,
+                    onToggleKey = { key ->
+                        val set = searchController.checkedKeysState.value.toMutableSet()
+                        if (set.contains(key)) set.remove(key) else set.add(key)
+                        searchController.checkedKeysState.value = set
+                    },
+                    onSelectAll = {
+                        searchController.checkedKeysState.value = searchController.allSearchableSources.map { it.key }.toSet()
+                    },
+                    onClearAll = {
+                        searchController.checkedKeysState.value = emptySet()
+                    },
+                    onClose = {
+                        searchController.closeFilterAndApply()
+                    }
+                )
             }
         }
     }

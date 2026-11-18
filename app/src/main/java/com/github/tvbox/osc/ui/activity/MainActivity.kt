@@ -222,7 +222,7 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                 HorizontalPager(
                     state = pagerState,
                     beyondViewportPageCount = 2,
-                    userScrollEnabled = !homeFragment.isAnyDropdownExpanded.value,
+                    userScrollEnabled = !homeFragment.isAnyDropdownExpanded.value && !homeFragment.isSearchActive.value,
                     modifier = Modifier.fillMaxSize()
                 ) { pageIndex ->
                     when (pageIndex) {
@@ -253,32 +253,44 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
             // 2. 底栏
             val scrollFraction = pagerState.currentPage + pagerState.currentPageOffsetFraction
 
-            LiquidBottomBar(
-                selectedIndex = pagerState.currentPage,
-                onTabSelected = { index ->
-                    if (index != 1 && currentTabState.intValue == 1) {
-                        liveFragment.userVisibleHint = false
-                    }
-                    currentTabState.intValue = index
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(index)
-                    }
-                },
-                floating = floating,
-                showLabels = showLabelsState.value,
-                material = materialState.value,
-                navInsetBottom = navInsetDp,
-                pageScrollFraction = scrollFraction,
-                backdrop = backdrop,
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !homeFragment.isSearchActive.value,
+                enter = androidx.compose.animation.slideInVertically(
+                    animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 400f),
+                    initialOffsetY = { it }
+                ) + androidx.compose.animation.fadeIn(tween(150)),
+                exit = androidx.compose.animation.slideOutVertically(
+                    animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.95f, stiffness = 400f),
+                    targetOffsetY = { it }
+                ) + androidx.compose.animation.fadeOut(tween(150)),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .offset(y = barOffsetY)
-            )
+            ) {
+                LiquidBottomBar(
+                    selectedIndex = pagerState.currentPage,
+                    onTabSelected = { index ->
+                        if (index != 1 && currentTabState.intValue == 1) {
+                            liveFragment.userVisibleHint = false
+                        }
+                        currentTabState.intValue = index
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(index)
+                        }
+                    },
+                    floating = floating,
+                    showLabels = showLabelsState.value,
+                    material = materialState.value,
+                    navInsetBottom = navInsetDp,
+                    pageScrollFraction = scrollFraction,
+                    backdrop = backdrop
+                )
+            }
 
             // 3. 「上次观看」悬浮条
             Box(Modifier.matchParentSize()) {
                 LastViewedTip(
-                    tip = lastViewedTipState.value.takeIf { currentTabState.intValue == 0 },
+                    tip = lastViewedTipState.value.takeIf { currentTabState.intValue == 0 && !homeFragment.isSearchActive.value },
                     material = materialState.value,
                     backdrop = backdrop,
                     onDismiss = { lastViewedTipState.value = null },
@@ -370,6 +382,9 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>(), BarAutoHide.ScrollBa
                 return
             }
             goToTab(0)
+            return
+        }
+        if (homeFragment.handleSearchBack()) {
             return
         }
         if (homeFragment.collapseTabsIfExpanded()) {
