@@ -874,13 +874,6 @@ fun MaterialExpressiveBottomTabs(
                     .fillMaxSize()
                     .background(solidBarColor, barShape)
             )
-            // 贴底顶部 0.75dp 柔和 M3 分割线
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(0.75.dp)
-                    .background(colorScheme.outlineVariant.copy(alpha = 0.35f))
-            )
         }
 
         // 2. M3 Expressive 指示胶囊 (在内容下方, 仅包裹 32dp 图标区域, 绝不遮挡文字)
