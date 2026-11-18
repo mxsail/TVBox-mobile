@@ -866,7 +866,6 @@ fun MaterialExpressiveBottomTabs(
                         ambientColor = colorScheme.outline.copy(alpha = 0.1f)
                     )
                     .background(solidBarColor, barShape)
-                    .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.35f), barShape)
             )
         } else {
             Box(

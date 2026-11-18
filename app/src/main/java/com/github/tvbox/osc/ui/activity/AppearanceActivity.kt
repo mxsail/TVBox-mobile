@@ -814,10 +814,6 @@ class AppearanceActivity : BaseActivity() {
                 }
                 Modifier
                     .background(solid, shape)
-                    .then(
-                        if (floating) Modifier.border(0.75.dp, colorScheme.outlineVariant.copy(alpha = 0.4f), shape)
-                        else Modifier
-                    )
             }
             else -> { // MATERIAL_LIQUID
                 val liquidBg = if (dark) Color(0x55323444) else Color(0x88FFFFFF)
