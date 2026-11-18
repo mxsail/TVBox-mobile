@@ -876,7 +876,10 @@ class HomeFragment : Fragment() {
                             // 搜索栏 (常态为胶囊，聚焦时向两侧变宽展开为全宽搜索栏)
                             val searchPaddingStart by animateDpAsState(
                                 targetValue = if (isSearchActive) 0.dp else 8.dp,
-                                animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+                                animationSpec = spring(
+                                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                                    stiffness = 400f
+                                ),
                                 label = "home_search_padding_start"
                             )
 
@@ -885,7 +888,7 @@ class HomeFragment : Fragment() {
                                 color = colorScheme.surfaceContainerHigh,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .padding(start = searchPaddingStart)
+                                    .padding(start = searchPaddingStart.coerceAtLeast(0.dp))
                                     .height(38.dp)
                             ) {
                                 if (!isSearchActive) {
