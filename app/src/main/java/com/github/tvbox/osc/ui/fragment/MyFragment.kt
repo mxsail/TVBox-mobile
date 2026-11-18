@@ -375,15 +375,14 @@ class MyFragment : Fragment() {
 
     @Composable
     private fun HistoryCard(currentActivity: android.app.Activity?, onGoToTab: ((Int) -> Unit)?) {
-        val isDark = isAppDarkTheme()
         val items = historyItems.value
         GroupCard {
             Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                // 头部: 标题 + 数量徽章 + 右侧「全部 >」胶囊
+                // 头部: 标题 + 右侧「全部 >」图标按钮
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -392,48 +391,17 @@ class MyFragment : Fragment() {
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    if (!items.isNullOrEmpty()) {
-                        Spacer(Modifier.width(6.dp))
-                        Surface(
-                            shape = CircleShape,
-                            color = colorScheme.surfaceContainerHigh
-                        ) {
-                            Text(
-                                "${items.size}",
-                                color = colorScheme.primary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
                     Spacer(Modifier.weight(1f))
-                    // 全部胶囊
-                    Surface(
-                        shape = CircleShape,
-                        color = if (isDark) colorScheme.surfaceContainerHigh else colorScheme.surfaceContainerLow,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .clickable { jumpActivity(currentActivity, HistoryActivity::class.java) }
+                    IconButton(
+                        onClick = { jumpActivity(currentActivity, HistoryActivity::class.java) },
+                        modifier = Modifier.size(28.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                "全部",
-                                color = colorScheme.onSurfaceVariant,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Spacer(Modifier.width(2.dp))
-                            Icon(
-                                painterResource(R.drawable.ic_chevron_right),
-                                contentDescription = "查看全部",
-                                tint = colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
+                        Icon(
+                            painterResource(R.drawable.ic_chevron_right),
+                            contentDescription = "查看全部",
+                            tint = colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
 

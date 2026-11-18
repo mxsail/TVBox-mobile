@@ -240,7 +240,7 @@ private fun LiveEpgBar(fragment: LiveFragment, uiState: LiveUiState) {
                         painterResource(R.drawable.ic_cast),
                         contentDescription = "投屏",
                         tint = colorScheme.onSurface,
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
@@ -254,7 +254,7 @@ private fun LiveEpgBar(fragment: LiveFragment, uiState: LiveUiState) {
                     modifier = Modifier.size(34.dp)
                 ) {
                     Icon(
-                        painterResource(R.drawable.ic_m3_fullscreen),
+                        painterResource(R.drawable.ic_fullscreen),
                         contentDescription = "全屏",
                         tint = colorScheme.onSurface,
                         modifier = Modifier.size(20.dp)

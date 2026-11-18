@@ -986,7 +986,7 @@ class HomeFragment : Fragment() {
                                                 modifier = Modifier.size(28.dp)
                                             ) {
                                                 Icon(
-                                                    painterResource(R.drawable.ic_clear),
+                                                    painterResource(R.drawable.ic_close_24),
                                                     contentDescription = "清空输入",
                                                     tint = colorScheme.onSurfaceVariant,
                                                     modifier = Modifier.size(16.dp)

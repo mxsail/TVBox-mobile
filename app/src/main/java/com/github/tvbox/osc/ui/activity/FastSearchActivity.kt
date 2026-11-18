@@ -855,7 +855,7 @@ class FastSearchActivity : BaseActivity() {
                                         modifier = Modifier.size(28.dp)
                                     ) {
                                         Icon(
-                                            painterResource(R.drawable.ic_clear),
+                                            painterResource(R.drawable.ic_close_24),
                                             contentDescription = "清空输入",
                                             tint = colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(16.dp)
@@ -1255,22 +1255,15 @@ class FastSearchActivity : BaseActivity() {
                                     .clip(CircleShape)
                                     .clickable { onToggleHistoryDeleteMode(true) }
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.size(28.dp)
                                 ) {
                                     Icon(
                                         painterResource(R.drawable.ic_delete_outline_24),
                                         contentDescription = "管理历史",
                                         tint = colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(Modifier.width(3.dp))
-                                    Text(
-                                        "删除",
-                                        color = colorScheme.onSurfaceVariant,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
+                                        modifier = Modifier.size(15.dp)
                                     )
                                 }
                             }
@@ -1374,7 +1367,7 @@ class FastSearchActivity : BaseActivity() {
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
-                                                    painterResource(R.drawable.ic_clear),
+                                                    painterResource(R.drawable.ic_close_24),
                                                     contentDescription = "删除记录",
                                                     tint = colorScheme.onSurfaceVariant,
                                                     modifier = Modifier.size(11.dp)
@@ -1388,10 +1381,10 @@ class FastSearchActivity : BaseActivity() {
                     }
                 }
 
-                // 全网热门搜索
+                // 热门搜索
                 if (hotWords.value.isNotEmpty()) {
                     Text(
-                        "全网热门搜索",
+                        "热门搜索",
                         color = colorScheme.onSurface,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
